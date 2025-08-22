@@ -189,7 +189,7 @@ class SyntheticDataGenerator:
         
         return {
             "patient_id": patient_id,
-            "year": year,
+            "year": int(year),
             "sex": state["sex"],
             "region": state["region"],
             "occupation": state["occupation"],
