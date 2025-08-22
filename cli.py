@@ -8,9 +8,30 @@ logger = logging.getLogger(__name__)
 app = typer.Typer()
 
 @app.command()
-def data_gen():
-    """Generate synthetic data for the project"""
-    logger.info("not implemented yet")
+def data_gen(
+    n_patients: int = typer.Option(..., "--n-patients", help="Number of patients to generate"),
+    years: str = typer.Option(..., "--years", help="Years to generate data for (comma-separated)"),
+    rows: int = typer.Option(None, "--rows", help="Total target rows (overrides n-patients)"),
+    positive_rate: float = typer.Option(0.07, "--positive-rate", help="Target positive diagnosis rate"),
+    rows_per_chunk: int = typer.Option(100_000, "--rows-per-chunk", help="Rows per chunk for memory efficiency"),
+    out: str = typer.Option("data/raw", "--out", help="Output directory"),
+    seed: int = typer.Option(0, "--seed", help="Random seed for reproducibility"),
+):
+    """Generate synthetic patient-year data with realistic features"""
+    from src.data_gen import generate
+    
+    # Parse years string to list of integers
+    years_list = [int(y.strip()) for y in years.split(",")]
+    
+    generate(
+        n_patients=n_patients,
+        years=years_list,
+        rows=rows,
+        positive_rate=positive_rate,
+        rows_per_chunk=rows_per_chunk,
+        out=out,
+        seed=seed,
+    )
 
 @app.command()
 def preprocess():
