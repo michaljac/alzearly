@@ -34,22 +34,9 @@ def data_gen(
     )
 
 @app.command()
-def preprocess(
-    input_dir: str = typer.Option("data/raw", "--input-dir", help="Input directory with partitioned Parquet data"),
-    output_dir: str = typer.Option("data/featurized", "--output-dir", help="Output directory for featurized data"),
-    rolling_window_years: int = typer.Option(3, "--rolling-window", help="Number of years for rolling features"),
-    chunk_size: int = typer.Option(100_000, "--chunk-size", help="Chunk size for processing"),
-    seed: int = typer.Option(42, "--seed", help="Random seed for reproducibility"),
-):
-    """Preprocess patient-year data with rolling features using Polars Lazy"""
-    from src.preprocess import preprocess
-    preprocess(
-        input_dir=input_dir,
-        output_dir=output_dir,
-        rolling_window_years=rolling_window_years,
-        chunk_size=chunk_size,
-        seed=seed,
-    )
+def preprocess():
+    """Preprocess the data"""
+    logger.info("not implemented yet")
 
 @app.command()
 def train():
