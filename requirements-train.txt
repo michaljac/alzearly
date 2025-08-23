@@ -8,3 +8,6 @@ imbalanced-learn
 wandb
 typer
 faker
+optuna
+matplotlib
+seaborn

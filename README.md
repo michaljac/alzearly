@@ -31,13 +31,20 @@ This project implements a complete ML pipeline for Alzheimer's disease predictio
 
 ### 1. Installation
 
+**Choose the appropriate requirements file based on your needs:**
+- `requirements-train.txt` - Full development environment (data generation, preprocessing, training)
+- `requirements-serve.txt` - Lightweight serving environment (model inference only)
+
 ```bash
 # Clone the repository
 git clone <repository-url>
 cd alzheimers-prediction
 
-# Install dependencies
-pip install -r requirements.txt
+# Install dependencies for training (includes all packages)
+pip install -r requirements-train.txt
+
+# Or install dependencies for serving only
+pip install -r requirements-serve.txt
 ```
 
 ### 2. Generate Data
@@ -188,7 +195,8 @@ alzheimers-prediction/
 ├── results/                   # Training results
 ├── logs/                      # Log files
 ├── cli.py                     # Command-line interface
-├── requirements.txt           # Dependencies
+├── requirements-train.txt     # Training dependencies
+├── requirements-serve.txt     # Serving dependencies
 └── README.md                  # This file
 ```
 
@@ -322,23 +330,5 @@ python cli.py train --model-type xgboost --n-trials 200
 - [ ] **Caching**: Redis caching for frequently accessed data
 - [ ] **Parallel processing**: Multi-core feature engineering
 
-## 🤝 Contributing
-
-1. Fork the repository
-2. Create a feature branch
-3. Make your changes
-4. Add tests if applicable
-5. Update documentation
-6. Submit a pull request
-
-## 📄 License
-
-This project is licensed under the MIT License - see the LICENSE file for details.
-
-## 📞 Support
-
-For questions and support, please open an issue on GitHub or contact the development team.
-
----
 
 **Note**: This project uses synthetic data for demonstration purposes. For real clinical applications, ensure compliance with relevant healthcare data regulations and privacy requirements.

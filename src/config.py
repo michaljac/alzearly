@@ -5,7 +5,7 @@ Loads and validates configuration from YAML files.
 
 import logging
 from pathlib import Path
-from typing import Any, Dict, Optional
+from typing import Any, Dict, Optional, List
 import yaml
 from dataclasses import dataclass, field
 
@@ -42,24 +42,56 @@ class PreprocessConfig:
 @dataclass
 class ModelConfig:
     """Configuration for model training."""
-    model_type: str = "xgboost"
-    model_name: str = "alzheimers_predictor"
-    test_size: float = 0.2
-    validation_size: float = 0.2
-    seed: int = 42
-    cv_folds: int = 5
-    stratified: bool = True
-    feature_selection_enabled: bool = True
-    feature_selection_method: str = "mutual_info"
-    n_features: int = 50
-    hyperparameter_tuning_enabled: bool = True
-    hyperparameter_tuning_method: str = "bayesian"
-    n_trials: int = 100
-    primary_metric: str = "roc_auc"
+    # Data configuration
     input_dir: str = "data/featurized"
     target_column: str = "alzheimers_diagnosis"
-    model_dir: str = "models"
-    results_dir: str = "results"
+    exclude_columns: List[str] = field(default_factory=lambda: ["patient_id", "year"])
+    
+    # Split configuration
+    test_size: float = 0.2
+    val_size: float = 0.2  # from training set
+    random_state: int = 42
+    stratify: bool = True
+    
+    # Feature selection
+    max_features: int = 150
+    variance_threshold: float = 0.01
+    
+    # Class imbalance
+    handle_imbalance: str = "class_weight"  # "class_weight", "smote", "none"
+    
+    # Model configuration
+    models: List[str] = field(default_factory=lambda: ["logistic_regression", "xgboost"])
+    
+    # Hyperparameter tuning
+    enable_hyperparameter_tuning: bool = False
+    n_trials: int = 50
+    
+    # XGBoost parameters
+    xgb_params: Dict[str, Any] = field(default_factory=lambda: {
+        "n_estimators": 100,
+        "max_depth": 6,
+        "learning_rate": 0.1,
+        "subsample": 0.8,
+        "colsample_bytree": 0.8,
+        "random_state": 42,
+        "eval_metric": "logloss"
+    })
+    
+    # Logistic Regression parameters
+    lr_params: Dict[str, Any] = field(default_factory=lambda: {
+        "random_state": 42,
+        "max_iter": 1000
+    })
+    
+    # Output configuration
+    output_dir: str = "models"
+    save_metadata: bool = True
+    
+    # Wandb configuration
+    wandb_project: str = "alzheimers-prediction"
+    wandb_entity: Optional[str] = None
+    log_artifacts: bool = True
 
 
 class ConfigLoader:
@@ -173,64 +205,64 @@ class ConfigLoader:
         """Load model training configuration."""
         config = self.load_yaml(filename)
         
-        # Extract model configuration
-        model = config.get("model", {})
-        model_type = model.get("type", "xgboost")
-        model_name = model.get("name", "alzheimers_predictor")
+        # Load flat structure (new format)
+        input_dir = config.get("input_dir", "data/featurized")
+        target_column = config.get("target_column", "alzheimers_diagnosis")
+        exclude_columns = config.get("exclude_columns", ["patient_id", "year"])
         
-        # Extract training configuration
-        training = config.get("training", {})
-        test_size = training.get("test_size", 0.2)
-        validation_size = training.get("validation_size", 0.2)
-        seed = training.get("seed", 42)
-        cv_folds = training.get("cv_folds", 5)
-        stratified = training.get("stratified", True)
+        test_size = config.get("test_size", 0.2)
+        val_size = config.get("val_size", 0.2)
+        random_state = config.get("random_state", 42)
+        stratify = config.get("stratify", True)
         
-        # Extract feature selection configuration
-        feature_selection = config.get("feature_selection", {})
-        feature_selection_enabled = feature_selection.get("enabled", True)
-        feature_selection_method = feature_selection.get("method", "mutual_info")
-        n_features = feature_selection.get("n_features", 50)
+        max_features = config.get("max_features", 150)
+        variance_threshold = config.get("variance_threshold", 0.01)
         
-        # Extract hyperparameter tuning configuration
-        hyperparameter_tuning = config.get("hyperparameter_tuning", {})
-        hyperparameter_tuning_enabled = hyperparameter_tuning.get("enabled", True)
-        hyperparameter_tuning_method = hyperparameter_tuning.get("method", "bayesian")
-        n_trials = hyperparameter_tuning.get("n_trials", 100)
+        handle_imbalance = config.get("handle_imbalance", "class_weight")
         
-        # Extract evaluation configuration
-        evaluation = config.get("evaluation", {})
-        primary_metric = evaluation.get("primary_metric", "roc_auc")
+        models = config.get("models", ["logistic_regression", "xgboost"])
         
-        # Extract data configuration
-        data = config.get("data", {})
-        input_dir = data.get("input_dir", "data/featurized")
-        target_column = data.get("target_column", "alzheimers_diagnosis")
+        # Hyperparameter tuning
+        enable_hyperparameter_tuning = config.get("enable_hyperparameter_tuning", False)
+        n_trials = config.get("n_trials", 50)
         
-        # Extract output configuration
-        output = config.get("output", {})
-        model_dir = output.get("model_dir", "models")
-        results_dir = output.get("results_dir", "results")
+        # XGBoost parameters
+        xgb_params = config.get("xgb_params", {})
+        
+        # Logistic Regression parameters
+        lr_params = config.get("lr_params", {
+            "random_state": random_state,
+            "max_iter": 1000
+        })
+        
+        output_dir = config.get("output_dir", "models")
+        save_metadata = config.get("save_metadata", True)
+        
+        wandb_project = config.get("wandb_project", "alzheimers-prediction")
+        wandb_entity = config.get("wandb_entity", None)
+        log_artifacts = config.get("log_artifacts", True)
         
         return ModelConfig(
-            model_type=model_type,
-            model_name=model_name,
-            test_size=test_size,
-            validation_size=validation_size,
-            seed=seed,
-            cv_folds=cv_folds,
-            stratified=stratified,
-            feature_selection_enabled=feature_selection_enabled,
-            feature_selection_method=feature_selection_method,
-            n_features=n_features,
-            hyperparameter_tuning_enabled=hyperparameter_tuning_enabled,
-            hyperparameter_tuning_method=hyperparameter_tuning_method,
-            n_trials=n_trials,
-            primary_metric=primary_metric,
             input_dir=input_dir,
             target_column=target_column,
-            model_dir=model_dir,
-            results_dir=results_dir
+            exclude_columns=exclude_columns,
+            test_size=test_size,
+            val_size=val_size,
+            random_state=random_state,
+            stratify=stratify,
+            max_features=max_features,
+            variance_threshold=variance_threshold,
+            handle_imbalance=handle_imbalance,
+            models=models,
+            enable_hyperparameter_tuning=enable_hyperparameter_tuning,
+            n_trials=n_trials,
+            xgb_params=xgb_params,
+            lr_params=lr_params,
+            output_dir=output_dir,
+            save_metadata=save_metadata,
+            wandb_project=wandb_project,
+            wandb_entity=wandb_entity,
+            log_artifacts=log_artifacts
         )
 
 

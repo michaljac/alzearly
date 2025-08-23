@@ -50,9 +50,27 @@ def preprocess(
     )
 
 @app.command()
-def train():
-    """Train the ML model"""
-    logger.info("not implemented yet")
+def train(
+    config_file: str = typer.Option("config/model.yaml", "--config", help="Configuration file path"),
+    input_dir: str = typer.Option(None, "--input-dir", "--in", help="Override input directory from config"),
+    output_dir: str = typer.Option(None, "--output-dir", "--artifacts", help="Override output directory from config"),
+    max_features: int = typer.Option(None, "--max-features", help="Override max features from config"),
+    handle_imbalance: str = typer.Option(None, "--handle-imbalance", help="Override imbalance handling from config"),
+    wandb_project: str = typer.Option(None, "--wandb-project", help="Override wandb project from config"),
+    wandb_entity: str = typer.Option(None, "--wandb-entity", help="Override wandb entity from config"),
+):
+    """Train machine learning models for Alzheimer's prediction"""
+    from src.train import train as train_models
+    
+    train_models(
+        config_file=config_file,
+        input_dir=input_dir,
+        output_dir=output_dir,
+        max_features=max_features,
+        handle_imbalance=handle_imbalance,
+        wandb_project=wandb_project,
+        wandb_entity=wandb_entity,
+    )
 
 @app.command()
 def evaluate():

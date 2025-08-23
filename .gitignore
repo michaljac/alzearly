@@ -6,3 +6,6 @@ artifacts/
 mlruns/
 *.parquet
 *.pkl
+models/
+wandb/
+demo_wandb_graphs.py
