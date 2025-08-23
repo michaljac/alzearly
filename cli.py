@@ -73,9 +73,15 @@ def train(
     )
 
 @app.command()
-def evaluate():
-    """Evaluate the trained model"""
-    logger.info("not implemented yet")
+def evaluate(
+    model_path: str = typer.Argument(..., help="Path to trained model (.pkl)"),
+    data_path: str = typer.Argument(..., help="Path to evaluation data"),
+    output_dir: str = typer.Option("artifacts", "--output", help="Output directory for results"),
+):
+    """Evaluate a trained model with comprehensive metrics"""
+    from src.evaluate import evaluate_model
+    
+    evaluate_model(model_path=model_path, data_path=data_path, output_dir=output_dir)
 
 @app.command()
 def serve_dev():

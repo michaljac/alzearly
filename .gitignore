@@ -9,3 +9,4 @@ mlruns/
 models/
 wandb/
 demo_wandb_graphs.py
+plots/
