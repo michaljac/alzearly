@@ -19,21 +19,14 @@ import pyarrow.dataset as ds  # for partitioned write
 logger = logging.getLogger(__name__)
 
 
-@dataclass
-class PreprocessConfig:
-    """Configuration for data preprocessing."""
-    input_dir: str = "data/raw"
-    output_dir: str = "data/featurized"
-    rolling_window_years: int = 3
-    numeric_columns: Optional[List[str]] = None
-    chunk_size: int = 100_000
-    seed: int = 42
+# Import the config loader
+from src.config import PreprocessConfig as ConfigPreprocessConfig
 
 
 class DataPreprocessor:
     """Preprocesses patient-year data with rolling features using Polars Lazy."""
 
-    def __init__(self, config: PreprocessConfig):
+    def __init__(self, config: ConfigPreprocessConfig):
         self.config = config
 
         # Default numeric columns for feature engineering
@@ -44,6 +37,9 @@ class DataPreprocessor:
                 "triglycerides", "creatinine", "hemoglobin", "white_blood_cells",
                 "platelets", "num_encounters", "num_medications", "num_lab_tests"
             ]
+            
+        # Target variable for Alzheimer's prediction
+        self.target_column = "alzheimers_diagnosis"
 
     def _get_partitioned_data(self) -> LazyFrame:
         """Read partitioned Parquet data using Polars Lazy.
@@ -222,11 +218,45 @@ class DataPreprocessor:
         )
         logger.info("Featurized data written successfully")
 
+    def _analyze_prevalence(self, df: LazyFrame) -> None:
+        """Analyze the prevalence of Alzheimer's diagnosis in the dataset."""
+        logger.info("Analyzing Alzheimer's diagnosis prevalence...")
+        
+        # Get overall statistics
+        stats = df.select([
+            pl.len().alias("total_rows"),
+            pl.col(self.target_column).sum().alias("positive_cases")
+        ]).collect()
+        
+        total_rows = stats[0]["total_rows"].item()
+        positive_cases = stats[0]["positive_cases"].item()
+        prevalence = positive_cases / total_rows if total_rows > 0 else 0
+        
+        logger.info(f"Total rows: {total_rows:,}")
+        logger.info(f"Alzheimer's positive cases: {positive_cases:,}")
+        logger.info(f"Prevalence: {prevalence:.1%}")
+        
+        # Analyze by year
+        year_stats = df.group_by("year").agg([
+            pl.len().alias("year_rows"),
+            pl.col(self.target_column).sum().alias("year_positives")
+        ]).collect()
+        
+        logger.info("Prevalence by year:")
+        for row in year_stats.iter_rows():
+            year, year_rows, year_positives = row
+            year_prevalence = year_positives / year_rows if year_rows > 0 else 0
+            logger.info(f"  {year}: {year_positives:,}/{year_rows:,} ({year_prevalence:.1%})")
+
     def preprocess(self) -> None:
         """Main preprocessing pipeline."""
         logger.info("Starting data preprocessing pipeline")
 
         df = self._get_partitioned_data()
+        
+        # Analyze prevalence before feature engineering
+        self._analyze_prevalence(df)
+        
         df = self._compute_rolling_features(df)
         df = self._compute_delta_features(df)
         df = self._compute_aggregate_features(df)
@@ -241,26 +271,36 @@ class DataPreprocessor:
 
 
 def preprocess(
-    input_dir: str = typer.Option("data/raw", "--input-dir", help="Input directory with partitioned Parquet data"),
-    output_dir: str = typer.Option("data/featurized", "--output-dir", help="Output directory for featurized data"),
-    rolling_window_years: int = typer.Option(3, "--rolling-window", help="Number of years for rolling features"),
-    chunk_size: int = typer.Option(100_000, "--chunk-size", help="(reserved) chunk size for processing"),
-    seed: int = typer.Option(42, "--seed", help="Random seed for reproducibility"),
+    config_file: str = typer.Option("config/preprocess.yaml", "--config", help="Configuration file path"),
+    input_dir: Optional[str] = typer.Option(None, "--input-dir", help="Override input directory from config"),
+    output_dir: Optional[str] = typer.Option(None, "--output-dir", help="Override output directory from config"),
+    rolling_window_years: Optional[int] = typer.Option(None, "--rolling-window", help="Override rolling window from config"),
+    chunk_size: Optional[int] = typer.Option(None, "--chunk-size", help="Override chunk size from config"),
+    seed: Optional[int] = typer.Option(None, "--seed", help="Override seed from config"),
 ) -> None:
     """
     Preprocess patient-year data with rolling features using Polars Lazy.
 
     Example:
-        python cli.py preprocess --rolling-window 3 --output-dir data/featurized
+        python cli.py preprocess --config config/preprocess.yaml
+        python cli.py preprocess --config config/preprocess.yaml --input-dir data/raw --output-dir data/featurized
     """
-    logging.basicConfig(level=logging.INFO)
-    config = PreprocessConfig(
-        input_dir=input_dir,
-        output_dir=output_dir,
-        rolling_window_years=rolling_window_years,
-        chunk_size=chunk_size,
-        seed=seed,
-    )
+    # Load configuration from file
+    from src.config import load_config
+    config = load_config("preprocess", config_file)
+    
+    # Override config values if provided as command line arguments
+    if input_dir is not None:
+        config.input_dir = input_dir
+    if output_dir is not None:
+        config.output_dir = output_dir
+    if rolling_window_years is not None:
+        config.rolling_window_years = rolling_window_years
+    if chunk_size is not None:
+        config.chunk_size = chunk_size
+    if seed is not None:
+        config.seed = seed
+    
     DataPreprocessor(config).preprocess()
 
 

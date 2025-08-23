@@ -1,0 +1,136 @@
+# Model Training Configuration
+# Machine learning model configuration for Alzheimer's prediction
+
+# Model configuration
+model:
+  # Model type (xgboost, lightgbm, catboost, random_forest, logistic_regression)
+  type: "xgboost"
+  # Model name for saving/loading
+  name: "alzheimers_predictor"
+  
+# Training configuration
+training:
+  # Test size for train/test split
+  test_size: 0.2
+  # Validation size (from training set)
+  validation_size: 0.2
+  # Random seed for reproducibility
+  seed: 42
+  # Number of folds for cross-validation
+  cv_folds: 5
+  # Stratified sampling for imbalanced data
+  stratified: true
+
+# Feature selection
+feature_selection:
+  # Enable feature selection
+  enabled: true
+  # Method for feature selection (mutual_info, chi2, f_classif, recursive)
+  method: "mutual_info"
+  # Number of features to select
+  n_features: 50
+  # Minimum feature importance threshold
+  min_importance: 0.01
+
+# Hyperparameter tuning
+hyperparameter_tuning:
+  # Enable hyperparameter optimization
+  enabled: true
+  # Optimization method (grid, random, bayesian)
+  method: "bayesian"
+  # Number of trials for optimization
+  n_trials: 100
+  # Cross-validation folds for tuning
+  cv_folds: 3
+
+# Model-specific parameters
+xgboost:
+  # Learning rate
+  learning_rate: 0.1
+  # Maximum depth
+  max_depth: 6
+  # Number of estimators
+  n_estimators: 100
+  # Subsample ratio
+  subsample: 0.8
+  # Column subsample ratio
+  colsample_bytree: 0.8
+  # Regularization
+  reg_alpha: 0.1
+  reg_lambda: 1.0
+  # Scale pos weight for imbalanced data
+  scale_pos_weight: 10.0
+
+lightgbm:
+  # Learning rate
+  learning_rate: 0.1
+  # Maximum depth
+  max_depth: 6
+  # Number of estimators
+  n_estimators: 100
+  # Subsample ratio
+  subsample: 0.8
+  # Feature subsample ratio
+  colsample_bytree: 0.8
+  # Regularization
+  reg_alpha: 0.1
+  reg_lambda: 1.0
+  # Scale pos weight for imbalanced data
+  scale_pos_weight: 10.0
+
+# Evaluation metrics
+evaluation:
+  # Primary metric for optimization
+  primary_metric: "roc_auc"
+  # Additional metrics to track
+  metrics:
+    - "accuracy"
+    - "precision"
+    - "recall"
+    - "f1"
+    - "roc_auc"
+    - "pr_auc"
+  # Threshold for binary classification
+  threshold: 0.5
+
+# Data handling
+data:
+  # Input directory for featurized data
+  input_dir: "data/featurized"
+  # Target column name
+  target_column: "alzheimers_diagnosis"
+  # Exclude columns from features
+  exclude_columns:
+    - "patient_id"
+    - "year"
+  # Handle class imbalance
+  class_imbalance:
+    # Method for handling imbalance (smote, adasyn, class_weight, none)
+    method: "class_weight"
+    # Parameters for SMOTE/ADASYN
+    sampling_strategy: "auto"
+    k_neighbors: 5
+
+# Output configuration
+output:
+  # Directory to save models
+  model_dir: "models"
+  # Directory to save results
+  results_dir: "results"
+  # Save feature importance plot
+  save_feature_importance: true
+  # Save confusion matrix plot
+  save_confusion_matrix: true
+  # Save ROC curve plot
+  save_roc_curve: true
+  # Save PR curve plot
+  save_pr_curve: true
+
+# Logging configuration
+logging:
+  # Log level
+  level: "INFO"
+  # Save training logs
+  save_logs: true
+  # Log directory
+  log_dir: "logs"

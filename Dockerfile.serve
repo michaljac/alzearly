@@ -14,8 +14,7 @@ RUN pip install --no-cache-dir -r requirements-serve.txt
 
 # Copy project files
 COPY src/ ./src/
-COPY configs/ ./configs/
-COPY tests/ ./tests/
+COPY config/ ./config/
 
 # Expose port for FastAPI
 EXPOSE 8000

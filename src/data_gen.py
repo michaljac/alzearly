@@ -21,21 +21,14 @@ from faker import Faker
 logger = logging.getLogger(__name__)
 
 
-@dataclass
-class DataGenConfig:
-    """Configuration for synthetic data generation."""
-    n_patients: int
-    years: List[int]
-    positive_rate: float = 0.07
-    rows_per_chunk: int = 100_000
-    seed: int = 0
-    output_dir: str = "data/raw"
+# Import the config loader
+from .config import DataGenConfig as ConfigDataGenConfig
 
 
 class SyntheticDataGenerator:
     """Generates synthetic patient-year data with realistic features."""
     
-    def __init__(self, config: DataGenConfig):
+    def __init__(self, config: ConfigDataGenConfig):
         self.config = config
         self.fake = Faker()
         Faker.seed(config.seed)
@@ -82,8 +75,8 @@ class SyntheticDataGenerator:
             pa.field("num_medications", pa.int32()),
             pa.field("num_lab_tests", pa.int32()),
             
-            # Target variable
-            pa.field("diagnosis", pa.int8()),
+            # Target variable - Alzheimer's diagnosis
+            pa.field("alzheimers_diagnosis", pa.int8()),
         ])
     
     def _initialize_patient_state(self, patient_id: str) -> Dict[str, Any]:
@@ -172,19 +165,39 @@ class SyntheticDataGenerator:
         num_medications = max(0, int(np.random.poisson(medication_lambda)))
         num_lab_tests = max(0, int(np.random.poisson(lab_lambda)))
         
-        # Calculate diagnosis probability based on risk factors
-        risk_factors = [
-            age > 65,
-            bmi > 30,
-            systolic > 140,
-            glucose > 126,
-            cholesterol_total > 240,
-            creatinine > 1.2,
+        # Calculate Alzheimer's diagnosis probability based on risk factors
+        # Alzheimer's risk factors: age, education, cardiovascular health, genetic factors
+        alzheimers_risk_factors = [
+            age > 65,  # Age is the strongest risk factor
+            age > 75,  # Even higher risk for older age
+            age > 85,  # Very high risk for very old age
+            state["education_level"] in ["High School", "Some College"],  # Lower education associated with higher risk
+            bmi > 30,  # Obesity is a risk factor
+            systolic > 140,  # Hypertension is a risk factor
+            glucose > 126,  # Diabetes is a risk factor
+            cholesterol_total > 240,  # High cholesterol is a risk factor
+            state["sex"] == "F",  # Women have slightly higher risk
         ]
-        risk_score = sum(risk_factors) / len(risk_factors)
-        state["diagnosis_prob"] = min(0.95, 0.05 + risk_score * 0.3)
         
-        # Generate diagnosis
+        # Calculate base risk score
+        risk_score = sum(alzheimers_risk_factors) / len(alzheimers_risk_factors)
+        
+        # Age is the primary factor - exponential increase with age
+        age_factor = max(0, (age - 65) / 20)  # 0 for age < 65, 1 for age 85+
+        age_risk = min(0.8, age_factor * 0.4)  # Max 80% risk from age alone
+        
+        # Combine risk factors with age
+        combined_risk = age_risk + (risk_score * 0.2)
+        
+        # Apply the target positive rate (5-10%)
+        # Use a sigmoid function to create a smooth probability curve
+        target_rate = self.config.positive_rate
+        base_prob = 1 / (1 + np.exp(-(combined_risk - 0.5) * 4))  # Sigmoid centered around 0.5
+        
+        # Scale to achieve target prevalence
+        state["diagnosis_prob"] = min(0.95, base_prob * target_rate * 5)
+        
+        # Generate Alzheimer's diagnosis
         diagnosis = 1 if np.random.random() < state["diagnosis_prob"] else 0
         
         return {
@@ -214,7 +227,7 @@ class SyntheticDataGenerator:
             "num_encounters": int(num_encounters),
             "num_medications": int(num_medications),
             "num_lab_tests": int(num_lab_tests),
-            "diagnosis": int(diagnosis),
+            "alzheimers_diagnosis": int(diagnosis),
         }
     
     def _generate_chunk(self, chunk_size: int) -> Iterator[Dict[str, Any]]:
@@ -279,45 +292,48 @@ class SyntheticDataGenerator:
         
         # Calculate actual positive rate
         actual_positive_rate = sum(1 for row in self._generate_chunk(total_rows) 
-                                 if row["diagnosis"] == 1) / total_rows
+                                 if row["alzheimers_diagnosis"] == 1) / total_rows
         
         logger.info(f"Data generation complete!")
         logger.info(f"Total rows generated: {total_rows:,}")
-        logger.info(f"Actual positive rate: {actual_positive_rate:.1%}")
+        logger.info(f"Actual Alzheimer's positive rate: {actual_positive_rate:.1%}")
         logger.info(f"Output directory: {output_path.absolute()}")
 
 
 def generate(
-    n_patients: int = typer.Option(..., "--n-patients", help="Number of patients to generate"),
-    years: List[int] = typer.Option(..., "--years", help="Years to generate data for"),
-    rows: Optional[int] = typer.Option(None, "--rows", help="Total target rows (overrides n-patients)"),
-    positive_rate: float = typer.Option(0.07, "--positive-rate", help="Target positive diagnosis rate"),
-    rows_per_chunk: int = typer.Option(100_000, "--rows-per-chunk", help="Rows per chunk for memory efficiency"),
-    out: str = typer.Option("data/raw", "--out", help="Output directory"),
-    seed: int = typer.Option(0, "--seed", help="Random seed for reproducibility"),
+    config_file: str = typer.Option("config/data_gen.yaml", "--config", help="Configuration file path"),
+    n_patients: Optional[int] = typer.Option(None, "--n-patients", help="Override number of patients from config"),
+    years: Optional[str] = typer.Option(None, "--years", help="Override years from config (comma-separated)"),
+    positive_rate: Optional[float] = typer.Option(None, "--positive-rate", help="Override positive rate from config"),
+    out: Optional[str] = typer.Option(None, "--out", help="Override output directory from config"),
+    seed: Optional[int] = typer.Option(None, "--seed", help="Override seed from config"),
 ) -> None:
     """
-    Generate synthetic patient-year data with realistic features.
+    Generate synthetic patient-year data with realistic features for Alzheimer's prediction.
     
     Creates a dataset with demographic, clinical, and temporal features.
+    Includes Alzheimer's diagnosis as target variable with configurable prevalence (5-10%).
     Data is saved to Parquet files partitioned by year for efficient querying.
     
     Example:
-        python cli.py data-gen --n-patients 5000 --years 2018 2019 2020 --out data/raw
+        python cli.py data-gen --config config/data_gen.yaml
+        python cli.py data-gen --config config/data_gen.yaml --n-patients 5000 --positive-rate 0.08
     """
-    # Calculate n_patients from rows if specified
-    if rows is not None:
-        n_patients = rows // len(years)
-        logger.info(f"Calculated n_patients={n_patients} from rows={rows} and years={len(years)}")
+    # Load configuration from file
+    from .config import load_config
+    config = load_config("data_gen", config_file)
     
-    config = DataGenConfig(
-        n_patients=n_patients,
-        years=years,
-        positive_rate=positive_rate,
-        rows_per_chunk=rows_per_chunk,
-        seed=seed,
-        output_dir=out,
-    )
+    # Override config values if provided as command line arguments
+    if n_patients is not None:
+        config.n_patients = n_patients
+    if years is not None:
+        config.years = [int(y.strip()) for y in years.split(",")]
+    if positive_rate is not None:
+        config.positive_rate = positive_rate
+    if out is not None:
+        config.output_dir = out
+    if seed is not None:
+        config.seed = seed
     
     generator = SyntheticDataGenerator(config)
     generator.generate()

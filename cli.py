@@ -9,34 +9,45 @@ app = typer.Typer()
 
 @app.command()
 def data_gen(
-    n_patients: int = typer.Option(..., "--n-patients", help="Number of patients to generate"),
-    years: str = typer.Option(..., "--years", help="Years to generate data for (comma-separated)"),
-    rows: int = typer.Option(None, "--rows", help="Total target rows (overrides n-patients)"),
-    positive_rate: float = typer.Option(0.07, "--positive-rate", help="Target positive diagnosis rate"),
-    rows_per_chunk: int = typer.Option(100_000, "--rows-per-chunk", help="Rows per chunk for memory efficiency"),
-    out: str = typer.Option("data/raw", "--out", help="Output directory"),
-    seed: int = typer.Option(0, "--seed", help="Random seed for reproducibility"),
+    config_file: str = typer.Option("config/data_gen.yaml", "--config", help="Configuration file path"),
+    n_patients: int = typer.Option(None, "--n-patients", help="Override number of patients from config"),
+    years: str = typer.Option(None, "--years", help="Override years from config (comma-separated)"),
+    positive_rate: float = typer.Option(None, "--positive-rate", help="Override positive rate from config"),
+    out: str = typer.Option(None, "--out", help="Override output directory from config"),
+    seed: int = typer.Option(None, "--seed", help="Override seed from config"),
 ):
     """Generate synthetic patient-year data with realistic features"""
     from src.data_gen import generate
     
-    # Parse years string to list of integers
-    years_list = [int(y.strip()) for y in years.split(",")]
-    
     generate(
+        config_file=config_file,
         n_patients=n_patients,
-        years=years_list,
-        rows=rows,
+        years=years,
         positive_rate=positive_rate,
-        rows_per_chunk=rows_per_chunk,
         out=out,
         seed=seed,
     )
 
 @app.command()
-def preprocess():
-    """Preprocess the data"""
-    logger.info("not implemented yet")
+def preprocess(
+    config_file: str = typer.Option("config/preprocess.yaml", "--config", help="Configuration file path"),
+    input_dir: str = typer.Option(None, "--input-dir", help="Override input directory from config"),
+    output_dir: str = typer.Option(None, "--output-dir", help="Override output directory from config"),
+    rolling_window_years: int = typer.Option(None, "--rolling-window", help="Override rolling window from config"),
+    chunk_size: int = typer.Option(None, "--chunk-size", help="Override chunk size from config"),
+    seed: int = typer.Option(None, "--seed", help="Override seed from config"),
+):
+    """Preprocess patient-year data with rolling features using Polars Lazy."""
+    from src.preprocess import preprocess as preprocess_data
+    
+    preprocess_data(
+        config_file=config_file,
+        input_dir=input_dir,
+        output_dir=output_dir,
+        rolling_window_years=rolling_window_years,
+        chunk_size=chunk_size,
+        seed=seed,
+    )
 
 @app.command()
 def train():

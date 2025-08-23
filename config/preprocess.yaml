@@ -1,0 +1,124 @@
+# Preprocessing Configuration
+# Feature engineering and data preprocessing for Alzheimer's prediction
+
+# Input/Output configuration
+io:
+  # Input directory with partitioned Parquet data
+  input_dir: "data/raw"
+  # Output directory for featurized data
+  output_dir: "data/featurized"
+  # File format
+  format: "parquet"
+  # Partitioning strategy
+  partitioning: "year"
+
+# Feature engineering configuration
+features:
+  # Target variable column name
+  target_column: "alzheimers_diagnosis"
+  
+  # Numeric columns for feature engineering
+  numeric_columns:
+    - "age"
+    - "bmi"
+    - "systolic_bp"
+    - "diastolic_bp"
+    - "heart_rate"
+    - "temperature"
+    - "glucose"
+    - "cholesterol_total"
+    - "hdl"
+    - "ldl"
+    - "triglycerides"
+    - "creatinine"
+    - "hemoglobin"
+    - "white_blood_cells"
+    - "platelets"
+    - "num_encounters"
+    - "num_medications"
+    - "num_lab_tests"
+
+# Rolling features configuration
+rolling:
+  # Number of years for rolling window
+  window_years: 3
+  # Minimum periods for rolling calculations
+  min_periods: 1
+  # Rolling statistics to compute
+  statistics:
+    - "mean"
+    - "max"
+    - "sum"
+    - "count"
+
+# Delta features configuration
+delta:
+  # Compute year-over-year changes
+  enabled: true
+  # Compute percentage changes
+  percentage_changes: true
+
+# Aggregate features configuration
+aggregate:
+  # Compute patient-level aggregates
+  enabled: true
+  # Statistics to compute per patient
+  statistics:
+    - "mean"
+    - "std"
+    - "min"
+    - "max"
+
+# Risk features configuration
+risk_features:
+  # BMI categories
+  bmi_categories:
+    underweight_threshold: 18.5
+    normal_max: 25.0
+    overweight_max: 30.0
+  
+  # Blood pressure categories
+  bp_categories:
+    high_systolic_threshold: 140
+    high_diastolic_threshold: 90
+  
+  # Glucose categories
+  glucose_categories:
+    prediabetic_min: 100
+    diabetic_threshold: 126
+  
+  # Cholesterol categories
+  cholesterol_categories:
+    high_total_threshold: 240
+    low_hdl_threshold: 40
+    high_ldl_threshold: 160
+  
+  # Age categories
+  age_categories:
+    middle_aged_min: 45
+    elderly_threshold: 65
+
+# Missing value handling
+missing_values:
+  # Strategy for handling missing values
+  strategy: "fill_zero"
+  # Default fill value for numeric features
+  default_fill: 0
+
+# Processing configuration
+processing:
+  # Chunk size for processing (reserved for future use)
+  chunk_size: 100000
+  # Random seed for reproducibility
+  seed: 42
+  # Enable lazy evaluation
+  lazy_evaluation: true
+
+# Logging configuration
+logging:
+  # Log level
+  level: "INFO"
+  # Enable prevalence analysis
+  analyze_prevalence: true
+  # Show feature count summary
+  show_feature_summary: true
