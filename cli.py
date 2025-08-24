@@ -86,7 +86,16 @@ def evaluate(
 @app.command()
 def serve_dev():
     """Run development server"""
-    logger.info("not implemented yet")
+    from src.serve import app
+    import uvicorn
+    
+    uvicorn.run(
+        app,
+        host="0.0.0.0",
+        port=8000,
+        reload=True,
+        log_level="info"
+    )
 
 if __name__ == "__main__":
     app()

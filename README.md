@@ -80,6 +80,81 @@ python cli.py train
 python cli.py train --config config/model.yaml
 ```
 
+### 5. Serve Model
+
+```bash
+# Start the FastAPI server
+uvicorn src.serve:app --host 0.0.0.0 --port 8002
+
+# The API will be available at:
+# - API Documentation: http://localhost:8002/docs
+# - Health Check: http://localhost:8002/health
+# - Prediction Endpoint: http://localhost:8002/predict
+```
+
+**Test the API:**
+```bash
+# Run the test script to verify all endpoints
+python test_api.py
+```
+
+## 🌐 API Documentation
+
+### FastAPI Server
+
+The project includes a production-ready FastAPI server for real-time Alzheimer's disease predictions.
+
+#### Endpoints
+
+- **`GET /`** - API information and available endpoints
+- **`GET /health`** - Health check with model status
+- **`POST /predict`** - Make predictions for patient data
+- **`GET /docs`** - Interactive API documentation (Swagger UI)
+
+#### Example Usage
+
+```python
+import requests
+
+# Health check
+response = requests.get("http://localhost:8002/health")
+print(response.json())
+
+# Make prediction
+patient_data = {
+    "patient_id": "P123456",
+    "sex": "M",
+    "region": "California",
+    "occupation": "Engineer",
+    "education_level": "Bachelor's",
+    "marital_status": "Married",
+    "insurance_type": "Private",
+    "age": 65.0,
+    "bmi": 26.5,
+    "systolic_bp": 140.0,
+    "diastolic_bp": 85.0,
+    "heart_rate": 72.0,
+    "temperature": 98.6,
+    "glucose": 95.0,
+    "cholesterol_total": 200.0,
+    "hdl": 45.0,
+    "ldl": 130.0,
+    "triglycerides": 150.0,
+    "creatinine": 1.2,
+    "hemoglobin": 14.5,
+    "white_blood_cells": 7.5,
+    "platelets": 250.0,
+    "num_encounters": 3,
+    "num_medications": 2,
+    "num_lab_tests": 5
+}
+
+response = requests.post("http://localhost:8002/predict", json=patient_data)
+prediction = response.json()
+print(f"Probability: {prediction['probability']:.3f}")
+print(f"Prediction: {'High Risk' if prediction['label'] == 1 else 'Low Risk'}")
+```
+
 ## ⚙️ Configuration System
 
 The project uses YAML-based configuration files for all components:
@@ -291,6 +366,39 @@ python cli.py train --model-type xgboost --n-trials 200
 - **Validation**: Automatic configuration validation and error handling
 - **Modular design**: Separate configs for each pipeline stage
 
+## 🎯 Threshold Selection Strategy
+
+The model evaluation uses a **two-tier threshold selection** approach for optimal binary classification:
+
+### Primary Strategy: Maximum F1 Score
+- **Goal**: Find threshold that maximizes F1-score (harmonic mean of precision and recall)
+- **Why F1?** Balances false positives (unnecessary alarms) and false negatives (missed cases)
+- **Medical Context**: Critical for Alzheimer's diagnosis where both precision and recall matter
+
+### Fallback Strategy: Recall Target
+- **Goal**: Ensure minimum 80% recall (catch at least 80% of actual cases)
+- **Why Fallback?** Sometimes maximizing F1 results in too low recall
+- **Medical Priority**: Missing actual cases can be more dangerous than false alarms
+
+### Why This Approach?
+For Alzheimer's prediction, I chose this strategy because:
+- **F1 optimization**: Provides balanced performance for general screening
+- **80% recall fallback**: Ensures we don't miss too many actual cases in critical scenarios
+- **Medical safety**: Prioritizes catching real cases over avoiding false alarms
+- **Flexibility**: Two thresholds allow different use cases (screening vs. high-risk monitoring)
+
+### Implementation
+```python
+# Test thresholds from 0.1 to 0.9
+thresholds = [0.1, 0.15, 0.2, ..., 0.85, 0.9]
+
+# Choose optimal threshold
+optimal_threshold = threshold_with_max_f1_score
+fallback_threshold = threshold_with_recall >= 0.8
+```
+
+**Result**: Two thresholds saved to `threshold.json` - use optimal for general cases, fallback when high recall is critical.
+
 ## 🔬 Technical Details
 
 ### Data Generation Algorithm
@@ -317,7 +425,7 @@ python cli.py train --model-type xgboost --n-trials 200
 ## 🚧 Future Enhancements
 
 ### Planned Features
-- [ ] **Model serving**: REST API for real-time predictions
+- [x] **Model serving**: REST API for real-time predictions ✅
 - [ ] **Feature selection**: Automated feature importance analysis
 - [ ] **Hyperparameter optimization**: Advanced tuning strategies
 - [ ] **Model interpretability**: SHAP explanations and feature importance
