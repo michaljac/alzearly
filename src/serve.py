@@ -4,7 +4,6 @@ FastAPI service for Alzheimer's prediction model serving.
 Provides endpoints for single patient prediction and health checks.
 """
 
-import logging
 import json
 import pickle
 from pathlib import Path
@@ -14,8 +13,6 @@ import pandas as pd
 from fastapi import FastAPI, HTTPException
 from pydantic import BaseModel, Field
 import uvicorn
-
-logger = logging.getLogger(__name__)
 
 # Initialize FastAPI app
 app = FastAPI(
@@ -135,66 +132,50 @@ class HealthResponse(BaseModel):
 
 
 def load_model_and_metadata():
-    """Load the trained model and metadata from artifacts directory."""
+    """Load the trained model and metadata from artifacts/latest/ directory."""
     global model, feature_names, optimal_threshold, fallback_threshold
     
-    # Try multiple possible artifact paths
-    possible_paths = [
-        Path("/app/artifacts"),  # Docker container path
-        Path("artifacts"),       # Relative path from workspace
-        Path("../artifacts"),    # Relative path from src directory
-    ]
-    
-    artifacts_dir = None
-    for path in possible_paths:
-        if path.exists():
-            artifacts_dir = path
-            break
-    
-    if artifacts_dir is None:
-        raise FileNotFoundError("No artifacts directory found. Tried: /app/artifacts, artifacts, ../artifacts")
-    
-    # Find the most recent model directory
-    model_dirs = list(artifacts_dir.glob("*"))
-    if not model_dirs:
-        raise FileNotFoundError(f"No model directories found in {artifacts_dir}")
-    
-    # Use the first available directory (you might want to implement more sophisticated selection)
-    model_dir = model_dirs[0]
-            # Loading model from directory
-    
-    # Load model
-    model_path = model_dir / "xgboost.pkl"
-    if not model_path.exists():
-        raise FileNotFoundError(f"Model file not found: {model_path}")
-    
-    with open(model_path, 'rb') as f:
-        model = pickle.load(f)
-    
-    # Load metadata
-    metadata_path = model_dir / "metadata.json"
-    if metadata_path.exists():
-        with open(metadata_path, 'r') as f:
-            metadata = json.load(f)
-        feature_names = metadata.get('feature_names', [])
-    else:
-        logger.warning("No metadata.json found, using default feature names")
-        feature_names = None
-    
-    # Load thresholds
-    threshold_path = artifacts_dir / "threshold.json"
-    if threshold_path.exists():
-        with open(threshold_path, 'r') as f:
-            threshold_data = json.load(f)
-        optimal_threshold = threshold_data.get('optimal_threshold', 0.5)
-        fallback_threshold = threshold_data.get('fallback_threshold', 0.5)
-    else:
-        logger.warning("No threshold.json found, using default thresholds")
-        optimal_threshold = 0.5
-        fallback_threshold = 0.5
-    
-    # Model loaded successfully
-    # Thresholds loaded
+    try:
+        # Use our helper functions to load artifacts
+        from src.train.save_artifacts import load_model, load_feature_names, load_threshold, load_metrics
+        
+        print("Loading model and metadata from artifacts/latest/...")
+        
+        # Load model
+        model = load_model("model.pkl")
+        print("✅ Model loaded successfully")
+        
+        # Load feature names
+        feature_names = load_feature_names()
+        print(f"✅ Feature names loaded: {len(feature_names)} features")
+        
+        # Load threshold
+        optimal_threshold = load_threshold()
+        fallback_threshold = optimal_threshold  # Use same threshold as fallback
+        print(f"✅ Threshold loaded: {optimal_threshold}")
+        
+        # Load metrics (optional, for logging)
+        try:
+            metrics = load_metrics()
+            print(f"✅ Metrics loaded: run_id={metrics.get('run_id', 'unknown')}")
+        except FileNotFoundError:
+            print("⚠️  Metrics file not found, continuing without metrics")
+        
+        print("🎉 All artifacts loaded successfully!")
+        
+    except FileNotFoundError as e:
+        error_msg = f"Missing required artifacts: {e}"
+        print(f"❌ {error_msg}")
+        print("Expected files in artifacts/latest/:")
+        print("  - model.pkl")
+        print("  - feature_names.json") 
+        print("  - threshold.json")
+        print("  - metrics.json")
+        raise FileNotFoundError(error_msg)
+    except Exception as e:
+        error_msg = f"Failed to load artifacts: {e}"
+        print(f"❌ {error_msg}")
+        raise Exception(error_msg)
 
 
 def prepare_features(patient_data: PatientData) -> np.ndarray:
@@ -233,13 +214,13 @@ def prepare_features(patient_data: PatientData) -> np.ndarray:
     missing_features = [col for col in base_features if col not in df.columns]
     
     if missing_features:
-        logger.warning(f"Missing base features: {missing_features}")
+        print(f"⚠️  Missing base features: {missing_features}")
     
     X = df[available_features].values.astype(float)
     
     # For now, return a simple prediction based on age and risk factors
     # This is a fallback since the model expects engineered features
-    logger.warning("Using fallback prediction method - model expects engineered features")
+    print("⚠️  Using fallback prediction method - model expects engineered features")
     
     # Create a simple risk score based on age and clinical factors
     age = df['age'].iloc[0]
@@ -268,9 +249,9 @@ async def startup_event():
     """Load model and metadata on startup."""
     try:
         load_model_and_metadata()
-        # Service started successfully
+        print("🚀 Service started successfully!")
     except Exception as e:
-        logger.error(f"Failed to load model: {e}")
+        print(f"❌ Failed to start service: {e}")
         raise
 
 
@@ -328,7 +309,7 @@ async def predict(patient_data: PatientData, use_fallback: bool = False):
         )
     
     except Exception as e:
-        logger.error(f"Prediction error: {e}")
+        print(f"❌ Prediction error: {e}")
         raise HTTPException(status_code=500, detail=f"Prediction failed: {str(e)}")
 
 
