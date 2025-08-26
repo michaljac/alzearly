@@ -867,14 +867,45 @@ class ModelTrainer:
         for model_name, model in self.models.items():
             self._save_plots(model_name, model, X_test_selected, y_test, descriptive_name)
         
-        # Save models and metadata
+        # Save artifacts using our helper function
+        from src.train.save_artifacts import save_all_artifacts
+        
+        # Get the best model (XGBoost if available, otherwise Logistic Regression)
+        best_model = self.models.get("xgboost", self.models.get("logistic_regression"))
+        best_model_name = "xgboost" if "xgboost" in self.models else "logistic_regression"
+        
+        # Get metrics and threshold from the best model
+        best_results = results[best_model_name]
+        optimal_threshold = best_results['optimal_threshold']
+        
+        # Prepare metrics for saving
+        metrics_to_save = {
+            'run_id': descriptive_name,
+            'tracker_run_id': get_run_id(),
+            'tracker_type': tracker_type,
+            'feature_names': self.feature_names,
+            'preprocessing_metadata': self.preprocessing_metadata,
+            'results': results,
+            'config': vars(self.config)
+        }
+        
+        # Save all required artifacts
+        saved_paths = save_all_artifacts(
+            model=best_model,
+            feature_names=self.feature_names,
+            threshold=optimal_threshold,
+            metrics=metrics_to_save,
+            model_name="model.pkl"
+        )
+        
+        # Also save all models to the original location for backward compatibility
         output_path = Path(self.config.output_dir)
         output_path.mkdir(parents=True, exist_ok=True)
         
         artifact_path = output_path / descriptive_name
         artifact_path.mkdir(exist_ok=True)
         
-        # Save models
+        # Save all models
         for model_name, model in self.models.items():
             model_file = artifact_path / f"{model_name}.pkl"
             with open(model_file, 'wb') as f:
@@ -885,22 +916,6 @@ class ModelTrainer:
                 scaler_file = artifact_path / f"{model_name}_scaler.pkl"
                 with open(scaler_file, 'wb') as f:
                     pickle.dump(self.lr_scaler, f)
-        
-        # Save metadata
-        if self.config.save_metadata:
-            metadata = {
-                'run_id': descriptive_name,
-                'tracker_run_id': get_run_id(),
-                'tracker_type': tracker_type,
-                'feature_names': self.feature_names,
-                'preprocessing_metadata': self.preprocessing_metadata,
-                'results': results,
-                'config': vars(self.config)
-            }
-            
-            metadata_file = artifact_path / "metadata.json"
-            with open(metadata_file, 'w') as f:
-                json.dump(metadata, f, indent=2, default=str)
         
         # Log artifacts
         if self.config.log_artifacts and self.tracker_enabled:
@@ -937,6 +952,7 @@ class ModelTrainer:
             'run_id': descriptive_name,
             'wandb_run_id': wandb.run.id,
             'artifact_path': str(artifact_path),
+            'latest_artifacts': saved_paths,
             'results': results
         }
 
