@@ -13,7 +13,7 @@ plots/
 # Generated images (but keep the logo)
 *.jpg
 *.png
-*.jpeg
+# *.jpeg
 !hippo.jpeg  # Keep the project logo
 
 # Docker build context exclusions

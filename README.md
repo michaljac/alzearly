@@ -291,36 +291,6 @@ docker-compose --profile pipeline up
 📖 Interactive docs at: http://localhost:8000/docs
 ```
 
-## 📁 **Project Structure**
-
-```
-alzearly/
-├── main.py                 # Interactive pipeline runner
-├── cli.py                  # Command-line interface
-├── src/
-│   ├── data_gen.py        # Synthetic data generation
-│   ├── preprocess.py      # Data preprocessing and feature engineering
-│   ├── train.py           # Model training with hyperparameter tuning
-│   ├── evaluate.py        # Model evaluation and metrics
-│   ├── serve.py           # FastAPI server for predictions
-│   ├── parallel.py        # Parallel processing utilities
-│   ├── model_versioning.py # Model versioning and A/B testing
-│   ├── config.py          # Configuration management
-│   └── units.py           # Unit conversion utilities
-├── config/
-│   ├── data_gen.yaml      # Data generation parameters
-│   ├── preprocess.yaml    # Preprocessing configuration
-│   └── model.yaml         # Model training parameters
-├── data/                  # Generated and processed data
-├── models/                # Trained models with descriptive names
-├── artifacts/             # Evaluation artifacts and results
-├── plots/                 # Generated comparison plots
-├── docker-compose.yml     # Multi-service container orchestration
-├── Dockerfile             # Training service container
-├── Dockerfile.serve       # Serving service container
-├── pipeline_with_server.py # Complete pipeline with optional API server
-└── requirements-serve.txt # Serving dependencies
-```
 
 ## 🔧 **Configuration**
 
