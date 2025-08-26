@@ -1,124 +1,128 @@
-# Preprocessing Configuration
-# Feature engineering and data preprocessing for Alzheimer's prediction
+# Data Preprocessing Configuration
+# Configuration for feature engineering and preprocessing
 
 # Input/Output configuration
 io:
-  # Input directory with partitioned Parquet data
+  # Input directory for raw data
   input_dir: "data/raw"
   # Output directory for featurized data
   output_dir: "data/featurized"
-  # File format
+  # File format for output
   format: "parquet"
   # Partitioning strategy
   partitioning: "year"
 
-# Feature engineering configuration
-features:
-  # Target variable column name
-  target_column: "alzheimers_diagnosis"
+# Feature engineering
+feature_engineering:
+  # Temporal features configuration
+  temporal:
+    # Number of years to look back for rolling features
+    lookback_years: 3
+    # Rolling window sizes (in years)
+    window_sizes: [1, 2, 3]
+    # Aggregation functions for rolling features
+    aggregations: ["mean", "std", "min", "max", "count"]
   
-  # Numeric columns for feature engineering
-  numeric_columns:
-    - "age"
-    - "bmi"
-    - "systolic_bp"
-    - "diastolic_bp"
-    - "heart_rate"
-    - "temperature"
-    - "glucose"
-    - "cholesterol_total"
-    - "hdl"
-    - "ldl"
-    - "triglycerides"
-    - "creatinine"
-    - "hemoglobin"
-    - "white_blood_cells"
-    - "platelets"
-    - "num_encounters"
-    - "num_medications"
-    - "num_lab_tests"
+  # Clinical features
+  clinical:
+    # Whether to create interaction features
+    create_interactions: true
+    # Whether to create polynomial features
+    create_polynomial: false
+    # Degree for polynomial features
+    polynomial_degree: 2
 
-# Rolling features configuration
-rolling:
-  # Number of years for rolling window
-  window_years: 3
-  # Minimum periods for rolling calculations
-  min_periods: 1
-  # Rolling statistics to compute
-  statistics:
-    - "mean"
-    - "max"
-    - "sum"
-    - "count"
+# Preprocessing steps
+preprocessing:
+  # Missing value handling
+  missing_values:
+    # Strategy for numeric columns
+    numeric_strategy: "median"
+    # Strategy for categorical columns
+    categorical_strategy: "mode"
+    # Whether to create missing value indicators
+    create_indicators: true
+  
+  # Categorical encoding
+  categorical_encoding:
+    # Method for encoding categorical variables
+    # Options: "one_hot", "label", "target"
+    method: "one_hot"
+    # Maximum number of categories per variable
+    max_categories: 50
+    # Whether to drop first category (for one-hot encoding)
+    drop_first: false
+  
+  # Feature scaling
+  scaling:
+    # Whether to scale numeric features
+    enabled: true
+    # Scaling method
+    # Options: "standard", "minmax", "robust"
+    method: "standard"
+    # Whether to handle outliers
+    handle_outliers: true
+    # Outlier detection method
+    outlier_method: "iqr"
 
-# Delta features configuration
-delta:
-  # Compute year-over-year changes
+# Feature selection
+feature_selection:
+  # Whether to perform feature selection
   enabled: true
-  # Compute percentage changes
-  percentage_changes: true
+  # Correlation threshold for removing highly correlated features
+  correlation_threshold: 0.95
+  # Variance threshold for removing low-variance features
+  variance_threshold: 0.01
+  # Maximum number of features to keep
+  max_features: 200
 
-# Aggregate features configuration
-aggregate:
-  # Compute patient-level aggregates
-  enabled: true
-  # Statistics to compute per patient
-  statistics:
-    - "mean"
-    - "std"
-    - "min"
-    - "max"
-
-# Risk features configuration
-risk_features:
-  # BMI categories
-  bmi_categories:
-    underweight_threshold: 18.5
-    normal_max: 25.0
-    overweight_max: 30.0
+# Memory optimization
+memory:
+  # Framework selection based on data size
+  framework_selection:
+    # Use Polars for datasets smaller than this (rows)
+    polars_threshold: 1000000
+    # Use Dask for datasets larger than this (rows)
+    dask_threshold: 5000000
   
-  # Blood pressure categories
-  bp_categories:
-    high_systolic_threshold: 140
-    high_diastolic_threshold: 90
-  
-  # Glucose categories
-  glucose_categories:
-    prediabetic_min: 100
-    diabetic_threshold: 126
-  
-  # Cholesterol categories
-  cholesterol_categories:
-    high_total_threshold: 240
-    low_hdl_threshold: 40
-    high_ldl_threshold: 160
-  
-  # Age categories
-  age_categories:
-    middle_aged_min: 45
-    elderly_threshold: 65
-
-# Missing value handling
-missing_values:
-  # Strategy for handling missing values
-  strategy: "fill_zero"
-  # Default fill value for numeric features
-  default_fill: 0
-
-# Processing configuration
-processing:
-  # Chunk size for processing (reserved for future use)
+  # Chunk size for processing large datasets
   chunk_size: 100000
-  # Random seed for reproducibility
-  seed: 42
-  # Enable lazy evaluation
-  lazy_evaluation: true
 
-# Logging configuration
-logging:
-  # Log level
-  level: "INFO"
-  # Enable prevalence analysis
-  analyze_prevalence: true
-  # Show feature count summary
-  show_feature_summary: true
+# Quality checks
+quality_checks:
+  # Whether to perform data quality checks
+  enabled: true
+  # Check for duplicate rows
+  check_duplicates: true
+  # Check for data type consistency
+  check_dtypes: true
+  # Check for value ranges
+  check_ranges: true
+  # Clinical value ranges to check
+  clinical_ranges:
+    age: [0, 120]
+    bmi: [10, 60]
+    systolic_bp: [50, 300]
+    diastolic_bp: [30, 200]
+    heart_rate: [30, 200]
+    temperature: [90, 110]
+    glucose: [20, 600]
+    cholesterol_total: [50, 800]
+    hdl: [10, 150]
+    ldl: [20, 400]
+    triglycerides: [10, 1000]
+    creatinine: [0.1, 10]
+    hemoglobin: [5, 25]
+    white_blood_cells: [1, 50]
+    platelets: [10, 1000]
+
+# Output validation
+validation:
+  # Whether to validate output data
+  enabled: true
+  # Check for missing values in output
+  check_missing: true
+  # Check for infinite values
+  check_infinite: true
+  # Check for data types
+  check_dtypes: true

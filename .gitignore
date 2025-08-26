@@ -8,5 +8,15 @@ mlruns/
 *.pkl
 models/
 wandb/
-demo_wandb_graphs.py
 plots/
+
+# Generated images (but keep the logo)
+*.jpg
+*.png
+*.jpeg
+!hippo.jpeg  # Keep the project logo
+
+# Docker build context exclusions
+wandb/
+__pycache__/
+*.log

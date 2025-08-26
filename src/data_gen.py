@@ -5,6 +5,7 @@ Generates realistic patient data with demographic, clinical, and temporal featur
 Supports chunked generation to handle large datasets efficiently.
 """
 
+import sys
 import logging
 import random
 from pathlib import Path
@@ -17,6 +18,7 @@ import pandas as pd
 import pyarrow as pa
 import pyarrow.dataset as ds
 from faker import Faker
+from tqdm import tqdm
 
 logger = logging.getLogger(__name__)
 
@@ -262,42 +264,50 @@ class SyntheticDataGenerator:
         )
     
     def generate(self) -> None:
-        """Generate synthetic data and save to partitioned Parquet files."""
+        """Generate synthetic data and save to partitioned Parquet files (single-line bar on Windows)."""
         output_path = Path(self.config.output_dir)
         output_path.mkdir(parents=True, exist_ok=True)
-        
-        logger.info(f"Generating synthetic data for {self.config.n_patients} patients "
-                   f"across years {self.config.years}")
-        logger.info(f"Target positive rate: {self.config.positive_rate:.1%}")
-        logger.info(f"Chunk size: {self.config.rows_per_chunk:,} rows")
-        
-        chunk_data = []
-        total_rows = 0
-        
-        for row in self._generate_chunk(self.config.rows_per_chunk):
+
+        total_rows = self.config.n_patients * len(self.config.years)
+        tqdm.write(f"🚀 Generating {self.config.n_patients:,} patients ({total_rows:,} total rows)...")
+
+        chunk_data: List[Dict[str, Any]] = []
+        rows_generated = 0
+        positive_count = 0
+
+        # IMPORTANT: no prints inside this loop
+        for row in tqdm(
+            self._generate_chunk(self.config.rows_per_chunk),
+            total=total_rows,
+            desc="Generating data",
+            unit="rows",
+            bar_format="{desc}: {percentage:3.0f}%|{bar}| {n_fmt}/{total_fmt} [{elapsed}<{remaining}]",
+            ncols=80,
+            dynamic_ncols=True,
+            mininterval=0.2,
+            ascii=True,
+            position=0,
+            leave=True,
+            file=sys.stdout,
+        ):
             chunk_data.append(row)
-            total_rows += 1
-            
+            rows_generated += 1
+            if row["alzheimers_diagnosis"] == 1:
+                positive_count += 1
+
             if len(chunk_data) >= self.config.rows_per_chunk:
                 self._write_chunk_to_parquet(chunk_data, output_path)
-                logger.info(f"Written chunk with {len(chunk_data):,} rows "
-                           f"(total: {total_rows:,})")
                 chunk_data = []
-        
-        # Write remaining data
+
         if chunk_data:
             self._write_chunk_to_parquet(chunk_data, output_path)
-            logger.info(f"Written final chunk with {len(chunk_data):,} rows "
-                       f"(total: {total_rows:,})")
-        
-        # Calculate actual positive rate
-        actual_positive_rate = sum(1 for row in self._generate_chunk(total_rows) 
-                                 if row["alzheimers_diagnosis"] == 1) / total_rows
-        
-        logger.info(f"Data generation complete!")
-        logger.info(f"Total rows generated: {total_rows:,}")
-        logger.info(f"Actual Alzheimer's positive rate: {actual_positive_rate:.1%}")
-        logger.info(f"Output directory: {output_path.absolute()}")
+
+        actual_positive_rate = positive_count / total_rows if total_rows else 0.0
+        tqdm.write(f"✅ Data generation complete! {rows_generated:,} rows generated")
+        tqdm.write(f"📈 Actual Alzheimer's positive rate: {actual_positive_rate:.1%}")
+        tqdm.write(f"📁 Output directory: {output_path.absolute()}")
+
+
 
 
 def generate(

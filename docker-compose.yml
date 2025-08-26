@@ -1,0 +1,63 @@
+services:
+  # Training service - handles data generation, preprocessing, training, evaluation
+  training:
+    image: alz_detect-pipeline:latest
+    container_name: alzearly_t
+    volumes:
+      - ./data:/workspace/data
+      - ./models:/workspace/models
+      - ./artifacts:/workspace/artifacts
+      - ./plots:/workspace/plots
+      - ./config:/workspace/config
+      - ./src:/workspace/src
+      - ./main.py:/workspace/main.py
+      - ./cli.py:/workspace/cli.py
+    environment:
+      - WANDB_API_KEY=${WANDB_API_KEY:-}
+      - PYTHONPATH=/workspace
+      - NON_INTERACTIVE=true
+    command: ["python", "main.py"]
+    profiles:
+      - training
+
+  # Serving service - FastAPI development server
+  serve:
+    build:
+      context: .
+      dockerfile: Dockerfile.serve
+    container_name: alzearly_s
+    ports:
+      - "8000:8000"
+    volumes:
+      - ./models:/app/models
+      - ./artifacts:/app/artifacts
+    environment:
+      - PYTHONPATH=/app
+    command: ["uvicorn", "src.serve:app", "--host", "0.0.0.0", "--port", "8000", "--reload"]
+    profiles:
+      - serve
+
+  # Complete pipeline (training + optional serving)
+  pipeline:
+    image: alz_detect-pipeline:latest
+    container_name: alzearly-pipeline
+    volumes:
+      - ./data:/workspace/data
+      - ./models:/workspace/models
+      - ./artifacts:/workspace/artifacts
+      - ./plots:/workspace/plots
+      - ./config:/workspace/config
+      - ./src:/workspace/src
+      - ./main.py:/workspace/main.py
+      - ./cli.py:/workspace/cli.py
+    environment:
+      - WANDB_API_KEY=${WANDB_API_KEY:-}
+      - PYTHONPATH=/workspace
+      - NON_INTERACTIVE=true
+    command: ["python", "pipeline_with_server.py"]
+    profiles:
+      - pipeline
+
+networks:
+  default:
+    name: alzearly-network

@@ -6,7 +6,7 @@ dataset:
   # Number of patients to generate (will be multiplied by years)
   n_patients: 100000
   # Years to generate data for
-  years: [2018, 2019, 2020, 2021]
+  years: [2021, 2022, 2023, 2024]
   # Target total rows (overrides n_patients if specified)
   target_rows: null
   

@@ -1,37 +1,47 @@
 # Model Training Configuration
-# Machine learning model configuration for Alzheimer's prediction
+# Configuration for Alzheimer's prediction model training
 
 # Data configuration
-input_dir: "data/featurized"
-target_column: "alzheimers_diagnosis"
-exclude_columns:
-  - "patient_id"
-  - "year"
+data:
+  # Input directory for featurized data
+  input_dir: "data/featurized"
+  # Target variable column name
+  target_column: "alzheimers_diagnosis"
+  # Columns to exclude from features
+  exclude_columns: ["patient_id", "year"]
 
 # Split configuration
-test_size: 0.2
-val_size: 0.2
-random_state: 42
-stratify: true
+splits:
+  # Test set size (fraction of total data)
+  test_size: 0.2
+  # Validation set size (fraction of training data)
+  val_size: 0.2
+  # Random seed for reproducibility
+  random_state: 42
+  # Whether to stratify splits
+  stratify: true
 
 # Feature selection
-max_features: 150
-variance_threshold: 0.01
+feature_selection:
+  # Maximum number of features to keep
+  max_features: 150
+  # Variance threshold for feature filtering
+  variance_threshold: 0.01
 
 # Class imbalance handling
-handle_imbalance: "class_weight"  # "class_weight", "smote", "none"
+class_imbalance:
+  # Method to handle class imbalance
+  # Options: "class_weight", "smote", "none"
+  method: "class_weight"
 
 # Model configuration
 models:
-  - "logistic_regression"
-  - "xgboost"
+  # List of models to train
+  # Options: ["logistic_regression", "xgboost"]
+  types: ["logistic_regression", "xgboost"]
 
-# Hyperparameter tuning
-enable_hyperparameter_tuning: true
-n_trials: 20  # Number of trials for hyperparameter optimization (reduced for faster training)
-
-# XGBoost parameters (these are the actual parameters used)
-xgb_params:
+# XGBoost parameters
+xgboost:
   n_estimators: 100
   max_depth: 6
   learning_rate: 0.1
@@ -41,15 +51,33 @@ xgb_params:
   eval_metric: "logloss"
 
 # Logistic Regression parameters
-lr_params:
+logistic_regression:
   random_state: 42
   max_iter: 1000
 
-# Output configuration
-output_dir: "models"
-save_metadata: true
+# Hyperparameter tuning
+hyperparameter_tuning:
+  # Whether to enable hyperparameter tuning
+  enabled: false
+  # Number of trials for Optuna
+  n_trials: 50
+  # Timeout for tuning (seconds)
+  timeout: 300
 
-# Wandb configuration
-wandb_project: "alz_detect"
-wandb_entity: null
-log_artifacts: true
+# Output configuration
+output:
+  # Output directory for models
+  directory: "models"
+  # Whether to save metadata
+  save_metadata: true
+  # Whether to log artifacts
+  log_artifacts: true
+
+# Experiment tracking
+experiment_tracking:
+  # Whether to enable experiment tracking
+  enabled: true
+  # Tracking backend (wandb, mlflow, none)
+  backend: "wandb"
+  # Project name for tracking
+  project_name: "alzheimers_prediction"

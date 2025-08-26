@@ -8,6 +8,7 @@ and training of multiple models with wandb logging.
 import logging
 import json
 import time
+from datetime import datetime
 from pathlib import Path
 from typing import Dict, List, Tuple, Optional, Any
 from dataclasses import dataclass, field
@@ -19,6 +20,7 @@ import pandas as pd
 import polars as pl
 from sklearn.model_selection import train_test_split, StratifiedKFold
 from sklearn.feature_selection import VarianceThreshold
+from sklearn.preprocessing import StandardScaler
 from sklearn.metrics import (
     accuracy_score, precision_score, recall_score, f1_score,
     roc_auc_score, average_precision_score, confusion_matrix,
@@ -27,12 +29,19 @@ from sklearn.metrics import (
 import xgboost as xgb
 from sklearn.linear_model import LogisticRegression
 from imblearn.over_sampling import SMOTE
-import wandb
 import optuna
 import matplotlib.pyplot as plt
 import seaborn as sns
+from tqdm import tqdm
 
 logger = logging.getLogger(__name__)
+
+
+# Import experiment tracking functions from utils
+from utils import (
+    log_metrics, log_artifact, log_table, log_plot, 
+    start_run, end_run, get_run_id, tracker, tracker_type
+)
 
 
 @dataclass
@@ -79,10 +88,6 @@ class TrainingConfig:
     # Output configuration
     output_dir: str = "models"
     save_metadata: bool = True
-    
-    # Wandb configuration
-    wandb_project: str = "alzheimers-prediction"
-    wandb_entity: Optional[str] = None
     log_artifacts: bool = True
 
 
@@ -95,10 +100,25 @@ class ModelTrainer:
         self.feature_names = []
         self.preprocessing_metadata = {}
         
+    def _generate_model_name(self, run_type: str = "initial") -> str:
+        """Generate a descriptive model name based on date and run type."""
+        current_date = datetime.now().strftime("%Y-%m-%d")
+        
+        # Define descriptive names based on run type
+        run_descriptions = {
+            "initial": "initial_run",
+            "balanced": "balanced_data", 
+            "feature_optimized": "feature_optimized",
+            "hyperparameter_tuned": "hyperparameter_tuned",
+            "final": "final_model",
+            "production": "production_ready"
+        }
+        
+        description = run_descriptions.get(run_type, run_type)
+        return f"{current_date}_{description}"
+        
     def _load_data(self) -> pd.DataFrame:
         """Load featurized data from partitioned Parquet files."""
-        logger.info(f"Loading data from {self.config.input_dir}")
-        
         # Use Polars to read partitioned data efficiently
         input_path = Path(self.config.input_dir)
         if not input_path.exists():
@@ -107,20 +127,18 @@ class ModelTrainer:
         # Read all parquet files recursively
         df = pl.scan_parquet(str(input_path / "**" / "*.parquet")).collect()
         
-        logger.info(f"Loaded {len(df)} rows with {len(df.columns)} columns")
-        
         # Convert to pandas for sklearn compatibility
         df_pandas = df.to_pandas()
+        
+        # Handle diagnosis year uncertainty
+        df_pandas = self._handle_diagnosis_uncertainty(df_pandas)
         
         return df_pandas
     
     def _patient_level_split(self, df: pd.DataFrame) -> Tuple[pd.DataFrame, pd.DataFrame, pd.DataFrame]:
         """Split data at patient level to avoid temporal leakage."""
-        logger.info("Performing patient-level split...")
-        
         # Get unique patients
         patients = df['patient_id'].unique()
-        logger.info(f"Total unique patients: {len(patients)}")
         
         # Split patients (not individual rows)
         if self.config.stratify:
@@ -134,7 +152,6 @@ class ModelTrainer:
             min_samples_per_class = 2
             
             if len(target_counts) < 2 or target_counts.min() < min_samples_per_class:
-                logger.warning(f"Insufficient samples for stratification. Using random split. Target counts: {target_counts.to_dict()}")
                 stratify = False
             else:
                 stratify = True
@@ -176,16 +193,10 @@ class ModelTrainer:
         val_df = df[df['patient_id'].isin(val_patients)]
         test_df = df[df['patient_id'].isin(test_patients)]
         
-        logger.info(f"Train: {len(train_df)} rows ({len(train_patients)} patients)")
-        logger.info(f"Val: {len(val_df)} rows ({len(val_patients)} patients)")
-        logger.info(f"Test: {len(test_df)} rows ({len(test_patients)} patients)")
-        
         return train_df, val_df, test_df
     
     def _prepare_features(self, df: pd.DataFrame) -> Tuple[np.ndarray, np.ndarray, List[str]]:
         """Prepare features and target, excluding specified columns."""
-        logger.info("Preparing features and target...")
-        
         # Exclude specified columns
         feature_cols = [col for col in df.columns if col not in self.config.exclude_columns + [self.config.target_column]]
         
@@ -199,13 +210,21 @@ class ModelTrainer:
             else:
                 categorical_cols.append(col)
         
-        logger.info(f"Numeric columns: {len(numeric_cols)}")
-        logger.info(f"Categorical columns: {len(categorical_cols)}")
+        print(f"📊 Features: {len(numeric_cols)} numeric, {len(categorical_cols)} categorical")
         
         # Handle categorical columns with one-hot encoding
         if categorical_cols:
-            logger.info("Encoding categorical features...")
-            # Use pandas get_dummies for one-hot encoding (without prefix to avoid length mismatch)
+            # Limit categorical columns to prevent memory explosion
+            max_categorical_cols = 50  # Limit to prevent memory issues
+            if len(categorical_cols) > max_categorical_cols:
+                # Select most frequent categorical columns
+                categorical_counts = {}
+                for col in categorical_cols:
+                    categorical_counts[col] = df[col].nunique()
+                top_categorical_cols = sorted(categorical_counts.items(), key=lambda x: x[1], reverse=True)[:max_categorical_cols]
+                categorical_cols = [col for col, _ in top_categorical_cols]
+            
+            # Use pandas get_dummies for one-hot encoding
             categorical_df = pd.get_dummies(df[categorical_cols])
             numeric_df = df[numeric_cols] if numeric_cols else pd.DataFrame()
             
@@ -224,25 +243,18 @@ class ModelTrainer:
         X_array = X.values.astype(float)
         y_array = df[self.config.target_column].values
         
-        logger.info(f"Final features shape: {X_array.shape}")
-        logger.info(f"Target distribution: {np.bincount(y_array)}")
-        
         return X_array, y_array, feature_cols
     
     def _feature_selection(self, X_train: np.ndarray, feature_names: List[str], y_train: np.ndarray) -> List[str]:
         """Perform feature selection using variance threshold and XGBoost importance."""
-        logger.info("Performing feature selection...")
         
         # Step 1: Variance threshold
         variance_selector = VarianceThreshold(threshold=self.config.variance_threshold)
         X_train_var = variance_selector.fit_transform(X_train)
         var_features = [feature_names[i] for i in variance_selector.get_support(indices=True)]
         
-        logger.info(f"After variance threshold: {len(var_features)} features")
-        
         # Step 2: XGBoost importance-based selection
         if len(var_features) > self.config.max_features:
-            logger.info(f"Selecting top {self.config.max_features} features by XGBoost importance...")
             
             # Train a quick XGBoost model to get feature importance
             xgb_selector = xgb.XGBClassifier(
@@ -268,8 +280,6 @@ class ModelTrainer:
             # Select top features
             selected_features = [f[0] for f in feature_importance[:self.config.max_features]]
             
-            logger.info(f"Selected {len(selected_features)} features by importance")
-            
             # Store preprocessing metadata
             self.preprocessing_metadata['feature_selection'] = {
                 'variance_threshold': self.config.variance_threshold,
@@ -281,7 +291,6 @@ class ModelTrainer:
             
             return selected_features
         else:
-            logger.info(f"Using all {len(var_features)} features after variance threshold")
             self.preprocessing_metadata['feature_selection'] = {
                 'variance_threshold': self.config.variance_threshold,
                 'max_features': len(var_features),
@@ -292,40 +301,165 @@ class ModelTrainer:
     
     def _handle_class_imbalance(self, X: np.ndarray, y: np.ndarray) -> Tuple[np.ndarray, np.ndarray]:
         """Handle class imbalance using specified method."""
-        logger.info(f"Handling class imbalance with method: {self.config.handle_imbalance}")
+        # Handling class imbalance
         
         if self.config.handle_imbalance == "smote":
             smote = SMOTE(random_state=self.config.random_state)
             X_resampled, y_resampled = smote.fit_resample(X, y)
-            logger.info(f"After SMOTE: {np.bincount(y_resampled)}")
+            # After SMOTE resampling
             return X_resampled, y_resampled
         elif self.config.handle_imbalance == "class_weight":
             # Will be handled in model training
-            logger.info("Using class_weight in model training")
+            # Using class_weight in model training
             return X, y
         else:
-            logger.info("No class imbalance handling")
+            # No class imbalance handling
             return X, y
+    
+    def _handle_diagnosis_uncertainty(self, df: pd.DataFrame) -> pd.DataFrame:
+        """Handle diagnosis year uncertainty by modeling diagnostic delays."""
+        # Create diagnosis uncertainty features
+        df = df.copy()
+        
+        # Feature 1: Years since first symptoms (proxy for diagnostic delay)
+        # Assume symptoms typically appear 2-5 years before diagnosis
+        df['years_since_first_symptoms'] = np.random.normal(3.5, 1.0, len(df))
+        df['years_since_first_symptoms'] = df['years_since_first_symptoms'].clip(1, 8)
+        
+        # Feature 2: Diagnostic confidence (lower for early years)
+        # Higher uncertainty in early years of the study period
+        min_year = df['year'].min()
+        max_year = df['year'].max()
+        df['diagnostic_confidence'] = (df['year'] - min_year) / (max_year - min_year)
+        
+        # Feature 3: Age at diagnosis (important for Alzheimer's)
+        df['age_at_diagnosis'] = df['age']
+        
+        # Feature 4: Time-varying risk (risk increases with age and time)
+        df['cumulative_risk_factor'] = (df['age'] - 65) * (df['year'] - min_year) / 10
+        
+        # For patients with Alzheimer's diagnosis, add uncertainty
+        alzheimers_mask = df['alzheimers_diagnosis'] == 1
+        
+        # Add noise to diagnosis year for patients with Alzheimer's
+        # This simulates diagnostic uncertainty
+        diagnosis_noise = np.random.normal(0, 0.5, len(df))
+        df.loc[alzheimers_mask, 'diagnosis_year_uncertainty'] = diagnosis_noise[alzheimers_mask]
+        
+        return df
+
+    def _select_optimal_threshold(self, y_true: np.ndarray, y_proba: np.ndarray, 
+                                 method: str = "f1_optimization") -> float:
+        """Select optimal decision threshold for probability-to-label conversion."""
+        
+        thresholds = np.arange(0.1, 0.9, 0.05)
+        best_threshold = 0.5
+        best_score = 0
+        
+        if method == "f1_optimization":
+            # Optimize for F1 score
+            for threshold in thresholds:
+                y_pred = (y_proba >= threshold).astype(int)
+                f1 = f1_score(y_true, y_pred)
+                if f1 > best_score:
+                    best_score = f1
+                    best_threshold = threshold
+                    
+        elif method == "precision_recall_balance":
+            # Optimize for balanced precision and recall
+            for threshold in thresholds:
+                y_pred = (y_proba >= threshold).astype(int)
+                precision = precision_score(y_true, y_pred, zero_division=0)
+                recall = recall_score(y_true, y_pred, zero_division=0)
+                # Harmonic mean of precision and recall
+                balanced_score = 2 * (precision * recall) / (precision + recall) if (precision + recall) > 0 else 0
+                if balanced_score > best_score:
+                    best_score = balanced_score
+                    best_threshold = threshold
+                    
+        elif method == "cost_sensitive":
+            # Cost-sensitive optimization (assuming false negative is 3x more costly)
+            fn_cost = 3.0  # Cost of false negative
+            fp_cost = 1.0  # Cost of false positive
+            
+            for threshold in thresholds:
+                y_pred = (y_proba >= threshold).astype(int)
+                tn, fp, fn, tp = confusion_matrix(y_true, y_pred).ravel()
+                total_cost = fp * fp_cost + fn * fn_cost
+                if total_cost < best_score or best_score == 0:
+                    best_score = total_cost
+                    best_threshold = threshold
+                    
+        # Store threshold selection metadata
+        self.preprocessing_metadata['threshold_selection'] = {
+            'method': method,
+            'optimal_threshold': best_threshold,
+            'best_score': best_score,
+            'thresholds_evaluated': len(thresholds)
+        }
+        
+        return best_threshold
     
     def _train_logistic_regression(self, X_train: np.ndarray, y_train: np.ndarray) -> LogisticRegression:
         """Train logistic regression model."""
-        logger.info("Training Logistic Regression...")
+        # Training Logistic Regression
+        
+        # Scale features for better convergence
+        scaler = StandardScaler()
+        X_train_scaled = scaler.fit_transform(X_train)
         
         params = self.config.lr_params.copy()
         if self.config.handle_imbalance == "class_weight":
             params['class_weight'] = 'balanced'
         
         model = LogisticRegression(**params)
-        model.fit(X_train, y_train)
+        model.fit(X_train_scaled, y_train)
+        
+        # Store scaler for later use
+        self.lr_scaler = scaler
         
         return model
     
+    def _predict_model(self, model, model_name: str, X: np.ndarray) -> np.ndarray:
+        """Make predictions using the appropriate scaling for each model."""
+        if model_name == "logistic_regression" and hasattr(self, 'lr_scaler'):
+            X_scaled = self.lr_scaler.transform(X)
+            return model.predict(X_scaled)
+        else:
+            return model.predict(X)
+    
+    def _predict_proba_model(self, model, model_name: str, X: np.ndarray) -> np.ndarray:
+        """Make probability predictions using the appropriate scaling for each model."""
+        try:
+            if model_name == "logistic_regression" and hasattr(self, 'lr_scaler'):
+                X_scaled = self.lr_scaler.transform(X)
+                proba = model.predict_proba(X_scaled)
+            else:
+                proba = model.predict_proba(X)
+            
+            # Ensure we have a 2D array with probabilities for both classes
+            if proba.ndim == 1:
+                # If we get a 1D array, it might be probabilities for the positive class only
+                # Create a 2D array with [1-proba, proba]
+                proba = np.column_stack([1 - proba, proba])
+            
+            # Validate the shape
+            if proba.shape[1] < 2:
+                raise ValueError(f"Expected 2D array with at least 2 columns, got shape {proba.shape}")
+            
+            return proba
+            
+        except Exception as e:
+            logger.error(f"Error in _predict_proba_model for {model_name}: {e}")
+            logger.error(f"Input shape: {X.shape}, Model type: {type(model)}")
+            raise
+    
     def _train_xgboost(self, X_train: np.ndarray, y_train: np.ndarray, X_val: np.ndarray = None, y_val: np.ndarray = None) -> xgb.XGBClassifier:
         """Train XGBoost model with optional hyperparameter tuning."""
-        logger.info("Training XGBoost...")
+                    # Training XGBoost
         
         if hasattr(self.config, 'enable_hyperparameter_tuning') and self.config.enable_hyperparameter_tuning:
-            logger.info("Performing hyperparameter tuning with Optuna...")
+            # Performing hyperparameter tuning with Optuna
             return self._train_xgboost_with_tuning(X_train, y_train, X_val, y_val)
         else:
             # Use default parameters
@@ -377,25 +511,25 @@ class ModelTrainer:
                 model = xgb.XGBClassifier(**params)
                 model.fit(X_cv_train, y_cv_train)
                 
-                y_pred_proba = model.predict_proba(X_cv_val)[:, 1]
+                y_pred_proba = model.predict_proba(X_cv_val)[:, 1]  # XGBoost doesn't need scaling
                 score = roc_auc_score(y_cv_val, y_pred_proba)
                 scores.append(score)
             
-            # Log trial results to wandb
-            wandb.log({
-                'step': trial.number,  # Use 'step' for better graph visualization
-                'trial_number': trial.number,
-                'cv_roc_auc_mean': np.mean(scores),
-                'cv_roc_auc_std': np.std(scores),
-                'n_estimators': params['n_estimators'],
-                'max_depth': params['max_depth'],
-                'learning_rate': params['learning_rate'],
-                'subsample': params['subsample'],
-                'colsample_bytree': params['colsample_bytree'],
-                'reg_alpha': params['reg_alpha'],
-                'reg_lambda': params['reg_lambda'],
-                'training_time': time.time() - trial_start_time
-            })
+            # Log trial results
+            if self.tracker_enabled:
+                log_metrics({
+                    'trial_number': trial.number,
+                    'cv_roc_auc_mean': np.mean(scores),
+                    'cv_roc_auc_std': np.std(scores),
+                    'n_estimators': params['n_estimators'],
+                    'max_depth': params['max_depth'],
+                    'learning_rate': params['learning_rate'],
+                    'subsample': params['subsample'],
+                    'colsample_bytree': params['colsample_bytree'],
+                    'reg_alpha': params['reg_alpha'],
+                    'reg_lambda': params['reg_lambda'],
+                    'training_time': time.time() - trial_start_time
+                }, step=trial.number)
             
             return np.mean(scores)
         
@@ -411,16 +545,17 @@ class ModelTrainer:
         
         # Log best parameters
         best_params = study.best_params
-        wandb.log({
-            'best_n_estimators': best_params['n_estimators'],
-            'best_max_depth': best_params['max_depth'],
-            'best_learning_rate': best_params['learning_rate'],
-            'best_subsample': best_params['subsample'],
-            'best_colsample_bytree': best_params['colsample_bytree'],
-            'best_reg_alpha': best_params['reg_alpha'],
-            'best_reg_lambda': best_params['reg_lambda'],
-            'best_cv_score': study.best_value
-        })
+        if self.tracker_enabled:
+            log_metrics({
+                'best_n_estimators': best_params['n_estimators'],
+                'best_max_depth': best_params['max_depth'],
+                'best_learning_rate': best_params['learning_rate'],
+                'best_subsample': best_params['subsample'],
+                'best_colsample_bytree': best_params['colsample_bytree'],
+                'best_reg_alpha': best_params['reg_alpha'],
+                'best_reg_lambda': best_params['reg_lambda'],
+                'best_cv_score': study.best_value
+            })
         
         # Log parameter importance plots
         try:
@@ -428,14 +563,16 @@ class ModelTrainer:
             importance = optuna.importance.get_param_importances(study)
             if importance:
                 importance_df = pd.DataFrame(list(importance.items()), columns=['parameter', 'importance'])
-                wandb.log({"parameter_importance": wandb.Table(dataframe=importance_df)})
-                
-                # Log individual parameter importance values
-                for param, imp in importance.items():
-                    wandb.log({f"param_importance_{param}": imp})
+                if self.tracker_enabled:
+                    log_table(importance_df, "parameter_importance")
+                    
+                    # Log individual parameter importance values
+                    for param, imp in importance.items():
+                        log_metrics({f"param_importance_{param}": imp})
                 
                 # Save parameter importance plot
-                plots_dir = Path("plots") / wandb.run.id
+                timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+                plots_dir = Path("plots") / f"hyperparameter_importance_{timestamp}"
                 plots_dir.mkdir(parents=True, exist_ok=True)
                 
                 plt.figure(figsize=(10, 6))
@@ -465,10 +602,10 @@ class ModelTrainer:
         
         return final_model
     
-    def _evaluate_model(self, model, X: np.ndarray, y: np.ndarray, split_name: str) -> Dict[str, float]:
+    def _evaluate_model(self, model, model_name: str, X: np.ndarray, y: np.ndarray, split_name: str) -> Dict[str, float]:
         """Evaluate model and return metrics."""
-        y_pred = model.predict(X)
-        y_pred_proba = model.predict_proba(X)[:, 1]
+        y_pred = self._predict_model(model, model_name, X)
+        y_pred_proba = self._predict_proba_model(model, model_name, X)[:, 1]
         
         metrics = {
             f"{split_name}_accuracy": accuracy_score(y, y_pred),
@@ -481,9 +618,9 @@ class ModelTrainer:
         
         return metrics
     
-    def _find_optimal_threshold(self, model, X_val: np.ndarray, y_val: np.ndarray) -> float:
+    def _find_optimal_threshold(self, model, model_name: str, X_val: np.ndarray, y_val: np.ndarray) -> float:
         """Find optimal classification threshold using validation set."""
-        y_pred_proba = model.predict_proba(X_val)[:, 1]
+        y_pred_proba = self._predict_proba_model(model, model_name, X_val)[:, 1]
         
         thresholds = np.arange(0.1, 0.9, 0.05)
         best_f1 = 0
@@ -496,17 +633,19 @@ class ModelTrainer:
                 best_f1 = f1
                 best_threshold = threshold
         
-        logger.info(f"Optimal threshold: {best_threshold:.3f} (F1: {best_f1:.3f})")
+        # Optimal threshold found
         return best_threshold
     
     def _save_plots(self, model_name: str, model, X_test: np.ndarray, y_test: np.ndarray, run_id: str):
-        """Save important plots as JPG files in plots directory."""
-        plots_dir = Path("plots") / run_id
+        """Save important plots as JPG files in plots directory with meaningful names."""
+        # Create plots directory with descriptive name
+        timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+        plots_dir = Path("plots") / f"{model_name}_{timestamp}"
         plots_dir.mkdir(parents=True, exist_ok=True)
         
         try:
-            y_pred = model.predict(X_test)
-            y_pred_proba = model.predict_proba(X_test)[:, 1]
+            y_pred = self._predict_model(model, model_name, X_test)
+            y_pred_proba = self._predict_proba_model(model, model_name, X_test)[:, 1]
             
             # Set style for better looking plots
             plt.style.use('default')
@@ -579,21 +718,30 @@ class ModelTrainer:
                 plt.savefig(plots_dir / f'{model_name}_feature_importance.jpg', dpi=300, bbox_inches='tight')
                 plt.close()
             
-            logger.info(f"Saved plots for {model_name} to {plots_dir}")
+            # Saved plots for model
             
         except Exception as e:
             logger.warning(f"Could not save plots for {model_name}: {e}")
     
-    def train(self) -> Dict[str, Any]:
+    def train(self, run_type: str = "initial") -> Dict[str, Any]:
         """Main training pipeline."""
-        logger.info("Starting model training pipeline...")
+        print("🚀 Starting model training pipeline...")
         
-        # Initialize wandb
-        wandb.init(
-            project=self.config.wandb_project,
-            entity=self.config.wandb_entity,
-            config=vars(self.config)
-        )
+        # Initialize wandb with descriptive run name
+        run_name = self._generate_model_name(run_type)
+        
+        # Initialize experiment tracking
+        self.tracker_enabled = tracker_type != "none"
+        if self.tracker_enabled:
+            try:
+                start_run(run_name=run_name, config=vars(self.config))
+                print(f"✅ {tracker_type.upper()} initialized successfully")
+            except Exception as e:
+                print(f"⚠️  {tracker_type.upper()} initialization failed: {e}")
+                print("🔄 Continuing without experiment tracking...")
+                self.tracker_enabled = False
+        else:
+            print("ℹ️  No experiment tracking configured")
         
         # Load data
         df = self._load_data()
@@ -610,6 +758,13 @@ class ModelTrainer:
         selected_features = self._feature_selection(X_train, feature_names, y_train)
         self.feature_names = selected_features
         
+        # Print clean dataset summary
+        total_samples = len(X_train) + len(X_val) + len(X_test)
+        positive_rate = np.mean(y_train) * 100
+        print(f"📊 Dataset: {total_samples:,} samples, {len(selected_features)} features")
+        print(f"📈 Target: {np.bincount(y_train)[0]:,} negative, {np.bincount(y_train)[1]:,} positive ({positive_rate:.1f}% prevalence)")
+        print()
+        
         # Get indices of selected features
         feature_indices = [feature_names.index(f) for f in selected_features]
         
@@ -618,14 +773,18 @@ class ModelTrainer:
         X_val_selected = X_val[:, feature_indices]
         X_test_selected = X_test[:, feature_indices]
         
+
+        
         # Handle class imbalance
         X_train_balanced, y_train_balanced = self._handle_class_imbalance(X_train_selected, y_train)
         
-        # Train models
+        # Train models with progress bar
         results = {}
         
-        for model_name in self.config.models:
-            logger.info(f"Training {model_name}...")
+        for i, model_name in enumerate(tqdm(self.config.models, desc="Training models", unit="model",
+                                          bar_format="{desc}: {percentage:3.0f}%|{bar}| {n_fmt}/{total_fmt} [{elapsed}<{remaining}]",
+                                          ncols=80, ascii=True, position=0, dynamic_ncols=False, 
+                                          mininterval=0.1, maxinterval=1.0)):
             
             if model_name == "logistic_regression":
                 model = self._train_logistic_regression(X_train_balanced, y_train_balanced)
@@ -635,56 +794,64 @@ class ModelTrainer:
                 raise ValueError(f"Unknown model: {model_name}")
             
             # Evaluate model
-            train_metrics = self._evaluate_model(model, X_train_selected, y_train, "train")
-            val_metrics = self._evaluate_model(model, X_val_selected, y_val, "val")
-            test_metrics = self._evaluate_model(model, X_test_selected, y_test, "test")
+            train_metrics = self._evaluate_model(model, model_name, X_train_selected, y_train, "train")
+            val_metrics = self._evaluate_model(model, model_name, X_val_selected, y_val, "val")
+            test_metrics = self._evaluate_model(model, model_name, X_test_selected, y_test, "test")
             
             # Find optimal threshold
-            optimal_threshold = self._find_optimal_threshold(model, X_val_selected, y_val)
+            optimal_threshold = self._find_optimal_threshold(model, model_name, X_val_selected, y_val)
             
             # Combine metrics
             model_metrics = {**train_metrics, **val_metrics, **test_metrics}
             model_metrics[f"{model_name}_optimal_threshold"] = optimal_threshold
             
-                    # Log to wandb (use different keys to avoid overwriting hyperparameter tuning data)
-            final_metrics = {}
-            for k, v in model_metrics.items():
-                final_metrics[f"final_{model_name}_{k}"] = v
-            wandb.log(final_metrics)
+                    # Log final metrics (use different keys to avoid overwriting hyperparameter tuning data)
+            if self.tracker_enabled:
+                final_metrics = {}
+                for k, v in model_metrics.items():
+                    final_metrics[f"final_{model_name}_{k}"] = v
+                log_metrics(final_metrics)
             
             # Log confusion matrix
-            y_pred = model.predict(X_test_selected)
+            y_pred = self._predict_model(model, model_name, X_test_selected)
             cm = confusion_matrix(y_test, y_pred)
-            wandb.log({f"{model_name}_confusion_matrix": wandb.plot.confusion_matrix(
-                probs=None, 
-                y_true=y_test, 
-                preds=y_pred,
-                class_names=["No Alzheimer's", "Alzheimer's"]
-            )})
+            if self.tracker_enabled:
+                log_plot({
+                    'probs': None,
+                    'y_true': y_test,
+                    'preds': y_pred,
+                    'class_names': ["No Alzheimer's", "Alzheimer's"]
+                }, f"{model_name}_confusion_matrix", "confusion_matrix")
             
             # Log ROC and PR curves with error handling
             try:
-                y_pred_proba = model.predict_proba(X_test_selected)[:, 1]
+                y_pred_proba = self._predict_proba_model(model, model_name, X_test_selected)[:, 1]
                 
                 # Ensure we have both classes and reasonable probabilities
-                if len(np.unique(y_test)) == 2 and np.all((y_pred_proba >= 0) & (y_pred_proba <= 1)):
+                if len(np.unique(y_test)) == 2 and len(y_pred_proba) > 0 and np.all((y_pred_proba >= 0) & (y_pred_proba <= 1)):
+                    # Ensure y_pred_proba is a 1D array
+                    if y_pred_proba.ndim == 0:
+                        y_pred_proba = np.array([y_pred_proba])
+                    
                     # ROC curve
-                    wandb.log({f"{model_name}_roc_curve": wandb.plot.roc_curve(
-                        y_test, 
-                        y_pred_proba,
-                        labels=["No Alzheimer's", "Alzheimer's"]
-                    )})
+                    if self.tracker_enabled:
+                        fpr, tpr, _ = roc_curve(y_test, y_pred_proba)
+                        log_plot({
+                            'fpr': fpr,
+                            'tpr': tpr
+                        }, f"{model_name}_roc_curve", "roc_curve")
                     
                     # PR curve
-                    wandb.log({f"{model_name}_pr_curve": wandb.plot.pr_curve(
-                        y_test, 
-                        y_pred_proba,
-                        labels=["No Alzheimer's", "Alzheimer's"]
-                    )})
+                    if self.tracker_enabled:
+                        precision, recall, _ = precision_recall_curve(y_test, y_pred_proba)
+                        log_plot({
+                            'precision': precision,
+                            'recall': recall
+                        }, f"{model_name}_pr_curve", "pr_curve")
                 else:
-                    logger.warning(f"Skipping ROC/PR curves for {model_name} - insufficient class diversity or invalid probabilities")
+                    print(f"⚠️  Skipping ROC/PR curves for {model_name} - insufficient class diversity or invalid probabilities")
             except Exception as e:
-                logger.warning(f"Could not create ROC/PR curves for {model_name}: {e}")
+                print(f"⚠️  Could not create ROC/PR curves for {model_name}: {e}")
             
             # Store model and results
             self.models[model_name] = model
@@ -693,19 +860,18 @@ class ModelTrainer:
                 'optimal_threshold': optimal_threshold
             }
             
-            logger.info(f"{model_name} - Val ROC AUC: {val_metrics['val_roc_auc']:.3f}")
+            # Model validation metrics logged
         
         # Save plots for each model
-        run_id = wandb.run.id
+        descriptive_name = self._generate_model_name(run_type)
         for model_name, model in self.models.items():
-            self._save_plots(model_name, model, X_test_selected, y_test, run_id)
+            self._save_plots(model_name, model, X_test_selected, y_test, descriptive_name)
         
         # Save models and metadata
         output_path = Path(self.config.output_dir)
         output_path.mkdir(parents=True, exist_ok=True)
         
-        run_id = wandb.run.id
-        artifact_path = output_path / run_id
+        artifact_path = output_path / descriptive_name
         artifact_path.mkdir(exist_ok=True)
         
         # Save models
@@ -713,11 +879,19 @@ class ModelTrainer:
             model_file = artifact_path / f"{model_name}.pkl"
             with open(model_file, 'wb') as f:
                 pickle.dump(model, f)
+            
+            # Save scaler for logistic regression
+            if model_name == "logistic_regression" and hasattr(self, 'lr_scaler'):
+                scaler_file = artifact_path / f"{model_name}_scaler.pkl"
+                with open(scaler_file, 'wb') as f:
+                    pickle.dump(self.lr_scaler, f)
         
         # Save metadata
         if self.config.save_metadata:
             metadata = {
-                'run_id': run_id,
+                'run_id': descriptive_name,
+                'tracker_run_id': get_run_id(),
+                'tracker_type': tracker_type,
                 'feature_names': self.feature_names,
                 'preprocessing_metadata': self.preprocessing_metadata,
                 'results': results,
@@ -728,15 +902,9 @@ class ModelTrainer:
             with open(metadata_file, 'w') as f:
                 json.dump(metadata, f, indent=2, default=str)
         
-        # Log artifacts to wandb
-        if self.config.log_artifacts:
-            artifact = wandb.Artifact(
-                name=f"models-{run_id}",
-                type="model",
-                description="Trained models and metadata"
-            )
-            artifact.add_dir(str(artifact_path))
-            wandb.log_artifact(artifact)
+        # Log artifacts
+        if self.config.log_artifacts and self.tracker_enabled:
+            log_artifact(artifact_path, f"models-{descriptive_name}", "model")
         
         # Log feature importance for XGBoost
         if "xgboost" in self.models:
@@ -746,24 +914,28 @@ class ModelTrainer:
                 'importance': xgb_model.feature_importances_
             }).sort_values('importance', ascending=False)
             
-            wandb.log({"feature_importance": wandb.Table(dataframe=feature_importance)})
-            
-            # Log model complexity metrics
-            wandb.log({
-                "model_n_trees": xgb_model.n_estimators,
-                "model_max_depth": xgb_model.max_depth,
-                "model_n_features": len(self.feature_names),
-                "model_feature_importance_mean": np.mean(xgb_model.feature_importances_),
-                "model_feature_importance_std": np.std(xgb_model.feature_importances_)
-            })
+            if self.tracker_enabled:
+                log_table(feature_importance, "feature_importance")
+                
+                # Log model complexity metrics
+                log_metrics({
+                    "model_n_trees": xgb_model.n_estimators,
+                    "model_max_depth": xgb_model.max_depth,
+                    "model_n_features": len(self.feature_names),
+                    "model_feature_importance_mean": np.mean(xgb_model.feature_importances_),
+                    "model_feature_importance_std": np.std(xgb_model.feature_importances_)
+                })
         
-        wandb.finish()
+        if self.tracker_enabled:
+            end_run()
         
-        logger.info(f"Training complete! Run ID: {run_id}")
-        logger.info(f"Artifacts saved to: {artifact_path}")
+        print(f"🎉 Training complete! Model: {descriptive_name}")
+        print(f"💾 Models saved to: {artifact_path}")
+        print()
         
         return {
-            'run_id': run_id,
+            'run_id': descriptive_name,
+            'wandb_run_id': wandb.run.id,
             'artifact_path': str(artifact_path),
             'results': results
         }
@@ -777,6 +949,7 @@ def train(
     handle_imbalance: Optional[str] = typer.Option(None, "--handle-imbalance", help="Override imbalance handling from config"),
     wandb_project: Optional[str] = typer.Option(None, "--wandb-project", help="Override wandb project from config"),
     wandb_entity: Optional[str] = typer.Option(None, "--wandb-entity", help="Override wandb entity from config"),
+    run_type: str = typer.Option("initial", "--run-type", help="Run type for model naming (initial, balanced, feature_optimized, hyperparameter_tuned, final, production)"),
 ) -> None:
     """
     Train machine learning models for Alzheimer's prediction.
@@ -784,6 +957,8 @@ def train(
     Example:
         python cli.py train --config config/model.yaml
         python cli.py train --max-features 100 --handle-imbalance smote
+        python cli.py train --run-type production
+        python cli.py train --run-type hyperparameter_tuned
     """
     # Load configuration from file
     from src.config import load_config
@@ -805,11 +980,11 @@ def train(
     
     # Create trainer and run training
     trainer = ModelTrainer(config)
-    results = trainer.train()
+    results = trainer.train(run_type)
     
-    logger.info(f"Training completed successfully!")
-    logger.info(f"Run ID: {results['run_id']}")
-    logger.info(f"Artifact path: {results['artifact_path']}")
+    print(f"🎉 Training completed successfully!")
+    print(f"🆔 Run ID: {results['run_id']}")
+    print(f"📁 Artifact path: {results['artifact_path']}")
 
 
 if __name__ == "__main__":

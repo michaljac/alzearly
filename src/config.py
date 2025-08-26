@@ -33,10 +33,13 @@ class PreprocessConfig:
     output_dir: str = "data/featurized"
     rolling_window_years: int = 3
     numeric_columns: Optional[list[str]] = None
+    categorical_columns: Optional[list[str]] = None
+    binary_columns: Optional[list[str]] = None
     chunk_size: int = 100_000
     seed: int = 42
     target_column: str = "alzheimers_diagnosis"
     risk_thresholds: Dict[str, Dict[str, float]] = field(default_factory=dict)
+    categorical_encoding: Dict[str, Any] = field(default_factory=dict)
 
 
 @dataclass
@@ -116,7 +119,7 @@ class ConfigLoader:
         with open(filepath, 'r') as f:
             config = yaml.safe_load(f)
         
-        logger.info(f"Loaded configuration from {filepath}")
+        # Loaded configuration from file
         return config
     
     def load_data_gen_config(self, filename: str = "data_gen.yaml") -> DataGenConfig:
@@ -132,7 +135,7 @@ class ConfigLoader:
         # Override n_patients if target_rows is specified
         if target_rows:
             n_patients = target_rows // len(years)
-            logger.info(f"Calculated n_patients={n_patients} from target_rows={target_rows}")
+            # Calculated n_patients from target_rows
         
         # Extract target configuration
         target = config.get("target", {})
@@ -177,6 +180,8 @@ class ConfigLoader:
         features = config.get("features", {})
         target_column = features.get("target_column", "alzheimers_diagnosis")
         numeric_columns = features.get("numeric_columns")
+        categorical_columns = features.get("categorical_columns")
+        binary_columns = features.get("binary_columns")
         
         # Extract rolling configuration
         rolling = config.get("rolling", {})
@@ -190,15 +195,21 @@ class ConfigLoader:
         # Extract risk feature thresholds
         risk_features = config.get("risk_features", {})
         
+        # Extract categorical encoding configuration
+        categorical_encoding = config.get("categorical_encoding", {})
+        
         return PreprocessConfig(
             input_dir=input_dir,
             output_dir=output_dir,
             rolling_window_years=rolling_window_years,
             numeric_columns=numeric_columns,
+            categorical_columns=categorical_columns,
+            binary_columns=binary_columns,
             chunk_size=chunk_size,
             seed=seed,
             target_column=target_column,
-            risk_thresholds=risk_features
+            risk_thresholds=risk_features,
+            categorical_encoding=categorical_encoding
         )
     
     def load_model_config(self, filename: str = "model.yaml") -> ModelConfig:

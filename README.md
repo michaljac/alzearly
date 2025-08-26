@@ -1,127 +1,431 @@
-# Alzheimer's Disease Prediction Project
+# Alzearly 🧠
 
-A comprehensive machine learning pipeline for predicting Alzheimer's disease using synthetic clinical data with realistic features and temporal patterns.
+> **Early Detection of Alzheimer's Disease**
 
-## 🎯 Project Overview
+![Alzearly Logo](hippo.jpeg)
 
-This project implements a complete ML pipeline for Alzheimer's disease prediction, featuring:
+A comprehensive machine learning pipeline for early detection of Alzheimer's disease using synthetic patient data, featuring XGBoost and Logistic Regression models with automated evaluation and API serving capabilities.
 
-- **Synthetic Data Generation**: Realistic patient-year clinical data with 5-10% positive prevalence
-- **Feature Engineering**: 191 features including rolling statistics, temporal changes, and risk factors
-- **Memory-Efficient Processing**: Polars Lazy evaluation for large-scale datasets
-- **Configuration-Driven**: YAML-based configuration for all pipeline components
-- **Scalable Architecture**: Designed to handle millions of rows with chunked processing
+## 🏗️ **Architecture Overview**
 
-## 📊 Dataset Characteristics
+### **Core Components:**
+- **Data Generation**: Synthetic patient data with realistic Alzheimer's disease patterns
+- **Data Preprocessing**: Feature engineering, encoding, and scaling
+- **Model Training**: XGBoost and Logistic Regression with hyperparameter optimization
+- **Model Evaluation**: Comprehensive metrics (ROC, PR curves, confusion matrices)
+- **API Serving**: FastAPI development server for real-time predictions
+- **Experiment Tracking**: Weights & Biases integration with descriptive run names
 
-### Data Structure
-- **Format**: Patient-year (one row per patient per calendar year)
-- **Scale**: 2M+ rows (configurable)
-- **Features**: 27 base + 164 engineered = 191 total features
-- **Target**: Alzheimer's diagnosis (5-10% positive prevalence)
-- **Storage**: Partitioned Parquet files by year
+### **Technology Stack:**
+- **ML Framework**: Scikit-learn, XGBoost
+- **Data Processing**: Polars (Lazy), Pandas
+- **API Framework**: FastAPI with Uvicorn
+- **Experiment Tracking**: Weights & Biases
+- **Visualization**: Matplotlib, Seaborn
+- **Containerization**: Docker & Docker Compose
+- **Progress Tracking**: TQDM with single-line updates
 
-### Feature Categories
-- **Demographics**: Sex, region, occupation, education, marital status, insurance
-- **Clinical**: Age, BMI, blood pressure, glucose, cholesterol, lab values
-- **Temporal**: Rolling statistics, year-over-year changes, patient aggregates
-- **Risk Factors**: BMI categories, BP categories, age groups, composite risk scores
+## 🚀 **Quick Start**
 
-## 🚀 Quick Start
+## 🚀 **Quick Start**
 
-### 1. Installation
-
-**Choose the appropriate requirements file based on your needs:**
-- `requirements-train.txt` - Full development environment (data generation, preprocessing, training)
-- `requirements-serve.txt` - Lightweight serving environment (model inference only)
-
+### **Option 1: Complete Pipeline (Recommended)**
 ```bash
-# Clone the repository
-git clone <repository-url>
-cd alzheimers-prediction
+python main.py
+```
+This launches an interactive menu where you can:
+- Run individual steps
+- Execute the complete pipeline automatically
+- Create comparison plots
+- Run tests
 
-# Install dependencies for training (includes all packages)
-pip install -r requirements-train.txt
+### **Option 2: Docker Compose (Production Ready)**
 
-# Or install dependencies for serving only
-pip install -r requirements-serve.txt
+#### **Complete Pipeline with Optional API Server (Recommended)**
+```bash
+docker-compose --profile pipeline up
+```
+This will:
+- ✅ Run the complete training pipeline (data generation, preprocessing, training, evaluation)
+- ✅ Ask if you want to start the API server immediately after training
+- ✅ If yes, start the FastAPI server on port 8000
+- ✅ Provide seamless experience from training to serving
+
+#### **Training Only**
+```bash
+docker-compose --profile training up
 ```
 
-### 2. Generate Data
-
+#### **API Server Only**
 ```bash
-# Generate data using default configuration
-python cli.py data-gen
-
-# Generate with custom parameters
-python cli.py data-gen --config config/data_gen.yaml --n-patients 50000 --positive-rate 0.08
-
-# Generate 2M rows (500K patients × 4 years)
-python cli.py data-gen --n-patients 500000
+docker-compose --profile serve up
 ```
 
-### 3. Preprocess Data
-
+#### **Development with Hot Reload**
 ```bash
-# Preprocess with default configuration
-python cli.py preprocess
-
-# Preprocess with custom configuration
-python cli.py preprocess --config config/preprocess.yaml
+docker-compose --profile serve up --build
 ```
 
-### 4. Train Model
-
+### **Option 3: Individual Commands**
 ```bash
-# Train model with default configuration
-python cli.py train
+# Data generation
+python -m src.data_gen
 
-# Train with custom configuration
-python cli.py train --config config/model.yaml
+# Data preprocessing
+python -m src.preprocess
+
+# Model training
+python -m src.train
+
+# Model evaluation
+python -m src.evaluate
+
+# Start API server
+python -m src.serve
 ```
 
-### 5. Serve Model
+### **Training Scripts**
 
+#### **Shell Script (Recommended)**
 ```bash
-# Start the FastAPI server
-uvicorn src.serve:app --host 0.0.0.0 --port 8002
+# Run complete pipeline
+./train.sh full
 
-# The API will be available at:
-# - API Documentation: http://localhost:8002/docs
-# - Health Check: http://localhost:8002/health
-# - Prediction Endpoint: http://localhost:8002/predict
+# Generate data only
+./train.sh data --n-patients 1000
+
+# Train models only
+./train.sh train --wandb-project my-experiment
+
+# Evaluate a model
+./train.sh evaluate models/best_model.pkl data/test_data.csv
 ```
 
-**Test the API:**
+#### **Python Script (More Options)**
 ```bash
-# Run the test script to verify all endpoints
-python test_api.py
+# Run complete pipeline
+python train_script.py --full-pipeline
+
+# Run individual steps
+python train_script.py --data-gen --n-patients 1000
+python train_script.py --preprocess --rolling-window 3
+python train_script.py --train --wandb-project my-exp
 ```
 
-## 🌐 API Documentation
+### **Pipeline Steps**
 
-### FastAPI Server
+#### **1. Data Generation**
+Generates synthetic patient-year data with realistic features for Alzheimer's prediction.
 
-The project includes a production-ready FastAPI server for real-time Alzheimer's disease predictions.
+**Key Parameters:**
+- `--n-patients`: Number of patients to generate
+- `--years`: Years to generate (comma-separated)
+- `--positive-rate`: Positive rate for target variable
+- `--seed`: Random seed for reproducibility
 
-#### Endpoints
+**Example:**
+```bash
+./train.sh data --n-patients 5000 --years "2018,2019,2020" --positive-rate 0.15
+```
 
-- **`GET /`** - API information and available endpoints
-- **`GET /health`** - Health check with model status
-- **`POST /predict`** - Make predictions for patient data
-- **`GET /docs`** - Interactive API documentation (Swagger UI)
+#### **2. Data Preprocessing**
+Preprocesses patient-year data with rolling features using Polars Lazy.
 
-#### Example Usage
+**Key Parameters:**
+- `--rolling-window`: Rolling window in years
+- `--chunk-size`: Chunk size for processing
+- `--input-dir`: Input directory (default: data/raw)
+- `--output-dir`: Output directory (default: data/featurized)
 
+**Example:**
+```bash
+./train.sh preprocess --rolling-window 3 --chunk-size 1000
+```
+
+#### **3. Model Training**
+Trains machine learning models for Alzheimer's prediction with hyperparameter tuning.
+
+**Key Parameters:**
+- `--max-features`: Maximum number of features
+- `--handle-imbalance`: Imbalance handling method (smote, class_weight, etc.)
+- `--wandb-project`: Weights & Biases project name
+- `--wandb-entity`: Weights & Biases entity
+
+**Example:**
+```bash
+./train.sh train --wandb-project alzheimers-prediction --handle-imbalance smote
+```
+
+#### **4. Model Evaluation**
+Evaluates trained models with comprehensive metrics and visualizations.
+
+**Required Parameters:**
+- Model path (e.g., `models/best_model.pkl`)
+- Data path (e.g., `data/test_data.csv`)
+
+**Example:**
+```bash
+./train.sh evaluate models/best_model.pkl data/test_data.csv
+```
+
+### **Common Use Cases**
+
+#### **Quick Experiment**
+```bash
+# Generate small dataset and run quick training
+./train.sh data --n-patients 1000
+./train.sh preprocess
+./train.sh train --wandb-project quick-exp
+```
+
+#### **Production Training**
+```bash
+# Run complete pipeline with production settings
+./train.sh full --n-patients 10000 --wandb-project production-v1
+```
+
+#### **Hyperparameter Tuning**
+```bash
+# Train with specific hyperparameters
+./train.sh train --max-features 100 --handle-imbalance smote --wandb-project hyperopt
+```
+
+### **Expected Workflow**
+```bash
+# Run complete pipeline with optional API server
+docker-compose --profile pipeline up
+
+# Expected output:
+🧠 Alzearly - Complete Pipeline with Optional API Server
+============================================================
+🚀 Starting Alzearly Training Pipeline...
+[Training completes...]
+🎉 Training Pipeline Completed Successfully!
+
+🤔 Would you like to start the API server now? (y/n): y
+🚀 Starting API server...
+📊 API available at: http://localhost:8000
+📖 Interactive docs at: http://localhost:8000/docs
+```
+
+## 📊 **Model Comparison and Visualization**
+
+The pipeline automatically generates comprehensive comparison plots showing:
+- **ROC Curves**: XGBoost vs Logistic Regression performance
+- **Precision-Recall Curves**: Model comparison on imbalanced data
+- **Confusion Matrices**: Detailed classification results
+- **Feature Importance**: Key predictive features
+
+All plots are saved in the `plots/` directory with timestamps for easy tracking.
+
+## 🔬 **Experiment Tracking**
+
+The pipeline supports multiple experiment tracking systems:
+
+### **Weights & Biases (wandb)**
+- **Cloud-based tracking** with API key authentication
+- **Offline mode** for local development
+- **Automatic logging** of metrics, plots, and model artifacts
+- **Experiment tracking** with hyperparameters and training history
+
+### **MLflow (Local)**
+- **Local file-based tracking** stored in `./mlruns/`
+- **Automatic setup** and configuration
+- **Artifact management** for models and evaluation results
+- **Experiment organization** with run history
+
+### **No Tracking**
+- **Skip experiment tracking** entirely for faster execution
+- **Local file storage** of models and plots
+- **Suitable for** development and testing
+
+### **Setup**
+When you run the pipeline, you'll be prompted to choose your preferred tracking system:
+```
+🔬 Experiment Tracking Setup
+==================================================
+Select experiment tracker:
+1. Weights & Biases (wandb)
+2. MLflow (local)
+3. No tracking
+
+Enter choice (1-3, default=1):
+```
+
+The system will automatically:
+- Install required packages if needed
+- Configure tracking settings
+- Handle authentication (for wandb)
+- Provide fallback options if setup fails
+
+## 🐳 **Docker Architecture**
+
+### **Services**
+- **Training Service**: Handles data generation, preprocessing, training, and evaluation
+- **Serving Service**: FastAPI development server for real-time predictions
+- **Pipeline Service**: Complete pipeline with optional API server startup
+
+### **Shared Volumes**
+- `./models` - Trained models with descriptive names
+- `./artifacts` - Evaluation results
+- `./data` - Generated and processed data
+- `./plots` - Visualization outputs with meaningful names
+- `./config` - Configuration files
+- `./src` - Source code
+
+### **Expected Workflow**
+```bash
+# Run complete pipeline with optional API server
+docker-compose --profile pipeline up
+
+# Expected output:
+🧠 Alzearly - Complete Pipeline with Optional API Server
+============================================================
+🚀 Starting Alzearly Training Pipeline...
+[Training completes...]
+🎉 Training Pipeline Completed Successfully!
+
+🤔 Would you like to start the API server now? (y/n): y
+🚀 Starting API server...
+📊 API available at: http://localhost:8000
+📖 Interactive docs at: http://localhost:8000/docs
+```
+
+## 📁 **Project Structure**
+
+```
+alzearly/
+├── main.py                 # Interactive pipeline runner
+├── cli.py                  # Command-line interface
+├── src/
+│   ├── data_gen.py        # Synthetic data generation
+│   ├── preprocess.py      # Data preprocessing and feature engineering
+│   ├── train.py           # Model training with hyperparameter tuning
+│   ├── evaluate.py        # Model evaluation and metrics
+│   ├── serve.py           # FastAPI server for predictions
+│   ├── parallel.py        # Parallel processing utilities
+│   ├── model_versioning.py # Model versioning and A/B testing
+│   ├── config.py          # Configuration management
+│   └── units.py           # Unit conversion utilities
+├── config/
+│   ├── data_gen.yaml      # Data generation parameters
+│   ├── preprocess.yaml    # Preprocessing configuration
+│   └── model.yaml         # Model training parameters
+├── data/                  # Generated and processed data
+├── models/                # Trained models with descriptive names
+├── artifacts/             # Evaluation artifacts and results
+├── plots/                 # Generated comparison plots
+├── docker-compose.yml     # Multi-service container orchestration
+├── Dockerfile             # Training service container
+├── Dockerfile.serve       # Serving service container
+├── pipeline_with_server.py # Complete pipeline with optional API server
+└── requirements-serve.txt # Serving dependencies
+```
+
+## 🔧 **Configuration**
+
+### **Data Generation** (`config/data_gen.yaml`)
+- Patient demographics and medical history
+- Disease progression patterns
+- Temporal data spanning 2021-2024
+
+### **Preprocessing** (`config/preprocess.yaml`)
+- Feature engineering strategies
+- Categorical encoding methods
+- Data validation rules
+
+### **Model Training** (`config/model.yaml`)
+- Hyperparameter ranges for optimization
+- Cross-validation settings
+- Model-specific parameters
+
+## 📈 **Performance Features**
+
+### **Progress Tracking**
+- Single-line TQDM progress bars throughout the pipeline
+- Percentage-based updates for long-running operations
+- Clean, non-verbose output with essential information only
+
+### **Parallel Processing**
+- Dask integration for large-scale data processing
+- Ray for distributed model training
+- Multiprocessing for CPU-intensive tasks
+
+### **Memory Optimization**
+- Lazy evaluation with Polars
+- Efficient categorical encoding (max 50 columns)
+- Streaming data processing for large datasets
+
+## 🌐 **API Endpoints**
+
+## 🌐 **API Endpoints**
+
+When the serving container is running:
+
+- **Health Check**: `GET /health`
+- **Model Info**: `GET /models`
+- **Prediction**: `POST /predict`
+- **Interactive Docs**: `GET /docs`
+
+### **Quick Start - API Server**
+
+#### **Option 1: Using the Shell Script (Recommended)**
+```bash
+# Run with default settings (Python)
+./serve.sh
+
+# Run with Docker
+./serve.sh docker
+
+# Run with Docker Compose
+./serve.sh compose
+
+# Run on a different port
+./serve.sh python --port 8080
+```
+
+#### **Option 2: Using the Python Script Directly**
+```bash
+# Run with default settings (Python)
+python3 run_serve.py
+
+# Run with Docker
+python3 run_serve.py --method docker
+
+# Run with Docker Compose
+python3 run_serve.py --method compose
+
+# Run on a different port
+python3 run_serve.py --port 8080
+```
+
+### **Available Methods**
+
+#### **1. Python (Default)**
+- **Best for**: Development and testing
+- **Pros**: Fast startup, easy debugging, auto-reload
+- **Cons**: Requires local dependencies
+
+#### **2. Docker**
+- **Best for**: Isolated deployment
+- **Pros**: Consistent environment, no local dependencies
+- **Cons**: Slower startup, requires Docker
+
+#### **3. Docker Compose**
+- **Best for**: Production-like environment
+- **Pros**: Full environment setup, volume mounting
+- **Cons**: Most complex setup
+
+### **Example API Usage**
 ```python
 import requests
 
 # Health check
-response = requests.get("http://localhost:8002/health")
+response = requests.get("http://localhost:8000/health")
 print(response.json())
 
-# Make prediction
-patient_data = {
+# Make a prediction
+response = requests.post("http://localhost:8000/predict", json={
     "patient_id": "P123456",
     "sex": "M",
     "region": "California",
@@ -147,296 +451,126 @@ patient_data = {
     "num_encounters": 3,
     "num_medications": 2,
     "num_lab_tests": 5
-}
+})
 
-response = requests.post("http://localhost:8002/predict", json=patient_data)
 prediction = response.json()
-print(f"Probability: {prediction['probability']:.3f}")
-print(f"Prediction: {'High Risk' if prediction['label'] == 1 else 'Low Risk'}")
+print(f"Alzheimer's Risk: {prediction['probability']:.2%}")
 ```
 
-## ⚙️ Configuration System
-
-The project uses YAML-based configuration files for all components:
-
-### Data Generation (`config/data_gen.yaml`)
-
-```yaml
-# Dataset size and structure
-dataset:
-  n_patients: 100000
-  years: [2018, 2019, 2020, 2021]
-  target_rows: null  # Overrides n_patients if specified
-
-# Target variable configuration
-target:
-  positive_rate: 0.08  # 5-10% recommended
-  column_name: "alzheimers_diagnosis"
-
-# Processing configuration
-processing:
-  rows_per_chunk: 100000
-  seed: 42
-
-# Clinical feature ranges
-clinical_ranges:
-  age:
-    min: 18
-    max: 85
-  bmi:
-    min: 16.0
-    max: 50.0
-  # ... more ranges
-```
-
-### Preprocessing (`config/preprocess.yaml`)
-
-```yaml
-# Input/Output configuration
-io:
-  input_dir: "data/raw"
-  output_dir: "data/featurized"
-
-# Feature engineering
-features:
-  target_column: "alzheimers_diagnosis"
-  numeric_columns:
-    - "age"
-    - "bmi"
-    - "systolic_bp"
-    # ... more columns
-
-# Rolling features
-rolling:
-  window_years: 3
-  statistics: ["mean", "max", "sum", "count"]
-
-# Risk features
-risk_features:
-  bmi_categories:
-    underweight_threshold: 18.5
-    normal_max: 25.0
-    overweight_max: 30.0
-  # ... more thresholds
-```
-
-### Model Training (`config/model.yaml`)
-
-```yaml
-# Model configuration
-model:
-  type: "xgboost"
-  name: "alzheimers_predictor"
-
-# Training configuration
-training:
-  test_size: 0.2
-  validation_size: 0.2
-  cv_folds: 5
-  stratified: true
-
-# Feature selection
-feature_selection:
-  enabled: true
-  method: "mutual_info"
-  n_features: 50
-
-# Hyperparameter tuning
-hyperparameter_tuning:
-  enabled: true
-  method: "bayesian"
-  n_trials: 100
-```
-
-## 📁 Project Structure
-
-```
-alzheimers-prediction/
-├── config/                     # Configuration files
-│   ├── data_gen.yaml          # Data generation config
-│   ├── preprocess.yaml        # Preprocessing config
-│   └── model.yaml             # Model training config
-├── src/                       # Source code
-│   ├── config.py              # Configuration loader
-│   ├── data_gen.py            # Data generation
-│   ├── preprocess.py          # Feature engineering
-│   ├── train.py               # Model training
-│   ├── evaluate.py            # Model evaluation
-│   └── serve.py               # Model serving
-├── data/                      # Data directories
-│   ├── raw/                   # Raw generated data
-│   └── featurized/            # Processed features
-├── models/                    # Trained models
-├── results/                   # Training results
-├── logs/                      # Log files
-├── cli.py                     # Command-line interface
-├── requirements-train.txt     # Training dependencies
-├── requirements-serve.txt     # Serving dependencies
-└── README.md                  # This file
-```
-
-## 🔧 Command Line Interface
-
-### Data Generation
-
+### **API Testing**
 ```bash
-# Basic usage
-python cli.py data-gen
+# Test with the --test flag
+./serve.sh python --test
 
-# With configuration file
-python cli.py data-gen --config config/data_gen.yaml
-
-# Override config parameters
-python cli.py data-gen --n-patients 50000 --positive-rate 0.08
-
-# Generate specific number of rows
-python cli.py data-gen --config config/data_gen.yaml
-# Edit config/data_gen.yaml to set target_rows: 2000000
+# Or manually test
+curl http://localhost:8000/health
 ```
 
-### Preprocessing
+### **Troubleshooting**
 
+#### **Common Issues**
+1. **"No trained models found"**
+   - Make sure you've run the training pipeline first
+   - Check that `artifacts/` or `models/` directory exists
+
+2. **"Missing dependencies"**
+   - Install requirements: `pip install -r requirements-serve.txt`
+
+3. **"Docker not found"**
+   - Install Docker and ensure it's running
+   - For Docker Compose: install Docker Compose
+
+4. **"Port already in use"**
+   - Use a different port: `--port 8080`
+   - Or stop the existing service on port 8000
+
+## 🧪 **Testing**
+
+The pipeline includes comprehensive testing:
+- Unit tests for core functions
+- Integration tests for data flow
+- Model validation tests
+- API endpoint testing
+
+Run tests with:
 ```bash
-# Basic usage
-python cli.py preprocess
-
-# With custom configuration
-python cli.py preprocess --config config/preprocess.yaml
-
-# Override parameters
-python cli.py preprocess --input-dir data/raw --output-dir data/featurized
+python main.py  # Select option 7
 ```
 
-### Model Training
+## 🔄 **Development Workflow**
 
+1. **Local Development**:
+   ```bash
+   python main.py  # Interactive development
+   ```
+
+2. **Containerized Development**:
+   ```bash
+   # Complete pipeline with optional API server
+   docker-compose --profile pipeline up
+   
+   # Or run separately:
+   # Terminal 1: Training
+   docker-compose --profile training up
+   
+   # Terminal 2: API Server
+   docker-compose --profile serve up
+   ```
+
+3. **Production Deployment**:
+   ```bash
+   docker-compose --profile pipeline up --build
+   ```
+
+## 🛠️ **Troubleshooting**
+
+### **Docker Compose Issues**
 ```bash
-# Basic usage
-python cli.py train
+# Port already in use
+# Edit docker-compose.yml to change port: "8001:8000"
 
-# With custom configuration
-python cli.py train --config config/model.yaml
+# Permission issues (Linux/Mac)
+sudo chown -R $USER:$USER ./data ./models ./artifacts ./plots
 
-# Override parameters
-python cli.py train --model-type xgboost --n-trials 200
+# View logs
+docker-compose --profile pipeline logs
+docker-compose --profile serve logs -f
 ```
 
-## 📈 Performance Characteristics
+### **Common Issues**
+- **No models found**: Ensure training completed successfully
+- **FastAPI dependencies missing**: Use the serve container instead of training container
+- **Port conflicts**: Change port mapping in docker-compose.yml
 
-### Memory Usage
-- **2M rows**: ~2.8 GB
-- **5M rows**: ~7.1 GB  
-- **10M rows**: ~14.2 GB
+## 📊 **Model Performance**
 
-### Feature Count
-- **Base features**: 27 (demographics, clinical, encounters)
-- **Rolling features**: 60 (4 per numeric column)
-- **Delta features**: 30 (2 per numeric column)
-- **Aggregate features**: 60 (4 per numeric column)
-- **Risk features**: 14 (categories and scores)
-- **Total**: 191 features
+The pipeline automatically evaluates models using:
+- **AUROC**: Area Under ROC Curve
+- **AUPRC**: Area Under Precision-Recall Curve
+- **F1 Score**: Balanced precision and recall
+- **Confusion Matrix**: Detailed classification results
 
-### Processing Speed
-- **Data generation**: ~100K rows/minute
-- **Feature engineering**: ~50K rows/minute
-- **Model training**: Depends on feature selection and hyperparameter tuning
+Results are logged to Weights & Biases and saved locally for analysis.
 
-## 🎯 Key Features
+## 🤝 **Contributing**
 
-### Realistic Data Generation
-- **Temporal consistency**: Patient states maintained across years
-- **Clinical correlations**: Health metrics influence encounter patterns
-- **Risk-based prevalence**: Alzheimer's probability based on medical risk factors
-- **Age progression**: Realistic aging patterns and health deterioration
+1. Fork the repository
+2. Create a feature branch
+3. Make your changes
+4. Add tests if applicable
+5. Submit a pull request
 
-### Efficient Processing
-- **Lazy evaluation**: Polars LazyFrame for memory efficiency
-- **Chunked processing**: Configurable chunk sizes for large datasets
-- **Partitioned storage**: Year-based partitioning for efficient querying
-- **Columnar format**: Parquet compression for storage efficiency
+## 📄 **License**
 
-### Comprehensive Feature Engineering
-- **Rolling statistics**: Mean, max, sum, count over time windows
-- **Temporal changes**: Year-over-year deltas and percentage changes
-- **Patient aggregates**: Lifetime statistics per patient
-- **Risk categorization**: Medical risk factors and composite scores
+This project is licensed under the MIT License - see the LICENSE file for details.
 
-### Configuration-Driven
-- **YAML configuration**: Human-readable parameter management
-- **Override support**: Command-line overrides for config values
-- **Validation**: Automatic configuration validation and error handling
-- **Modular design**: Separate configs for each pipeline stage
+## 🙏 **Acknowledgments**
 
-## 🎯 Threshold Selection Strategy
+- Weights & Biases for experiment tracking
+- FastAPI for the web framework
+- Scikit-learn and XGBoost for machine learning capabilities
+- The open-source community for various dependencies
 
-The model evaluation uses a **two-tier threshold selection** approach for optimal binary classification:
+---
 
-### Primary Strategy: Maximum F1 Score
-- **Goal**: Find threshold that maximizes F1-score (harmonic mean of precision and recall)
-- **Why F1?** Balances false positives (unnecessary alarms) and false negatives (missed cases)
-- **Medical Context**: Critical for Alzheimer's diagnosis where both precision and recall matter
-
-### Fallback Strategy: Recall Target
-- **Goal**: Ensure minimum 80% recall (catch at least 80% of actual cases)
-- **Why Fallback?** Sometimes maximizing F1 results in too low recall
-- **Medical Priority**: Missing actual cases can be more dangerous than false alarms
-
-### Why This Approach?
-For Alzheimer's prediction, I chose this strategy because:
-- **F1 optimization**: Provides balanced performance for general screening
-- **80% recall fallback**: Ensures we don't miss too many actual cases in critical scenarios
-- **Medical safety**: Prioritizes catching real cases over avoiding false alarms
-- **Flexibility**: Two thresholds allow different use cases (screening vs. high-risk monitoring)
-
-### Implementation
-```python
-# Test thresholds from 0.1 to 0.9
-thresholds = [0.1, 0.15, 0.2, ..., 0.85, 0.9]
-
-# Choose optimal threshold
-optimal_threshold = threshold_with_max_f1_score
-fallback_threshold = threshold_with_recall >= 0.8
-```
-
-**Result**: Two thresholds saved to `threshold.json` - use optimal for general cases, fallback when high recall is critical.
-
-## 🔬 Technical Details
-
-### Data Generation Algorithm
-1. **Patient initialization**: Generate stable demographic and baseline clinical features
-2. **Temporal progression**: Apply random walks to simulate health changes over time
-3. **Risk calculation**: Compute Alzheimer's probability based on age and risk factors
-4. **Diagnosis generation**: Sample from probability distribution to create target variable
-5. **Chunked writing**: Write data in configurable chunks to partitioned Parquet files
-
-### Feature Engineering Pipeline
-1. **Data loading**: Read partitioned Parquet files using Polars Lazy
-2. **Rolling features**: Compute statistics over configurable time windows
-3. **Delta features**: Calculate year-over-year changes and percentage changes
-4. **Aggregate features**: Compute patient-level statistics across all years
-5. **Risk features**: Create categorical features and composite risk scores
-6. **Missing value handling**: Fill null values with appropriate defaults
-
-### Memory Optimization
-- **Lazy evaluation**: Defer computation until materialization
-- **Chunked processing**: Process data in configurable chunks
-- **Efficient data types**: Use appropriate data types for memory efficiency
-- **Streaming operations**: Avoid loading entire dataset into memory
-
-## 🚧 Future Enhancements
-
-### Planned Features
-- [x] **Model serving**: REST API for real-time predictions ✅
-- [ ] **Feature selection**: Automated feature importance analysis
-- [ ] **Hyperparameter optimization**: Advanced tuning strategies
-- [ ] **Model interpretability**: SHAP explanations and feature importance
-- [ ] **Data validation**: Schema validation and data quality checks
-- [ ] **Monitoring**: Model performance monitoring and drift detection
-
-### Scalability Improvements
-- [ ] **Distributed processing**: Spark integration for very large datasets
-- [ ] **Cloud deployment**: AWS/GCP deployment configurations
-- [ ] **Caching**: Redis caching for frequently accessed data
-- [ ] **Parallel processing**: Multi-core feature engineering
-
-
-**Note**: This project uses synthetic data for demonstration purposes. For real clinical applications, ensure compliance with relevant healthcare data regulations and privacy requirements.
+**Built with ❤️ for early Alzheimer's detection**

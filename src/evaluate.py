@@ -8,6 +8,7 @@ chooses optimal thresholds, and evaluates with time windows.
 import logging
 import json
 import pickle
+import time
 from pathlib import Path
 from typing import Dict, List, Tuple, Optional, Any
 import numpy as np
@@ -20,6 +21,7 @@ from sklearn.metrics import (
 import wandb
 import matplotlib.pyplot as plt
 import seaborn as sns
+from tqdm import tqdm
 
 logger = logging.getLogger(__name__)
 
@@ -46,10 +48,10 @@ class ModelEvaluator:
         try:
             with open(self.model_path, 'rb') as f:
                 model = pickle.load(f)
-            logger.info(f"Loaded model from {self.model_path}")
+            print(f"📁 Loaded model: {self.model_path.name}")
             return model
         except Exception as e:
-            logger.error(f"Failed to load model: {e}")
+            print(f"❌ Failed to load model: {e}")
             raise
     
     def _load_data(self) -> pd.DataFrame:
@@ -64,10 +66,10 @@ class ModelEvaluator:
                 # Assume it's a directory with parquet files
                 data = pd.read_parquet(self.data_path)
             
-            logger.info(f"Loaded data with shape {data.shape}")
+            print(f"📊 Loaded data: {data.shape[0]:,} samples, {data.shape[1]} features")
             return data
         except Exception as e:
-            logger.error(f"Failed to load data: {e}")
+            print(f"❌ Failed to load data: {e}")
             raise
     
     def _prepare_features(self, df: pd.DataFrame) -> Tuple[np.ndarray, np.ndarray, List[str]]:
@@ -80,20 +82,22 @@ class ModelEvaluator:
             with open(metadata_file, 'r') as f:
                 metadata = json.load(f)
             feature_names = metadata.get('feature_names', [])
-            logger.info(f"Using {len(feature_names)} features from model metadata")
+            print(f"🎯 Using {len(feature_names)} features from model metadata")
         else:
             # Fallback: exclude non-feature columns
             exclude_cols = ['patient_id', 'year', 'alzheimers_diagnosis']
             feature_names = [col for col in df.columns if col not in exclude_cols]
-            logger.warning("No metadata found, using all available features")
+            print(f"⚠️  No metadata found, using {len(feature_names)} available features")
         
         # Handle missing values
         df = df.fillna(0)
         
-        # Convert categorical columns to numeric
+        # Convert categorical columns to numeric (if they haven't been encoded yet)
+        # Note: In the new preprocessing pipeline, categorical columns are already encoded
+        # This is a fallback for backward compatibility
         categorical_cols = ['sex', 'region', 'occupation', 'education_level', 'marital_status', 'insurance_type']
         for col in categorical_cols:
-            if col in df.columns:
+            if col in df.columns and df[col].dtype == 'object':
                 df[col] = pd.Categorical(df[col]).codes
         
         # Use only the features that were used during training
@@ -101,13 +105,13 @@ class ModelEvaluator:
         missing_features = [col for col in feature_names if col not in df.columns]
         
         if missing_features:
-            logger.warning(f"Missing features: {missing_features}")
+            print(f"⚠️  Missing {len(missing_features)} features")
         
         # Prepare features and target
         X = df[available_features].values.astype(float)
         y = df['alzheimers_diagnosis'].values
         
-        logger.info(f"Prepared features: {X.shape}, target distribution: {np.bincount(y)}")
+        print(f"📈 Prepared: {X.shape[0]:,} samples, {X.shape[1]} features")
         return X, y, available_features
     
     def _compute_metrics_at_threshold(self, y_true: np.ndarray, y_pred_proba: np.ndarray, 
@@ -192,7 +196,13 @@ class ModelEvaluator:
         window_correct = 0
         total_positive_preds = len(positive_predictions)
         
-        for _, pred_row in positive_predictions.iterrows():
+        for _, pred_row in tqdm(positive_predictions.iterrows(), 
+                               total=len(positive_predictions), 
+                               desc="Evaluating time windows", 
+                               unit="prediction",
+                               bar_format="{desc}: {percentage:3.0f}%|{bar}| {n_fmt}/{total_fmt} [{elapsed}<{remaining}]",
+                               ncols=80, ascii=True, position=0, dynamic_ncols=False, 
+                               mininterval=0.1, maxinterval=1.0):
             patient_id = pred_row['patient_id']
             pred_year = pred_row['year']
             
@@ -225,8 +235,10 @@ class ModelEvaluator:
     
     def _save_plots(self, y_true: np.ndarray, y_pred_proba: np.ndarray, 
                    threshold_metrics: List[Dict], run_id: str):
-        """Save evaluation plots."""
-        plots_dir = Path("plots") / run_id
+        """Save evaluation plots with meaningful names."""
+        # Create plots directory with descriptive name
+        timestamp = time.strftime("%Y%m%d_%H%M%S")
+        plots_dir = Path("plots") / f"evaluation_{timestamp}"
         plots_dir.mkdir(parents=True, exist_ok=True)
         
         # Set style
@@ -305,17 +317,20 @@ class ModelEvaluator:
         plt.savefig(plots_dir / 'evaluation_threshold_analysis.jpg', dpi=300, bbox_inches='tight')
         plt.close()
         
-        logger.info(f"Saved evaluation plots to {plots_dir}")
+        # Saved evaluation plots
     
     def evaluate(self) -> Dict[str, Any]:
         """Run comprehensive evaluation."""
-        logger.info("Starting comprehensive model evaluation...")
+        # Starting comprehensive model evaluation
+        print("🔍 Starting comprehensive model evaluation...")
         
         # Initialize wandb if not already initialized
+        print("📊 Initializing Weights & Biases...")
         if not wandb.run:
+            run_name = f"evaluation_{time.strftime('%Y%m%d_%H%M%S')}"
             wandb.init(
                 project="alz_detect",
-                name="model_evaluation",
+                name=run_name,
                 config={
                     "model_path": str(self.model_path),
                     "data_path": str(self.data_path),
@@ -394,9 +409,9 @@ class ModelEvaluator:
         run_id = wandb.run.id if wandb.run else "evaluation"
         self._save_plots(y_true, y_pred_proba, threshold_analysis['threshold_metrics'], run_id)
         
-        logger.info(f"Evaluation complete! Results saved to {self.output_dir}")
-        logger.info(f"AUROC: {auroc:.3f}, AUPRC: {auprc:.3f}")
-        logger.info(f"Optimal threshold: {threshold_analysis['optimal_threshold']:.3f} (F1: {threshold_analysis['optimal_f1']:.3f})")
+        print(f"✅ Evaluation complete! Results saved to {self.output_dir}")
+        print(f"📊 AUROC: {auroc:.3f}, AUPRC: {auprc:.3f}")
+        print(f"🎯 Optimal threshold: {threshold_analysis['optimal_threshold']:.3f} (F1: {threshold_analysis['optimal_f1']:.3f})")
         
         return results
 
@@ -410,8 +425,8 @@ def evaluate_model(
     evaluator = ModelEvaluator(model_path, data_path, output_dir)
     results = evaluator.evaluate()
     
-    logger.info("Model evaluation completed successfully!")
-    logger.info(f"Results saved to: {output_dir}")
+    print("✅ Model evaluation completed successfully!")
+    print(f"📁 Results saved to: {output_dir}")
 
 
 if __name__ == "__main__":
