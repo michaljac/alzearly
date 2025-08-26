@@ -60,7 +60,8 @@ def check_dependencies() -> bool:
         'seaborn': 'seaborn',
         'tqdm': 'tqdm',
         'typer': 'typer',
-        'wandb': 'wandb'
+        'wandb': 'wandb',
+        'mlflow': 'mlflow'
     }
     
     missing_packages = []
@@ -156,18 +157,11 @@ def setup_wandb():
     # Try to import wandb
     try:
         import wandb
-        print("✅ wandb already available")
+        print("✅ wandb available")
     except ImportError:
-        print("📦 Installing wandb...")
-        try:
-            import subprocess
-            subprocess.check_call(["pip", "install", "wandb"])
-            import wandb
-            print("✅ wandb installed successfully")
-        except Exception as e:
-            print(f"❌ Failed to install wandb: {e}")
-            print("🔄 Falling back to no tracking")
-            return None, "none"
+        print("❌ wandb not available - please install it in the Dockerfile")
+        print("🔄 Falling back to no tracking")
+        return None, "none"
     
     # Ask for API key
     print("\n📝 Weights & Biases API Key:")
@@ -206,18 +200,11 @@ def setup_mlflow():
     # Try to import mlflow
     try:
         import mlflow
-        print("✅ mlflow already available")
+        print("✅ mlflow available")
     except ImportError:
-        print("📦 Installing mlflow...")
-        try:
-            import subprocess
-            subprocess.check_call(["pip", "install", "mlflow"])
-            import mlflow
-            print("✅ mlflow installed successfully")
-        except Exception as e:
-            print(f"❌ Failed to install mlflow: {e}")
-            print("🔄 Falling back to no tracking")
-            return None, "none"
+        print("❌ mlflow not available - please install it in the Dockerfile")
+        print("🔄 Falling back to no tracking")
+        return None, "none"
     
     # Set up MLflow tracking
     try:

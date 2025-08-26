@@ -231,7 +231,12 @@ class ConfigLoader:
         
         handle_imbalance = config.get("handle_imbalance", "class_weight")
         
-        models = config.get("models", ["logistic_regression", "xgboost"])
+        # Handle both flat and nested models configuration
+        models_config = config.get("models", {})
+        if isinstance(models_config, list):
+            models = models_config
+        else:
+            models = models_config.get("types", ["logistic_regression", "xgboost"])
         
         # Hyperparameter tuning
         enable_hyperparameter_tuning = config.get("enable_hyperparameter_tuning", False)

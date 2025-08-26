@@ -11,9 +11,17 @@ A comprehensive machine learning pipeline for early detection of Alzheimer's dis
 git clone https://github.com/michaljac/alz-detect
 cd alz-detect
 
-# Training pipeline
+# Training pipeline (with interactive tracker selection)
 docker build -f Dockerfile.train -t alzearly-train .
 docker run -it alzearly-train python run_training.py
+
+# Training with specific tracker
+docker run -it alzearly-train python run_training.py --tracker none
+docker run -it alzearly-train python run_training.py --tracker wandb
+docker run -it alzearly-train python run_training.py --tracker mlflow
+
+# Direct training (bypasses data generation)
+docker run -it alzearly-train python src/train.py --tracker none
 
 # Serve latest model (after training)
 docker build -f Dockerfile.serve -t alzearly-serve .
@@ -27,6 +35,152 @@ docker run -p 8000:8000 alzearly-serve
 - Trained artifacts written to `./artifacts/latest/`
 - MLflow runs stored in `./mlruns/`
 - For Weights & Biases tracking, set `WANDB_API_KEY` environment variable in the docker run command: `-e WANDB_API_KEY=your_key_here`
+
+## <img src="readme_images/hippo.jpeg" alt="🔧" width="25" height="25" style="background: transparent;"> **CLI Commands & Experiment Tracking**
+
+### **Training Commands**
+
+#### **Interactive Tracker Selection (Recommended)**
+```bash
+# Shows interactive menu to choose tracker
+python run_training.py
+python src/train.py
+```
+
+**User sees:**
+```
+🔬 Experiment Tracking Setup
+==================================================
+Select experiment tracker:
+1. Weights & Biases (wandb)
+2. MLflow (local)
+3. No tracking
+
+Enter choice (1-3, default=1): 
+```
+
+#### **Non-Interactive Training**
+```bash
+# No experiment tracking
+python src/train.py --tracker none
+python run_training.py --tracker none
+
+# With Weights & Biases
+export WANDB_API_KEY=your_api_key_here
+python src/train.py --tracker wandb
+python run_training.py --tracker wandb
+
+# With MLflow (local)
+python src/train.py --tracker mlflow
+python run_training.py --tracker mlflow
+```
+
+### **Key CLI Parameters**
+
+#### **Training Parameters**
+```bash
+# Basic training
+python src/train.py --tracker none
+
+# With custom configuration
+python src/train.py \
+  --tracker wandb \
+  --config config/model.yaml \
+  --max-features 100 \
+  --handle-imbalance smote \
+  --run-type production
+
+# Training with specific data
+python src/train.py \
+  --tracker none \
+  --input-dir data/featurized \
+  --output-dir models
+```
+
+#### **Available Options**
+- `--tracker`: `none`, `wandb`, `mlflow` (or omit for interactive menu)
+- `--config`: Configuration file path (default: `config/model.yaml`)
+- `--input-dir`: Input data directory (default: `data/featurized`)
+- `--output-dir`: Output directory (default: `models`)
+- `--max-features`: Maximum features to use (default: 150)
+- `--handle-imbalance`: `class_weight`, `smote`, `none` (default: `class_weight`)
+- `--run-type`: `initial`, `production`, `hyperparameter_tuned` (default: `initial`)
+
+### **Experiment Tracking Setup**
+
+#### **Weights & Biases (wandb)**
+```bash
+# Set API key
+export WANDB_API_KEY=your_api_key_here
+
+# Run training
+python src/train.py --tracker wandb
+```
+
+**Features:**
+- ✅ Automatic metric logging
+- ✅ Model artifact versioning
+- ✅ Hyperparameter tracking
+- ✅ Visualization dashboards
+- ✅ Offline mode support
+
+#### **MLflow (Local)**
+```bash
+# No setup required
+python src/train.py --tracker mlflow
+```
+
+**Features:**
+- ✅ Local experiment tracking
+- ✅ Model registry
+- ✅ Metric logging
+- ✅ Artifact storage in `./mlruns/`
+
+#### **No Tracking**
+```bash
+# Fastest option, no external dependencies
+python src/train.py --tracker none
+```
+
+**Features:**
+- ✅ Local artifact saving
+- ✅ No external API calls
+- ✅ Perfect for development/testing
+
+### **Artifacts & Outputs**
+
+All training runs save artifacts to `artifacts/latest/`:
+```bash
+artifacts/latest/
+├── model.pkl              # Trained model
+├── feature_names.json     # Feature names
+├── threshold.json         # Optimal threshold
+└── metrics.json          # Training metrics
+```
+
+### **Docker Commands**
+
+#### **Training with Interactive Menu**
+```bash
+docker run -it alzearly-train python run_training.py
+```
+
+#### **Training with Specific Tracker**
+```bash
+# No tracking
+docker run -it alzearly-train python run_training.py --tracker none
+
+# With wandb
+docker run -it -e WANDB_API_KEY=your_key alzearly-train python run_training.py --tracker wandb
+
+# With mlflow
+docker run -it alzearly-train python run_training.py --tracker mlflow
+```
+
+#### **Direct Training (Skip Data Generation)**
+```bash
+docker run -it alzearly-train python src/train.py --tracker none
+```
 
 ## <img src="readme_images/hippo.jpeg" alt="🏗️" width="25" height="25" style="background: transparent;"> **Architecture Overview**
 

@@ -10,7 +10,7 @@ uvicorn[standard]==0.24.0
 pydantic==2.5.0
 
 # Data processing
-polars==0.19.19
+polars==0.20.3
 pyarrow==12.0.1
 
 # Configuration

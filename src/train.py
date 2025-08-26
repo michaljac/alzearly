@@ -8,6 +8,7 @@ and training of multiple models with wandb logging.
 import logging
 import json
 import time
+import os
 from datetime import datetime
 from pathlib import Path
 from typing import Dict, List, Tuple, Optional, Any
@@ -124,8 +125,21 @@ class ModelTrainer:
         if not input_path.exists():
             raise FileNotFoundError(f"Input directory {input_path} does not exist")
         
-        # Read all parquet files recursively
-        df = pl.scan_parquet(str(input_path / "**" / "*.parquet")).collect()
+        # Use the same data loading logic as the preprocessor to ensure year column exists
+        lazy_frames = []
+        
+        # Handle year-partitioned directories (e.g., 2023/part-0.parquet)
+        year_dirs = [d for d in input_path.iterdir() if d.is_dir() and d.name.isdigit()]
+        for d in tqdm(year_dirs, desc="Loading data", unit="year", leave=False):
+            year = int(d.name)
+            lf = pl.scan_parquet(str(d / "*.parquet")).with_columns(pl.lit(year).alias("year"))
+            lazy_frames.append(lf)
+        
+        # If no year directories found, try recursive scan
+        if not lazy_frames:
+            df = pl.scan_parquet(str(input_path / "**" / "*.parquet")).collect()
+        else:
+            df = pl.concat(lazy_frames, how="vertical").collect()
         
         # Convert to pandas for sklearn compatibility
         df_pandas = df.to_pandas()
@@ -204,7 +218,7 @@ class ModelTrainer:
         numeric_cols = []
         categorical_cols = []
         
-        for col in feature_cols:
+        for col in tqdm(feature_cols, desc="Analyzing features", unit="feat", leave=False):
             if df[col].dtype in ['int64', 'float64']:
                 numeric_cols.append(col)
             else:
@@ -219,7 +233,7 @@ class ModelTrainer:
             if len(categorical_cols) > max_categorical_cols:
                 # Select most frequent categorical columns
                 categorical_counts = {}
-                for col in categorical_cols:
+                for col in tqdm(categorical_cols, desc="Analyzing categorical", unit="feat", leave=False):
                     categorical_counts[col] = df[col].nunique()
                 top_categorical_cols = sorted(categorical_counts.items(), key=lambda x: x[1], reverse=True)[:max_categorical_cols]
                 categorical_cols = [col for col, _ in top_categorical_cols]
@@ -328,15 +342,22 @@ class ModelTrainer:
         
         # Feature 2: Diagnostic confidence (lower for early years)
         # Higher uncertainty in early years of the study period
-        min_year = df['year'].min()
-        max_year = df['year'].max()
-        df['diagnostic_confidence'] = (df['year'] - min_year) / (max_year - min_year)
+        if 'year' in df.columns:
+            min_year = df['year'].min()
+            max_year = df['year'].max()
+            df['diagnostic_confidence'] = (df['year'] - min_year) / (max_year - min_year)
+            
+            # Feature 4: Time-varying risk (risk increases with age and time)
+            df['cumulative_risk_factor'] = (df['age'] - 65) * (df['year'] - min_year) / 10
+        else:
+            # If no year column, create synthetic year-based features
+            print("⚠️  No 'year' column found, creating synthetic year features")
+            df['year'] = 2023  # Default year
+            df['diagnostic_confidence'] = 0.5  # Default confidence
+            df['cumulative_risk_factor'] = (df['age'] - 65) / 10  # Simplified risk factor
         
         # Feature 3: Age at diagnosis (important for Alzheimer's)
         df['age_at_diagnosis'] = df['age']
-        
-        # Feature 4: Time-varying risk (risk increases with age and time)
-        df['cumulative_risk_factor'] = (df['age'] - 65) * (df['year'] - min_year) / 10
         
         # For patients with Alzheimer's diagnosis, add uncertainty
         alzheimers_mask = df['alzheimers_diagnosis'] == 1
@@ -348,7 +369,31 @@ class ModelTrainer:
         
         return df
 
-    def _select_optimal_threshold(self, y_true: np.ndarray, y_proba: np.ndarray, 
+    def _clean_and_impute_data(self, X: np.ndarray) -> np.ndarray:
+        """Clean and impute missing values in the data."""
+        # Convert to pandas for easier handling
+        if isinstance(X, np.ndarray):
+            X_df = pd.DataFrame(X)
+        else:
+            X_df = X.copy()
+        
+        # Check for NaN values
+        nan_count = X_df.isna().sum().sum()
+        if nan_count > 0:
+            # Impute with median for numeric columns
+            for col in tqdm(X_df.columns, desc="Imputing NaN values", unit="col", leave=False):
+                if X_df[col].dtype in ['float64', 'int64']:
+                    median_val = X_df[col].median()
+                    X_df[col].fillna(median_val, inplace=True)
+                else:
+                    # For non-numeric, fill with most frequent value
+                    mode_val = X_df[col].mode().iloc[0] if len(X_df[col].mode()) > 0 else 0
+                    X_df[col].fillna(mode_val, inplace=True)
+        
+        # Convert back to numpy array
+        return X_df.values
+
+    def _select_optimal_threshold(self, y_true: np.ndarray, y_proba: np.ndarray,
                                  method: str = "f1_optimization") -> float:
         """Select optimal decision threshold for probability-to-label conversion."""
         
@@ -358,7 +403,7 @@ class ModelTrainer:
         
         if method == "f1_optimization":
             # Optimize for F1 score
-            for threshold in thresholds:
+            for threshold in tqdm(thresholds, desc="Optimizing threshold", unit="thresh", leave=False):
                 y_pred = (y_proba >= threshold).astype(int)
                 f1 = f1_score(y_true, y_pred)
                 if f1 > best_score:
@@ -367,7 +412,7 @@ class ModelTrainer:
                     
         elif method == "precision_recall_balance":
             # Optimize for balanced precision and recall
-            for threshold in thresholds:
+            for threshold in tqdm(thresholds, desc="Optimizing threshold", unit="thresh", leave=False):
                 y_pred = (y_proba >= threshold).astype(int)
                 precision = precision_score(y_true, y_pred, zero_division=0)
                 recall = recall_score(y_true, y_pred, zero_division=0)
@@ -382,7 +427,7 @@ class ModelTrainer:
             fn_cost = 3.0  # Cost of false negative
             fp_cost = 1.0  # Cost of false positive
             
-            for threshold in thresholds:
+            for threshold in tqdm(thresholds, desc="Optimizing threshold", unit="thresh", leave=False):
                 y_pred = (y_proba >= threshold).astype(int)
                 tn, fp, fn, tp = confusion_matrix(y_true, y_pred).ravel()
                 total_cost = fp * fp_cost + fn * fn_cost
@@ -404,9 +449,12 @@ class ModelTrainer:
         """Train logistic regression model."""
         # Training Logistic Regression
         
+        # Clean and impute data
+        X_train_clean = self._clean_and_impute_data(X_train)
+        
         # Scale features for better convergence
         scaler = StandardScaler()
-        X_train_scaled = scaler.fit_transform(X_train)
+        X_train_scaled = scaler.fit_transform(X_train_clean)
         
         params = self.config.lr_params.copy()
         if self.config.handle_imbalance == "class_weight":
@@ -423,19 +471,23 @@ class ModelTrainer:
     def _predict_model(self, model, model_name: str, X: np.ndarray) -> np.ndarray:
         """Make predictions using the appropriate scaling for each model."""
         if model_name == "logistic_regression" and hasattr(self, 'lr_scaler'):
-            X_scaled = self.lr_scaler.transform(X)
+            X_clean = self._clean_and_impute_data(X)
+            X_scaled = self.lr_scaler.transform(X_clean)
             return model.predict(X_scaled)
         else:
-            return model.predict(X)
+            X_clean = self._clean_and_impute_data(X)
+            return model.predict(X_clean)
     
     def _predict_proba_model(self, model, model_name: str, X: np.ndarray) -> np.ndarray:
         """Make probability predictions using the appropriate scaling for each model."""
         try:
             if model_name == "logistic_regression" and hasattr(self, 'lr_scaler'):
-                X_scaled = self.lr_scaler.transform(X)
+                X_clean = self._clean_and_impute_data(X)
+                X_scaled = self.lr_scaler.transform(X_clean)
                 proba = model.predict_proba(X_scaled)
             else:
-                proba = model.predict_proba(X)
+                X_clean = self._clean_and_impute_data(X)
+                proba = model.predict_proba(X_clean)
             
             # Ensure we have a 2D array with probabilities for both classes
             if proba.ndim == 1:
@@ -723,7 +775,7 @@ class ModelTrainer:
         except Exception as e:
             logger.warning(f"Could not save plots for {model_name}: {e}")
     
-    def train(self, run_type: str = "initial") -> Dict[str, Any]:
+    def train(self, run_type: str = "initial", tracker_type: str = "none") -> Dict[str, Any]:
         """Main training pipeline."""
         print("🚀 Starting model training pipeline...")
         
@@ -784,7 +836,7 @@ class ModelTrainer:
         for i, model_name in enumerate(tqdm(self.config.models, desc="Training models", unit="model",
                                           bar_format="{desc}: {percentage:3.0f}%|{bar}| {n_fmt}/{total_fmt} [{elapsed}<{remaining}]",
                                           ncols=80, ascii=True, position=0, dynamic_ncols=False, 
-                                          mininterval=0.1, maxinterval=1.0)):
+                                          mininterval=0.1, maxinterval=1.0, leave=True)):
             
             if model_name == "logistic_regression":
                 model = self._train_logistic_regression(X_train_balanced, y_train_balanced)
@@ -948,9 +1000,19 @@ class ModelTrainer:
         print(f"💾 Models saved to: {artifact_path}")
         print()
         
+        # Get wandb run ID only if wandb is being used
+        wandb_run_id = None
+        if self.tracker_enabled and tracker_type == "wandb":
+            try:
+                import wandb
+                if hasattr(wandb, 'run') and wandb.run:
+                    wandb_run_id = wandb.run.id
+            except ImportError:
+                pass
+        
         return {
             'run_id': descriptive_name,
-            'wandb_run_id': wandb.run.id,
+            'wandb_run_id': wandb_run_id,
             'artifact_path': str(artifact_path),
             'latest_artifacts': saved_paths,
             'results': results
@@ -966,6 +1028,7 @@ def train(
     wandb_project: Optional[str] = typer.Option(None, "--wandb-project", help="Override wandb project from config"),
     wandb_entity: Optional[str] = typer.Option(None, "--wandb-entity", help="Override wandb entity from config"),
     run_type: str = typer.Option("initial", "--run-type", help="Run type for model naming (initial, balanced, feature_optimized, hyperparameter_tuned, final, production)"),
+    tracker: Optional[str] = typer.Option(None, "--tracker"),
 ) -> None:
     """
     Train machine learning models for Alzheimer's prediction.
@@ -975,6 +1038,9 @@ def train(
         python cli.py train --max-features 100 --handle-imbalance smote
         python cli.py train --run-type production
         python cli.py train --run-type hyperparameter_tuned
+        python cli.py train --tracker wandb
+        python cli.py train --tracker mlflow
+        python cli.py train --tracker none
     """
     # Load configuration from file
     from src.config import load_config
@@ -994,13 +1060,48 @@ def train(
     if wandb_entity is not None:
         config.wandb_entity = wandb_entity
     
+    # Set up experiment tracking based on tracker parameter
+    if tracker is None:
+        # No tracker specified - use interactive setup
+        from utils import setup_experiment_tracker
+        global_tracker, tracker_type = setup_experiment_tracker()
+    else:
+        # Tracker specified - use non-interactive setup
+        tracker_lower = tracker.lower()
+        print(f"🔬 Setting up experiment tracking: {tracker_lower}")
+        
+        if tracker_lower == "wandb":
+            os.environ['NON_INTERACTIVE'] = 'true'
+            from utils import setup_wandb
+            global_tracker, tracker_type = setup_wandb()
+        elif tracker_lower == "mlflow":
+            os.environ['NON_INTERACTIVE'] = 'true'
+            from utils import setup_mlflow
+            global_tracker, tracker_type = setup_mlflow()
+        elif tracker_lower == "none":
+            os.environ['NON_INTERACTIVE'] = 'true'
+            global_tracker, tracker_type = None, "none"
+        else:
+            print(f"❌ Invalid tracker option: {tracker}")
+            print("Valid options: none, mlflow, wandb")
+            return
+    
     # Create trainer and run training
     trainer = ModelTrainer(config)
-    results = trainer.train(run_type)
+    results = trainer.train(run_type, tracker_type)
     
     print(f"🎉 Training completed successfully!")
     print(f"🆔 Run ID: {results['run_id']}")
     print(f"📁 Artifact path: {results['artifact_path']}")
+    
+    # Add WandB run link if available
+    if results.get('wandb_run_id'):
+        try:
+            import wandb
+            if hasattr(wandb, 'run') and wandb.run:
+                print(f"🔗 View run online: {wandb.run.get_url()}")
+        except ImportError:
+            pass
 
 
 if __name__ == "__main__":

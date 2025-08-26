@@ -5,8 +5,25 @@ Ensures consistent saving of model, feature names, threshold, and metrics.
 
 import json
 import pickle
+import numpy as np
 from pathlib import Path
 from typing import Any, Dict, List, Union
+
+
+def _json_serializable(obj):
+    """Convert numpy types to JSON serializable types."""
+    if isinstance(obj, np.integer):
+        return int(obj)
+    elif isinstance(obj, np.floating):
+        return float(obj)
+    elif isinstance(obj, np.ndarray):
+        return obj.tolist()
+    elif isinstance(obj, dict):
+        return {key: _json_serializable(value) for key, value in obj.items()}
+    elif isinstance(obj, list):
+        return [_json_serializable(item) for item in obj]
+    else:
+        return obj
 
 from src.io.paths import (
     get_latest_artifacts_dir,
@@ -60,8 +77,11 @@ def save_metrics(metrics: Dict[str, Any]) -> Path:
     
     print(f"Saving metrics to: {metrics_path}")
     
+    # Convert numpy types to JSON serializable types
+    serializable_metrics = _json_serializable(metrics)
+    
     with open(metrics_path, 'w') as f:
-        json.dump(metrics, f, indent=2)
+        json.dump(serializable_metrics, f, indent=2)
     
     return metrics_path
 
