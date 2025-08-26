@@ -20,3 +20,6 @@ plots/
 wandb/
 __pycache__/
 *.log
+
+run_training.py
+run_training_simple.py

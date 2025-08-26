@@ -15,15 +15,9 @@ import multiprocessing as mp
 from functools import partial
 import warnings
 
-# Optional imports for distributed processing
-try:
-    import dask.dataframe as dd
-    import dask.array as da
-    from dask.distributed import Client, LocalCluster
-    DASK_AVAILABLE = True
-except ImportError:
-    DASK_AVAILABLE = False
-    warnings.warn("Dask not available. Install with: pip install dask[distributed]")
+# Dask disabled due to IPython conflicts
+DASK_AVAILABLE = False
+print("ℹ️  Dask disabled - using alternative parallel processing methods.")
 
 try:
     import ray

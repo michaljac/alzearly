@@ -17,14 +17,10 @@ from polars import LazyFrame
 import pyarrow.dataset as ds  # for partitioned write
 from tqdm import tqdm
 
-# Try to import Dask for large datasets
-try:
-    import dask.dataframe as dd
-    import pandas as pd  # Needed for Dask operations
-    DASK_AVAILABLE = True
-except ImportError:
-    DASK_AVAILABLE = False
-    print("⚠️  Dask not available. Using Polars for all datasets.")
+# Use only Polars for data processing
+import pandas as pd  # Needed for some operations
+DASK_AVAILABLE = False
+print("ℹ️  Using Polars for all data processing (Dask disabled).")
 
 logger = logging.getLogger(__name__)
 
@@ -75,12 +71,8 @@ class DataPreprocessor:
 
     def _choose_framework(self, data_size: int) -> str:
         """Choose the appropriate framework based on data size."""
-        if data_size >= self.dask_threshold and DASK_AVAILABLE:
-            return "dask"
-        elif data_size >= self.polars_threshold:
-            return "polars"
-        else:
-            return "polars"  # Default to polars for small datasets
+        # Always use Polars since Dask is disabled
+        return "polars"
 
     def _get_partitioned_data(self) -> LazyFrame:
         """Read partitioned Parquet data using Polars Lazy.
@@ -341,7 +333,7 @@ class DataPreprocessor:
         """Analyze the prevalence of Alzheimer's diagnosis in the dataset."""
         # Get overall statistics
         stats = df.select([
-            pl.len().alias("total_rows"),
+            pl.count().alias("total_rows"),
             pl.col(self.target_column).sum().alias("positive_cases")
         ]).collect()
         
@@ -351,7 +343,7 @@ class DataPreprocessor:
         
         # Analyze by year
         year_stats = df.group_by("year").agg([
-            pl.len().alias("year_rows"),
+            pl.count().alias("year_rows"),
             pl.col(self.target_column).sum().alias("year_positives")
         ]).collect()
         

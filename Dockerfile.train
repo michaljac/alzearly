@@ -54,7 +54,7 @@ RUN useradd -m -u 1000 trainer && \
     chown -R trainer:trainer /workspace
 
 # Switch to non-root user
-USER trainer
+USER root
 
 # Expose port for debugging (if needed)
 EXPOSE 5678
