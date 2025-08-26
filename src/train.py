@@ -868,7 +868,7 @@ class ModelTrainer:
             self._save_plots(model_name, model, X_test_selected, y_test, descriptive_name)
         
         # Save artifacts using our helper function
-        from src.train.save_artifacts import save_all_artifacts
+        from src.train_utils.save_artifacts import save_all_artifacts
         
         # Get the best model (XGBoost if available, otherwise Logistic Regression)
         best_model = self.models.get("xgboost", self.models.get("logistic_regression"))

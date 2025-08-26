@@ -137,7 +137,7 @@ def load_model_and_metadata():
     
     try:
         # Use our helper functions to load artifacts
-        from src.train.save_artifacts import load_model, load_feature_names, load_threshold, load_metrics
+        from src.train_utils.save_artifacts import load_model, load_feature_names, load_threshold, load_metrics
         
         print("Loading model and metadata from artifacts/latest/...")
         
