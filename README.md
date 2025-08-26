@@ -2,7 +2,7 @@
 
 > **Early Detection of Alzheimer's Disease**
 
-![Alzearly Logo](hippo.jpeg)
+![Alzearly Logo](readme_images/hippo.jpeg)
 
 A comprehensive machine learning pipeline for early detection of Alzheimer's disease using synthetic patient data, featuring XGBoost and Logistic Regression models with automated evaluation and API serving capabilities.
 
