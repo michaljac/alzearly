@@ -5,6 +5,29 @@
 
 A comprehensive machine learning pipeline for early detection of Alzheimer's disease using synthetic patient data, featuring XGBoost and Logistic Regression models with automated evaluation and API serving capabilities.
 
+## Quickstart (local, no accounts)
+
+```bash
+git clone https://github.com/michaljac/alz-detect
+cd alz-detect
+
+# Training pipeline
+docker build -f Dockerfile.train -t alzearly-train .
+docker run -it alzearly-train python run_training.py
+
+# Serve latest model (after training)
+docker build -f Dockerfile.serve -t alzearly-serve .
+docker run -p 8000:8000 alzearly-serve
+# Open http://localhost:8000/docs
+```
+
+**Notes:**
+- Python 3.10 inside all Docker images
+- API exposed on port 8000
+- Trained artifacts written to `./artifacts/latest/`
+- MLflow runs stored in `./mlruns/`
+- For Weights & Biases tracking, set `WANDB_API_KEY` environment variable in the docker run command: `-e WANDB_API_KEY=your_key_here`
+
 ## <img src="readme_images/hippo.jpeg" alt="🏗️" width="25" height="25" style="background: transparent;"> **Architecture Overview**
 
 ### **Core Components:**
