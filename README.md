@@ -8,7 +8,7 @@
 
 A comprehensive machine learning pipeline for early detection of Alzheimer's disease using synthetic patient data, featuring XGBoost and Logistic Regression models with automated evaluation and API serving capabilities.
 
-## 🏗️ **Architecture Overview** <img src="readme_images/hippo.jpeg" alt="🧠" width="25" height="25" style="background: transparent;">
+## <img src="readme_images/hippo.jpeg" alt="🏗️" width="25" height="25" style="background: transparent;"> **Architecture Overview**
 
 ### **Core Components:**
 - **Data Generation**: Synthetic patient data with realistic Alzheimer's disease patterns
@@ -27,9 +27,8 @@ A comprehensive machine learning pipeline for early detection of Alzheimer's dis
 - **Containerization**: Docker & Docker Compose
 - **Progress Tracking**: TQDM with single-line updates
 
-## 🚀 **Quick Start** <img src="readme_images/hippo.jpeg" alt="🧠" width="25" height="25" style="background: transparent;">
+## <img src="readme_images/hippo.jpeg" alt="🚀" width="25" height="25" style="background: transparent;"> **Quick Start**
 
-## 🚀 **Quick Start** <img src="readme_images/hippo.jpeg" alt="🧠" width="25" height="25" style="background: transparent;">
 
 ### **Option 1: Complete Pipeline (Recommended)**
 ```bash
@@ -210,7 +209,7 @@ docker-compose --profile pipeline up
 📖 Interactive docs at: http://localhost:8000/docs
 ```
 
-## 📊 **Model Comparison and Visualization** <img src="readme_images/hippo.jpeg" alt="🧠" width="25" height="25" style="background: transparent;">
+## <img src="readme_images/hippo.jpeg" alt="📊" width="25" height="25" style="background: transparent;"> **Model Comparison and Visualization**
 
 The pipeline automatically generates comprehensive comparison plots showing:
 - **ROC Curves**: XGBoost vs Logistic Regression performance
@@ -220,7 +219,7 @@ The pipeline automatically generates comprehensive comparison plots showing:
 
 All plots are saved in the `plots/` directory with timestamps for easy tracking.
 
-## 🔬 **Experiment Tracking** <img src="readme_images/hippo.jpeg" alt="🧠" width="25" height="25" style="background: transparent;">
+## <img src="readme_images/hippo.jpeg" alt="🔬" width="25" height="25" style="background: transparent;"> **Experiment Tracking**
 
 The pipeline supports multiple experiment tracking systems:
 
@@ -260,7 +259,7 @@ The system will automatically:
 - Handle authentication (for wandb)
 - Provide fallback options if setup fails
 
-## 🐳 **Docker Architecture** <img src="readme_images/hippo.jpeg" alt="🧠" width="25" height="25" style="background: transparent;">
+## <img src="readme_images/hippo.jpeg" alt="🐳" width="25" height="25" style="background: transparent;"> **Docker Architecture**
 
 ### **Services**
 - **Training Service**: Handles data generation, preprocessing, training, and evaluation
@@ -294,7 +293,7 @@ docker-compose --profile pipeline up
 ```
 
 
-## 🔧 **Configuration** <img src="readme_images/hippo.jpeg" alt="🧠" width="25" height="25" style="background: transparent;">
+## <img src="readme_images/hippo.jpeg" alt="🔧" width="25" height="25" style="background: transparent;"> **Configuration**
 
 ### **Data Generation** (`config/data_gen.yaml`)
 - Patient demographics and medical history
@@ -311,7 +310,7 @@ docker-compose --profile pipeline up
 - Cross-validation settings
 - Model-specific parameters
 
-## 📈 **Performance Features** <img src="readme_images/hippo.jpeg" alt="🧠" width="25" height="25" style="background: transparent;">
+## <img src="readme_images/hippo.jpeg" alt="📈" width="25" height="25" style="background: transparent;"> **Performance Features**
 
 ### **Progress Tracking**
 - Single-line TQDM progress bars throughout the pipeline
@@ -328,9 +327,9 @@ docker-compose --profile pipeline up
 - Efficient categorical encoding (max 50 columns)
 - Streaming data processing for large datasets
 
-## 🌐 **API Endpoints** <img src="readme_images/hippo.jpeg" alt="🧠" width="25" height="25" style="background: transparent;">
+## <img src="readme_images/hippo.jpeg" alt="🌐" width="25" height="25" style="background: transparent;"> **API Endpoints**
 
-## 🌐 **API Endpoints** <img src="readme_images/hippo.jpeg" alt="🧠" width="25" height="25" style="background: transparent;">
+## <img src="readme_images/hippo.jpeg" alt="🌐" width="25" height="25" style="background: transparent;"> **API Endpoints**
 
 When the serving container is running:
 
@@ -456,7 +455,7 @@ curl http://localhost:8000/health
    - Use a different port: `--port 8080`
    - Or stop the existing service on port 8000
 
-## 🧪 **Testing** <img src="readme_images/hippo.jpeg" alt="🧠" width="25" height="25" style="background: transparent;">
+## <img src="readme_images/hippo.jpeg" alt="🧪" width="25" height="25" style="background: transparent;"> **Testing**
 
 The pipeline includes comprehensive testing:
 - Unit tests for core functions
@@ -469,7 +468,7 @@ Run tests with:
 python main.py  # Select option 7
 ```
 
-## 🔄 **Development Workflow** <img src="readme_images/hippo.jpeg" alt="🧠" width="25" height="25" style="background: transparent;">
+## <img src="readme_images/hippo.jpeg" alt="🔄" width="25" height="25" style="background: transparent;"> **Development Workflow**
 
 1. **Local Development**:
    ```bash
@@ -494,7 +493,7 @@ python main.py  # Select option 7
    docker-compose --profile pipeline up --build
    ```
 
-## 🛠️ **Troubleshooting** <img src="readme_images/hippo.jpeg" alt="🧠" width="25" height="25" style="background: transparent;">
+## <img src="readme_images/hippo.jpeg" alt="🛠️" width="25" height="25" style="background: transparent;"> **Troubleshooting**
 
 ### **Docker Compose Issues**
 ```bash
@@ -514,7 +513,7 @@ docker-compose --profile serve logs -f
 - **FastAPI dependencies missing**: Use the serve container instead of training container
 - **Port conflicts**: Change port mapping in docker-compose.yml
 
-## 📊 **Model Performance** <img src="readme_images/hippo.jpeg" alt="🧠" width="25" height="25" style="background: transparent;">
+## <img src="readme_images/hippo.jpeg" alt="📊" width="25" height="25" style="background: transparent;"> **Model Performance**
 
 The pipeline automatically evaluates models using:
 - **AUROC**: Area Under ROC Curve
