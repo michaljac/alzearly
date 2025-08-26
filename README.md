@@ -2,11 +2,13 @@
 
 > **Early Detection of Alzheimer's Disease**
 
-![Alzearly Logo](readme_images/hippo.jpeg)
+<div align="center">
+  <img src="readme_images/hippo.jpeg" alt="Alzearly Logo" width="50" height="50" style="background: transparent;">
+</div>
 
 A comprehensive machine learning pipeline for early detection of Alzheimer's disease using synthetic patient data, featuring XGBoost and Logistic Regression models with automated evaluation and API serving capabilities.
 
-## 🏗️ **Architecture Overview**
+## 🏗️ **Architecture Overview** <img src="readme_images/hippo.jpeg" alt="🧠" width="25" height="25" style="background: transparent;">
 
 ### **Core Components:**
 - **Data Generation**: Synthetic patient data with realistic Alzheimer's disease patterns
@@ -25,9 +27,9 @@ A comprehensive machine learning pipeline for early detection of Alzheimer's dis
 - **Containerization**: Docker & Docker Compose
 - **Progress Tracking**: TQDM with single-line updates
 
-## 🚀 **Quick Start**
+## 🚀 **Quick Start** <img src="readme_images/hippo.jpeg" alt="🧠" width="25" height="25" style="background: transparent;">
 
-## 🚀 **Quick Start**
+## 🚀 **Quick Start** <img src="readme_images/hippo.jpeg" alt="🧠" width="25" height="25" style="background: transparent;">
 
 ### **Option 1: Complete Pipeline (Recommended)**
 ```bash
@@ -208,7 +210,7 @@ docker-compose --profile pipeline up
 📖 Interactive docs at: http://localhost:8000/docs
 ```
 
-## 📊 **Model Comparison and Visualization**
+## 📊 **Model Comparison and Visualization** <img src="readme_images/hippo.jpeg" alt="🧠" width="25" height="25" style="background: transparent;">
 
 The pipeline automatically generates comprehensive comparison plots showing:
 - **ROC Curves**: XGBoost vs Logistic Regression performance
@@ -218,7 +220,7 @@ The pipeline automatically generates comprehensive comparison plots showing:
 
 All plots are saved in the `plots/` directory with timestamps for easy tracking.
 
-## 🔬 **Experiment Tracking**
+## 🔬 **Experiment Tracking** <img src="readme_images/hippo.jpeg" alt="🧠" width="25" height="25" style="background: transparent;">
 
 The pipeline supports multiple experiment tracking systems:
 
@@ -258,7 +260,7 @@ The system will automatically:
 - Handle authentication (for wandb)
 - Provide fallback options if setup fails
 
-## 🐳 **Docker Architecture**
+## 🐳 **Docker Architecture** <img src="readme_images/hippo.jpeg" alt="🧠" width="25" height="25" style="background: transparent;">
 
 ### **Services**
 - **Training Service**: Handles data generation, preprocessing, training, and evaluation
@@ -292,7 +294,7 @@ docker-compose --profile pipeline up
 ```
 
 
-## 🔧 **Configuration**
+## 🔧 **Configuration** <img src="readme_images/hippo.jpeg" alt="🧠" width="25" height="25" style="background: transparent;">
 
 ### **Data Generation** (`config/data_gen.yaml`)
 - Patient demographics and medical history
@@ -309,7 +311,7 @@ docker-compose --profile pipeline up
 - Cross-validation settings
 - Model-specific parameters
 
-## 📈 **Performance Features**
+## 📈 **Performance Features** <img src="readme_images/hippo.jpeg" alt="🧠" width="25" height="25" style="background: transparent;">
 
 ### **Progress Tracking**
 - Single-line TQDM progress bars throughout the pipeline
@@ -326,9 +328,9 @@ docker-compose --profile pipeline up
 - Efficient categorical encoding (max 50 columns)
 - Streaming data processing for large datasets
 
-## 🌐 **API Endpoints**
+## 🌐 **API Endpoints** <img src="readme_images/hippo.jpeg" alt="🧠" width="25" height="25" style="background: transparent;">
 
-## 🌐 **API Endpoints**
+## 🌐 **API Endpoints** <img src="readme_images/hippo.jpeg" alt="🧠" width="25" height="25" style="background: transparent;">
 
 When the serving container is running:
 
@@ -454,7 +456,7 @@ curl http://localhost:8000/health
    - Use a different port: `--port 8080`
    - Or stop the existing service on port 8000
 
-## 🧪 **Testing**
+## 🧪 **Testing** <img src="readme_images/hippo.jpeg" alt="🧠" width="25" height="25" style="background: transparent;">
 
 The pipeline includes comprehensive testing:
 - Unit tests for core functions
@@ -467,7 +469,7 @@ Run tests with:
 python main.py  # Select option 7
 ```
 
-## 🔄 **Development Workflow**
+## 🔄 **Development Workflow** <img src="readme_images/hippo.jpeg" alt="🧠" width="25" height="25" style="background: transparent;">
 
 1. **Local Development**:
    ```bash
@@ -492,7 +494,7 @@ python main.py  # Select option 7
    docker-compose --profile pipeline up --build
    ```
 
-## 🛠️ **Troubleshooting**
+## 🛠️ **Troubleshooting** <img src="readme_images/hippo.jpeg" alt="🧠" width="25" height="25" style="background: transparent;">
 
 ### **Docker Compose Issues**
 ```bash
@@ -512,7 +514,7 @@ docker-compose --profile serve logs -f
 - **FastAPI dependencies missing**: Use the serve container instead of training container
 - **Port conflicts**: Change port mapping in docker-compose.yml
 
-## 📊 **Model Performance**
+## 📊 **Model Performance** <img src="readme_images/hippo.jpeg" alt="🧠" width="25" height="25" style="background: transparent;">
 
 The pipeline automatically evaluates models using:
 - **AUROC**: Area Under ROC Curve
