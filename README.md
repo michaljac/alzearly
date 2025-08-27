@@ -484,6 +484,7 @@ export WANDB_API_KEY=your_key_here
 
 
 ```
+```bash
 
 # Build the generate data image
 docker build -f Dockerfile.datagen -t alzearly-datagen . --network=host
@@ -496,7 +497,7 @@ docker run -it --gpus all --ipc=host --net=host \
   alzearly-datagen:latest /bin/bash
 
 ```
-```
+```bash
 
 # Build the train image
 
