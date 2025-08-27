@@ -483,7 +483,12 @@ This section tells you exactly when and why to modify each parameter. All change
 export WANDB_API_KEY=your_key_here
 
 # Run with cloud tracking
-docker run -it -e WANDB_API_KEY=your_key alzearly-train python run_training.py --tracker wandb
+docker run -it --gpus all --ipc=host --net=host \
+  -v "$(pwd):/workspace" \
+  -v "$(dirname $(pwd))/Data:/Data" \
+  --name alz_train \
+  alzearly-train:latest /bin/bash
+
 ```
 
 #### **MLflow (Local)**
@@ -612,10 +617,13 @@ curl -X POST http://localhost:8000/predict \
 docker build -f Dockerfile.serve -t alzearly-serve . --network=host
 
 # Run the container
-docker run -p 8000:8000 \
-  -v $(pwd)/models:/app/models \
-  -v $(pwd)/artifacts:/app/artifacts \
-  alzearly-serve
+docker run -it --gpus all --ipc=host --net=host \
+  --dns=8.8.8.8 --dns=1.1.1.1 \
+  -v "$(pwd):/workspace" \
+  -v "$(dirname $(pwd))/Data:/Data" \
+  --name alz_serve \
+  --entrypoint /bin/bash \
+  alzearly-serve:latest
 ```
 
 #### **Docker Compose (Recommended)**
@@ -694,9 +702,10 @@ The serving tests cover:
 docker-compose --profile test up test
 
 # Test with specific configuration
-docker run --rm -v $(pwd)/tests:/app/tests \
-  -v $(pwd)/models:/app/models \
-  -v $(pwd)/artifacts:/app/artifacts \
+docker run --rm \
+  -v "$(pwd)/tests:/app/tests" \
+  -v "$(pwd)/models:/app/models" \
+  -v "$(pwd)/artifacts:/app/artifacts" \
   alzearly-serve python /app/tests/test_run_serve.py
 ```
 

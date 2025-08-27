@@ -4,6 +4,10 @@ pandas==2.0.3
 scikit-learn==1.3.0
 xgboost==1.7.6
 
+# Development and debugging tools
+ipdb==0.13.13        # Enhanced Python debugger (recommended)
+#jupyter==1.0.0       # If you want notebook debugging
+
 # Data processing
 polars==0.20.3
 pyarrow==12.0.1
