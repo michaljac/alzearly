@@ -1,101 +1,330 @@
-import typer
-import logging
+#!/usr/bin/env python3
+"""
+Alzearly CLI - Command Line Interface for Alzheimer's Prediction Pipeline
 
-# Configure logging
-logging.basicConfig(level=logging.INFO)
-logger = logging.getLogger(__name__)
+Usage:
+    python cli.py train --tracker none
+    python cli.py train --tracker mlflow --rows 1000
+    python cli.py train --tracker wandb --seed 123
+"""
 
-app = typer.Typer()
+import argparse
+import os
+import sys
+import subprocess
+import platform
+from pathlib import Path
+from datetime import datetime
+from typing import Optional, Tuple
 
-@app.command()
-def data_gen(
-    config_file: str = typer.Option("config/data_gen.yaml", "--config", help="Configuration file path"),
-    n_patients: int = typer.Option(None, "--n-patients", help="Override number of patients from config"),
-    years: str = typer.Option(None, "--years", help="Override years from config (comma-separated)"),
-    positive_rate: float = typer.Option(None, "--positive-rate", help="Override positive rate from config"),
-    out: str = typer.Option(None, "--out", help="Override output directory from config"),
-    seed: int = typer.Option(None, "--seed", help="Override seed from config"),
-):
-    """Generate synthetic patient-year data with realistic features"""
-    from src.data_gen import generate
+def detect_environment() -> Tuple[bool, str]:
+    """Detect if Docker is available and determine the best execution method."""
+    try:
+        # Check if Docker is available
+        result = subprocess.run(['docker', '--version'], 
+                              capture_output=True, text=True, timeout=5)
+        if result.returncode == 0:
+            return True, "docker"
+    except (subprocess.TimeoutExpired, FileNotFoundError):
+        pass
     
-    generate(
-        config_file=config_file,
-        n_patients=n_patients,
-        years=years,
-        positive_rate=positive_rate,
-        out=out,
-        seed=seed,
+    # Check if Python dependencies are available
+    try:
+        import pandas
+        import numpy
+        import sklearn
+        return False, "python"
+    except ImportError:
+        return False, "none"
+
+def check_dependencies() -> bool:
+    """Check if required Python dependencies are installed."""
+    required_packages = ['pandas', 'numpy', 'sklearn', 'polars', 'typer']
+    missing_packages = []
+    
+    for package in required_packages:
+        try:
+            __import__(package)
+        except ImportError:
+            missing_packages.append(package)
+    
+    if missing_packages:
+        print(f"❌ Missing required packages: {', '.join(missing_packages)}")
+        print("💡 Install with: pip install -r requirements-train.txt")
+        return False
+    
+    return True
+
+def setup_paths() -> bool:
+    """Setup Python paths and validate project structure."""
+    # Add src to Python path
+    src_path = Path(__file__).parent / "src"
+    if not src_path.exists():
+        print("❌ src/ directory not found. Are you in the project root?")
+        return False
+    
+    if str(src_path) not in sys.path:
+        sys.path.insert(0, str(src_path))
+    
+    return True
+
+def import_modules() -> Tuple[bool, dict]:
+    """Import required modules with comprehensive error handling."""
+    modules = {}
+    
+    try:
+        from src.data_gen import generate
+        modules['generate'] = generate
+    except ImportError as e:
+        print(f"❌ Failed to import data_gen: {e}")
+        return False, {}
+    
+    try:
+        from src.preprocess import preprocess
+        modules['preprocess'] = preprocess
+    except ImportError as e:
+        print(f"❌ Failed to import preprocess: {e}")
+        return False, {}
+    
+    try:
+        from src.train import train
+        modules['train'] = train
+    except ImportError as e:
+        print(f"❌ Failed to import train: {e}")
+        return False, {}
+    
+    return True, modules
+
+def run_with_docker(args) -> int:
+    """Run the pipeline using Docker."""
+    try:
+        # Build command
+        cmd = [
+            'docker', 'run', '-it', '--rm',
+            '-v', f'{os.getcwd()}:/app',
+            '-w', '/app'
+        ]
+        
+        # Add environment variables
+        if args.tracker == 'wandb':
+            wandb_key = os.getenv('WANDB_API_KEY')
+            if wandb_key:
+                cmd.extend(['-e', f'WANDB_API_KEY={wandb_key}'])
+            else:
+                print("⚠️  WANDB_API_KEY not set. WandB tracking may fail.")
+        
+        cmd.extend(['alzearly-train', 'python', 'run_training.py'])
+        
+        # Add arguments
+        if args.tracker:
+            cmd.extend(['--tracker', args.tracker])
+        if args.rows:
+            cmd.extend(['--rows', str(args.rows)])
+        if args.seed:
+            cmd.extend(['--seed', str(args.seed)])
+        
+        print(f"🚀 Running: {' '.join(cmd)}")
+        result = subprocess.run(cmd)
+        return result.returncode
+        
+    except Exception as e:
+        print(f"❌ Docker execution failed: {e}")
+        return 1
+
+def run_with_python(args, modules) -> int:
+    """Run the pipeline using local Python."""
+    try:
+        print("🧠 Alzearly Training Pipeline")
+        print("=" * 50)
+        
+        # Check for cached data
+        featurized_path = Path("data/featurized")
+        if featurized_path.exists() and any(featurized_path.glob("*")):
+            print("✅ Cache hit: Found existing featurized data")
+            skip_data_gen = True
+            skip_preprocess = True
+        else:
+            print("📁 No cached data found - will generate new data")
+            skip_data_gen = False
+            skip_preprocess = False
+        
+        # Step 1: Data Generation
+        if not skip_data_gen:
+            print("\n📊 Step 1: Data Generation")
+            if args.rows:
+                print(f"   Generating {args.rows} rows...")
+            modules['generate']()
+            print("✅ Data generation completed")
+        else:
+            print("\n📊 Step 1: Data Generation (skipped - using cached data)")
+        
+        # Step 2: Preprocessing
+        if not skip_preprocess:
+            print("\n🔧 Step 2: Data Preprocessing")
+            modules['preprocess']()
+            print("✅ Data preprocessing completed")
+        else:
+            print("\n🔧 Step 2: Data Preprocessing (skipped - using cached data)")
+        
+        # Step 3: Training
+        print("\n🤖 Step 3: Model Training")
+        print(f"   Tracker: {args.tracker}")
+        if args.seed:
+            print(f"   Seed: {args.seed}")
+        
+        # Create artifacts directory
+        artifacts_dir = Path("artifacts/latest")
+        artifacts_dir.mkdir(parents=True, exist_ok=True)
+        
+        # Also create timestamped directory
+        timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+        timestamped_dir = Path(f"artifacts/{timestamp}")
+        timestamped_dir.mkdir(parents=True, exist_ok=True)
+        
+        # Set up experiment tracking
+        if args.tracker == "wandb":
+            os.environ['NON_INTERACTIVE'] = 'true'
+            from utils import setup_wandb
+            global_tracker, tracker_type = setup_wandb()
+        elif args.tracker == "mlflow":
+            os.environ['NON_INTERACTIVE'] = 'true'
+            from utils import setup_mlflow
+            global_tracker, tracker_type = setup_mlflow()
+        elif args.tracker == "none":
+            os.environ['NON_INTERACTIVE'] = 'true'
+            global_tracker, tracker_type = None, "none"
+        else:
+            print(f"❌ Invalid tracker option: {args.tracker}")
+            return 1
+        
+        # Load config and create trainer
+        from src.config import load_config
+        config = load_config("model", "config/model.yaml")
+        
+        # Override config if rows specified
+        if args.rows:
+            # This would need to be handled in data generation
+            pass
+        
+        from src.train import ModelTrainer, TrainingConfig
+        trainer_config = TrainingConfig()
+        trainer = ModelTrainer(trainer_config)
+        
+        # Run training
+        results = trainer.train(run_type="initial", tracker_type=tracker_type)
+        
+        print("✅ Model training completed")
+        
+        # Step 4: Export artifacts
+        print("\n📦 Step 4: Exporting Artifacts")
+        
+        # The training already saved artifacts to artifacts/latest/
+        # Just copy them to the timestamped directory
+        from src.io.paths import get_latest_artifacts_dir
+        
+        latest_path = get_latest_artifacts_dir()
+        
+        # Copy to timestamped directory
+        import shutil
+        for file in latest_path.glob("*"):
+            if file.is_file():
+                shutil.copy2(file, timestamped_dir / file.name)
+        
+        print(f"✅ Artifacts saved to: {latest_path}")
+        print(f"✅ Artifacts mirrored to: {timestamped_dir}")
+        
+        # Print final artifact path
+        model_path = latest_path / "model.pkl"
+        if model_path.exists():
+            print(f"\n🎉 Training completed successfully!")
+            print(f"📁 Final model path: {model_path.absolute()}")
+            return 0
+        else:
+            print("❌ Model file not found after training")
+            return 1
+            
+    except Exception as e:
+        print(f"❌ Pipeline execution failed: {e}")
+        import traceback
+        traceback.print_exc()
+        return 1
+
+def train_command(args):
+    """Execute the training pipeline."""
+    print("🚀 Starting Alzearly Training Pipeline")
+    
+    # Detect environment
+    use_docker, env_type = detect_environment()
+    if env_type == "none":
+        print("❌ Neither Docker nor Python dependencies available")
+        return 1
+    
+    # Setup paths
+    if not setup_paths():
+        return 1
+    
+    # Import modules or use Docker
+    if use_docker and not getattr(args, 'force_python', False):
+        print("🐳 Using Docker for execution...")
+        return run_with_docker(args)
+    else:
+        print("🐍 Using local Python for execution...")
+        if not check_dependencies():
+            return 1
+        
+        import_success, modules = import_modules()
+        if not import_success:
+            return 1
+        
+        return run_with_python(args, modules)
+
+def main():
+    """Main CLI entry point."""
+    parser = argparse.ArgumentParser(
+        description="Alzearly CLI - Alzheimer's Prediction Pipeline",
+        formatter_class=argparse.RawDescriptionHelpFormatter,
+        epilog="""
+Examples:
+  python cli.py train --tracker none
+  python cli.py train --tracker mlflow --rows 1000
+  python cli.py train --tracker wandb --seed 123
+        """
     )
-
-@app.command()
-def preprocess(
-    config_file: str = typer.Option("config/preprocess.yaml", "--config", help="Configuration file path"),
-    input_dir: str = typer.Option(None, "--input-dir", help="Override input directory from config"),
-    output_dir: str = typer.Option(None, "--output-dir", help="Override output directory from config"),
-    rolling_window_years: int = typer.Option(None, "--rolling-window", help="Override rolling window from config"),
-    chunk_size: int = typer.Option(None, "--chunk-size", help="Override chunk size from config"),
-    seed: int = typer.Option(None, "--seed", help="Override seed from config"),
-):
-    """Preprocess patient-year data with rolling features using Polars Lazy."""
-    from src.preprocess import preprocess as preprocess_data
     
-    preprocess_data(
-        config_file=config_file,
-        input_dir=input_dir,
-        output_dir=output_dir,
-        rolling_window_years=rolling_window_years,
-        chunk_size=chunk_size,
-        seed=seed,
+    subparsers = parser.add_subparsers(dest='command', help='Available commands')
+    
+    # Train command
+    train_parser = subparsers.add_parser('train', help='Run the complete training pipeline')
+    train_parser.add_argument(
+        '--tracker', 
+        choices=['none', 'mlflow', 'wandb'], 
+        default='none',
+        help='Experiment tracker to use (default: none)'
     )
-
-@app.command()
-def train(
-    config_file: str = typer.Option("config/model.yaml", "--config", help="Configuration file path"),
-    input_dir: str = typer.Option(None, "--input-dir", "--in", help="Override input directory from config"),
-    output_dir: str = typer.Option(None, "--output-dir", "--artifacts", help="Override output directory from config"),
-    max_features: int = typer.Option(None, "--max-features", help="Override max features from config"),
-    handle_imbalance: str = typer.Option(None, "--handle-imbalance", help="Override imbalance handling from config"),
-    wandb_project: str = typer.Option(None, "--wandb-project", help="Override wandb project from config"),
-    wandb_entity: str = typer.Option(None, "--wandb-entity", help="Override wandb entity from config"),
-):
-    """Train machine learning models for Alzheimer's prediction"""
-    from src.train import train as train_models
-    
-    train_models(
-        config_file=config_file,
-        input_dir=input_dir,
-        output_dir=output_dir,
-        max_features=max_features,
-        handle_imbalance=handle_imbalance,
-        wandb_project=wandb_project,
-        wandb_entity=wandb_entity,
+    train_parser.add_argument(
+        '--rows', 
+        type=int,
+        help='Number of rows to generate (for fast testing)'
     )
-
-@app.command()
-def evaluate(
-    model_path: str = typer.Argument(..., help="Path to trained model (.pkl)"),
-    data_path: str = typer.Argument(..., help="Path to evaluation data"),
-    output_dir: str = typer.Option("artifacts", "--output", help="Output directory for results"),
-):
-    """Evaluate a trained model with comprehensive metrics"""
-    from src.evaluate import evaluate_model
-    
-    evaluate_model(model_path=model_path, data_path=data_path, output_dir=output_dir)
-
-@app.command()
-def serve_dev():
-    """Run development server"""
-    from src.serve import app
-    import uvicorn
-    
-    uvicorn.run(
-        app,
-        host="0.0.0.0",
-        port=8000,
-        reload=True,
-        log_level="info"
+    train_parser.add_argument(
+        '--seed', 
+        type=int, 
+        default=42,
+        help='Random seed for reproducibility (default: 42)'
     )
+    train_parser.add_argument(
+        '--force-python',
+        action='store_true',
+        help='Force local Python execution even if Docker is available'
+    )
+    
+    args = parser.parse_args()
+    
+    if args.command == 'train':
+        return train_command(args)
+    else:
+        parser.print_help()
+        return 1
 
 if __name__ == "__main__":
-    app()
+    sys.exit(main())

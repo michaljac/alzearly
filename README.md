@@ -30,7 +30,7 @@ Alzheimer's disease is a progressive brain disorder that affects memory, thinkin
 ## <img src="readme_images/hippo.jpeg" alt="🚀" width="20" height="20" style="background: transparent;"> **Quick Start - Run the Complete Pipeline**
 
 ### **Prerequisites**
-- Docker installed on your system
+- Python 3.10+ or Docker installed on your system
 - Git for cloning the repository
 
 ### **Step-by-Step Instructions**
@@ -40,39 +40,45 @@ Alzheimer's disease is a progressive brain disorder that affects memory, thinkin
 git clone https://github.com/michaljac/alz-detect
 cd alz-detect
 
-# 2. Build the training container
-docker build -f Dockerfile.train -t alzearly-train .
+# 2. Train (no external services)
+python cli.py train --tracker none
 
-# 3. Run the complete training pipeline
-docker run -it alzearly-train python run_training.py
-
-# 4. Choose your experiment tracker when prompted:
-#    - Option 1: Weights & Biases (cloud tracking)
-#    - Option 2: MLflow (local tracking) 
-#    - Option 3: No tracking (fastest)
+# 3. Serve the API (port 8000)
+uvicorn src.serve:app --port 8000
 ```
 
 ### **What Happens During Training**
 
 1. **📊 Data Generation**: Creates synthetic patient data with realistic health patterns
-2. **🔧 Feature Engineering**: Transforms raw data into predictive features
+2. **🔧 Feature Engineering**: Transforms raw data into predictive features  
 3. **🤖 Model Training**: Trains XGBoost and Logistic Regression models
 4. **📈 Evaluation**: Calculates performance metrics and creates visualizations
-5. **💾 Artifact Saving**: Saves trained models and results to `artifacts/latest/`
+5. **💾 Artifact Export**: Saves trained models to `./artifacts/latest/` and `./artifacts/{timestamp}/`
+
+### **Artifacts & Output**
+
+- **Model files**: `./artifacts/latest/model.pkl`, `feature_names.json`, `threshold.json`, `metrics.json`
+- **MLflow logs**: `./mlruns/` (if using `--tracker mlflow`)
+- **Cache behavior**: If `./data/featurized` exists, reuses cached data (logs "cache hit")
 
 ### **Expected Output**
 ```
-🧠 Alzheimer's Prediction Pipeline
-============================================================
-🔬 Setting up experiment tracking...
-📊 Step 1: Data Generation
-✅ Data generation completed
-🔧 Step 2: Data Preprocessing  
-✅ Data preprocessing completed
+🚀 Starting Alzearly Training Pipeline
+🐍 Using local Python for execution...
+🧠 Alzearly Training Pipeline
+==================================================
+✅ Cache hit: Found existing featurized data
+📊 Step 1: Data Generation (skipped - using cached data)
+🔧 Step 2: Data Preprocessing (skipped - using cached data)
 🤖 Step 3: Model Training
+   Tracker: none
+   Seed: 42
 ✅ Model training completed
-📦 Step 4: Model artifacts automatically saved to artifacts/latest/
-🎉 Training pipeline completed successfully!
+📦 Step 4: Exporting Artifacts
+✅ Artifacts saved to: ./artifacts/latest
+✅ Artifacts mirrored to: ./artifacts/20241201_143022
+🎉 Training completed successfully!
+📁 Final model path: /workspace/artifacts/latest/model.pkl
 ```
 
 ## <img src="readme_images/hippo.jpeg" alt="🏗️" width="20" height="20" style="background: transparent;"> **Architecture Overview**
