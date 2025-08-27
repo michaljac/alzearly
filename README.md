@@ -608,8 +608,8 @@ curl -X POST http://localhost:8000/predict \
 
 #### **Production Deployment**
 ```bash
-# Build the serving container
-docker build -f Dockerfile.serve -t alzearly-serve .
+# Build the serving image
+docker build -f Dockerfile.serve -t alzearly-serve . --network=host
 
 # Run the container
 docker run -p 8000:8000 \

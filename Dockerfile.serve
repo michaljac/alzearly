@@ -1,36 +1,33 @@
-# Serving Docker image for ML project
-FROM python:3.10-slim
+# Pin to a stable debian base to avoid mirror hiccups
+FROM python:3.10-slim-bullseye
 
-# Set working directory
+ENV PYTHONDONTWRITEBYTECODE=1 \
+    PYTHONUNBUFFERED=1 \
+    PIP_NO_CACHE_DIR=1 \
+    PIP_DEFAULT_TIMEOUT=120
+
 WORKDIR /app
 
-# Update system packages and install security updates
-RUN apt-get update && apt-get upgrade -y && apt-get clean && rm -rf /var/lib/apt/lists/*
+# Update package lists and install necessary packages
+RUN apt-get update && apt-get install -y \
+    ca-certificates \
+    && rm -rf /var/lib/apt/lists/*
 
-# Update pip to latest version
-RUN python -m pip install --upgrade pip
+# Upgrade pip tooling early for better wheel resolution
+RUN python -m pip install --upgrade pip setuptools wheel
 
-# Copy requirements and install Python dependencies
+# Install Python deps first (better caching)
 COPY requirements-serve.txt .
-RUN pip install --no-cache-dir -r requirements-serve.txt
+RUN pip install -r requirements-serve.txt \
+    --trusted-host pypi.org \
+    --trusted-host pypi.python.org \
+    --trusted-host files.pythonhosted.org \
+    --index-url https://pypi.org/simple/
 
 # Copy project files
-COPY src/ ./src/
-COPY config/ ./config/
-COPY run_serve.py .
+COPY . .
 
-# Create directories for models and artifacts
-RUN mkdir -p /app/models /app/artifacts
-
-# Make run_serve.py executable
-RUN chmod +x run_serve.py
-
-# Expose port for FastAPI
 EXPOSE 8000
 
-# Set environment variables
-ENV PYTHONUNBUFFERED=1
-ENV PYTHONPATH=/app
-
-# Default command to run FastAPI server using run_serve.py
-CMD ["python", "run_serve.py"]
+# Use exec form for better signal handling
+ENTRYPOINT ["python", "run_serve.py"]
