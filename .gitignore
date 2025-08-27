@@ -21,5 +21,4 @@ wandb/
 __pycache__/
 *.log
 
-run_training.py
-run_training_simple.py
+upload_to_bigquery.py
