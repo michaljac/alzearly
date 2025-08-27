@@ -345,7 +345,7 @@ python run_training.py \
 data_gen:
   n_patients: 1000          # Small dataset for testing
   years: [2020]             # Single year
-  positive_rate: 0.15
+  positive_rate: 0.08
 
 model:
   max_features: 50          # Fewer features
@@ -371,8 +371,8 @@ model:
 # config/research.yaml
 data_gen:
   n_patients: 10000
-  years: [2018, 2019, 2020, 2021, 2022]  # 5 years
-  positive_rate: 0.18       # Higher prevalence
+  years: [2021, 2022, 2023, 2024]  # 5 years
+  positive_rate: 0.08       # Higher prevalence
 
 preprocess:
   rolling_window: 5         # Longer trend analysis
@@ -390,8 +390,8 @@ This section tells you exactly when and why to modify each parameter. All change
 | **Parameter** | **Current Value** | **When to Change** | **Recommended Range** |
 |---------------|-------------------|-------------------|----------------------|
 | `n_patients` | 5000 | **Increase for production** | 10,000+ for production, 1,000 for testing |
-| `years` | [2018, 2019, 2020] | **Add more years** | [2015-2022] for longer disease progression |
-| `positive_rate` | 0.15 | **Adjust population** | 0.05-0.1 for typical populations |
+| `years` | [2021, 2022, 2023, 2024] | **Add more years** | [2015-2022] for longer disease progression |
+| `positive_rate` | 0.08 
 | `seed` | 42 | **For reproducibility** | Any integer (keep same for consistent results) |
 
 #### **File: `config/model.yaml`**
@@ -467,29 +467,6 @@ python run_training.py --skip-preprocess
 python run_training.py --skip-data-gen --skip-preprocess
 ```
 
-## <img src="readme_images/hippo.jpeg" alt="📁" width="20" height="20" style="background: transparent;"> **Project Structure**
-
-```
-alz-detect/
-├── run_training.py              # Main pipeline orchestrator
-├── src/
-│   ├── data_gen.py             # Synthetic data generation
-│   ├── preprocess.py           # Feature engineering
-│   ├── train.py               # Model training & evaluation
-│   ├── serve.py               # Model serving (optional)
-│   └── config.py              # Configuration management
-├── config/
-│   └── model.yaml             # Training configuration
-├── tests/
-│   └── test_run_training.py   # Pipeline tests
-├── artifacts/
-│   └── latest/                # Trained models & results
-├── data/
-│   ├── raw/                   # Generated patient data
-│   └── featurized/            # Processed features
-└── plots/                     # Performance visualizations
-```
-
 ## <img src="readme_images/hippo.jpeg" alt="🧪" width="20" height="20" style="background: transparent;"> **Testing the Pipeline**
 
 ```bash
@@ -499,48 +476,6 @@ python -m pytest tests/test_run_training.py -v
 # Test specific functionality
 python -m pytest tests/test_run_training.py::TestRunTraining::test_main_successful_pipeline -v
 ```
-
-## <img src="readme_images/hippo.jpeg" alt="🚀" width="20" height="20" style="background: transparent;"> **Improved Usage with Built-in Error Handling**
-
-The `run_training.py` script now includes comprehensive error handling and validation:
-
-### **Automatic Problem Detection & Fixes**
-
-✅ **Smart Path Detection**: Automatically detects if you're in the right directory
-✅ **Import Validation**: Checks all dependencies are installed before running
-✅ **Data Validation**: Verifies data files exist before processing
-✅ **Config Validation**: Ensures configuration files are present and valid
-✅ **Artifact Verification**: Confirms all model artifacts were created successfully
-
-### **Enhanced Error Messages**
-
-The script now provides clear, actionable error messages:
-
-```bash
-# If you're in the wrong directory:
-❌ Error: src directory not found at /path/to/src
-💡 Make sure you're running from the project root directory
-
-# If dependencies are missing:
-❌ Import error: No module named 'pandas'
-💡 Make sure all dependencies are installed:
-   pip install -r requirements-train.txt
-
-# If config file is missing:
-❌ Configuration file not found: config/model.yaml
-💡 Check if the config file exists or use --config to specify a different file
-
-# If data is missing:
-❌ No raw data found for preprocessing
-💡 Run data generation first or check data/raw directory
-```
-
-### **Automatic Directory Creation**
-
-The script automatically creates necessary directories:
-- `data/raw/` - For generated patient data
-- `data/featurized/` - For processed features
-- `artifacts/latest/` - For trained models
 
 ### **Smart Data Detection**
 
@@ -569,6 +504,218 @@ After training, the script verifies all artifacts were created:
 - **Fast iteration**: Use `--tracker none` for no experiment tracking
 - **Memory issues**: Reduce `max_features` in config
 - **GPU training**: Modify Dockerfile to include CUDA support
+
+## <img src="readme_images/hippo.jpeg" alt="🚀" width="20" height="20" style="background: transparent;"> **Serving Endpoint - API Deployment**
+
+### **Quick Start - Run the API Server**
+
+After training your models, you can deploy the prediction API:
+
+```bash
+# Option 1: Run with Python (development)
+python run_serve.py
+
+# Option 2: Run with Docker (production)
+docker-compose up serve
+
+# Option 3: Run with custom port
+python run_serve.py --port 9000 --host 127.0.0.1 --reload
+```
+
+### **API Endpoints**
+
+The FastAPI server provides these endpoints:
+
+| **Endpoint** | **Method** | **Description** | **Example** |
+|--------------|------------|-----------------|-------------|
+| `/` | GET | API information | `curl http://localhost:8000/` |
+| `/health` | GET | Health check | `curl http://localhost:8000/health` |
+| `/predict` | POST | Make predictions | `curl -X POST http://localhost:8000/predict` |
+| `/docs` | GET | Interactive API docs | Open `http://localhost:8000/docs` |
+
+### **Making Predictions**
+
+#### **Example Prediction Request**
+```bash
+curl -X POST "http://localhost:8000/predict" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "patient_id": "P123456",
+    "age": 65.0,
+    "bmi": 26.5,
+    "systolic_bp": 140.0,
+    "diastolic_bp": 85.0,
+    "heart_rate": 72.0,
+    "temperature": 98.6,
+    "glucose": 95.0,
+    "cholesterol_total": 200.0,
+    "hdl": 45.0,
+    "ldl": 130.0,
+    "triglycerides": 150.0,
+    "creatinine": 1.2,
+    "hemoglobin": 14.5,
+    "white_blood_cells": 7.5,
+    "platelets": 250.0,
+    "num_encounters": 3,
+    "num_medications": 2,
+    "num_lab_tests": 5
+  }'
+```
+
+#### **Example Prediction Response**
+```json
+{
+  "patient_id": "P123456",
+  "probability": 0.75,
+  "label": 1,
+  "threshold_used": "optimal",
+  "threshold_value": 0.55
+}
+```
+
+### **Docker Deployment**
+
+#### **Production Deployment**
+```bash
+# Build the serving container
+docker build -f Dockerfile.serve -t alzearly-serve .
+
+# Run the container
+docker run -p 8000:8000 \
+  -v $(pwd)/models:/app/models \
+  -v $(pwd)/artifacts:/app/artifacts \
+  alzearly-serve
+```
+
+#### **Docker Compose (Recommended)**
+```bash
+# Start the serving service
+docker-compose up serve
+
+# Start with specific profile
+docker-compose --profile serve up
+```
+
+### **Health Check**
+
+Monitor the API health:
+```bash
+curl http://localhost:8000/health
+```
+
+**Response:**
+```json
+{
+  "status": "healthy",
+  "model_loaded": true,
+  "feature_count": 150,
+  "optimal_threshold": 0.55,
+  "fallback_threshold": 0.35
+}
+```
+
+### **Interactive API Documentation**
+
+Open your browser to `http://localhost:8000/docs` for:
+- **Interactive API testing**
+- **Request/response schemas**
+- **Example requests**
+- **Real-time API exploration**
+
+## <img src="readme_images/hippo.jpeg" alt="🧪" width="20" height="20" style="background: transparent;"> **Testing the Serving Endpoint**
+
+### **Unit Tests for API Server**
+
+Comprehensive unit tests are available for the serving functionality:
+
+```bash
+# Run all serving tests
+cd tests && python run_tests.py
+
+# Run specific serving tests
+cd tests && python test_run_serve.py
+
+# Run individual test classes
+cd tests && python -c "
+import unittest
+from test_run_serve import TestRunServe, TestRunServeIntegration
+unittest.main(argv=[''], exit=False, verbosity=2)
+"
+```
+
+### **Test Coverage**
+
+The serving tests cover:
+
+| **Test Category** | **Description** | **Test Count** |
+|-------------------|-----------------|----------------|
+| **Argument Parsing** | CLI argument validation | 5 tests |
+| **Server Startup** | Uvicorn integration | 4 tests |
+| **Error Handling** | Exception management | 3 tests |
+| **Output Validation** | Console output verification | 2 tests |
+| **Integration** | FastAPI app validation | 3 tests |
+| **Code Quality** | Import and structure checks | 4 tests |
+
+### **Running Tests in Docker**
+
+```bash
+# Test the serving container
+docker-compose --profile test up test
+
+# Test with specific configuration
+docker run --rm -v $(pwd)/tests:/app/tests \
+  -v $(pwd)/models:/app/models \
+  -v $(pwd)/artifacts:/app/artifacts \
+  alzearly-serve python /app/tests/test_run_serve.py
+```
+
+### **Test Results Example**
+
+```bash
+🧪 Running tests from test_run_serve.py...
+============================================================
+test_argument_parser_custom_values (__main__.TestRunServe) ... ok
+test_argument_parser_defaults (__main__.TestRunServe) ... ok
+test_main_function_success (__main__.TestRunServe) ... ok
+test_fastapi_app_import (__main__.TestRunServeIntegration) ... ok
+test_fastapi_app_routes (__main__.TestRunServeIntegration) ... ok
+test_uvicorn_app_string_validity (__main__.TestRunServeIntegration) ... ok
+
+----------------------------------------------------------------------
+Ran 21 tests in 1.277s
+OK
+```
+
+### **API Testing with curl**
+
+Test the API endpoints directly:
+
+```bash
+# Health check
+curl http://localhost:8000/health
+
+# Make a prediction
+curl -X POST "http://localhost:8000/predict" \
+  -H "Content-Type: application/json" \
+  -d @test_patient.json
+
+# Get API info
+curl http://localhost:8000/
+```
+
+### **Load Testing**
+
+Test API performance under load:
+
+```bash
+# Install Apache Bench (if available)
+apt-get install apache2-utils
+
+# Test with 100 requests, 10 concurrent
+ab -n 100 -c 10 -T application/json \
+  -p test_patient.json \
+  http://localhost:8000/predict
+```
 
 ## <img src="readme_images/hippo.jpeg" alt="📚" width="20" height="20" style="background: transparent;"> **Understanding the Results**
 

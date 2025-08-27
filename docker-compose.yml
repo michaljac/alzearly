@@ -33,7 +33,7 @@ services:
       - ./artifacts:/app/artifacts
     environment:
       - PYTHONPATH=/app
-    command: ["uvicorn", "src.serve:app", "--host", "0.0.0.0", "--port", "8000", "--reload"]
+    command: ["python", "run_serve.py", "--reload"]
     profiles:
       - serve
 
