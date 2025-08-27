@@ -169,8 +169,15 @@ def run_with_python(args, modules) -> int:
         # Step 3: Training
         print("\n🤖 Step 3: Model Training")
         print(f"   Tracker: {args.tracker}")
+        
+        # Set random seed for deterministic runs
         if args.seed:
-            print(f"   Seed: {args.seed}")
+            from utils import set_seed
+            set_seed(args.seed)
+        else:
+            # Use default seed if not specified
+            from utils import set_seed
+            set_seed(42)
         
         # Create artifacts directory
         artifacts_dir = Path("artifacts/latest")
@@ -213,6 +220,13 @@ def run_with_python(args, modules) -> int:
         
         from src.train import ModelTrainer, TrainingConfig
         trainer_config = TrainingConfig()
+        
+        # Update random_state in config with the seed from args
+        seed_value = args.seed if args.seed else 42
+        trainer_config.random_state = seed_value
+        trainer_config.xgb_params['random_state'] = seed_value
+        trainer_config.lr_params['random_state'] = seed_value
+        
         trainer = ModelTrainer(trainer_config)
         
         # Run training

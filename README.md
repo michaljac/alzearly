@@ -81,13 +81,31 @@ uvicorn src.serve:app --port 8000
 🔧 Step 2: Data Preprocessing (skipped - using cached data)
 🤖 Step 3: Model Training
    Tracker: none
-   Seed: 42
+🌱 Random seed set to: 42
 ✅ Model training completed
 📦 Step 4: Exporting Artifacts
 ✅ Artifacts saved to: ./artifacts/latest
 ✅ Artifacts mirrored to: ./artifacts/20241201_143022
 🎉 Training completed successfully!
 📁 Final model path: /workspace/artifacts/latest/model.pkl
+```
+
+### **Deterministic Runs**
+
+For reproducible results, the pipeline uses seeded random number generators:
+
+- **Seed setting**: Automatically sets seeds for Python `random`, NumPy, XGBoost, and scikit-learn
+- **Default seed**: `42` (can be overridden with `--seed <number>`)
+- **Cache requirement**: Deterministic runs require using the same cached features under `./data/featurized`
+- **Verification**: Running the same command twice with existing cache produces identical metrics and artifacts
+
+**Example:**
+```bash
+# First run (creates cache)
+python cli.py train --tracker none --rows 1000 --seed 123
+
+# Second run (uses cache, should be identical)
+python cli.py train --tracker none --rows 1000 --seed 123
 ```
 
 ## <img src="readme_images/hippo.jpeg" alt="🏗️" width="20" height="20" style="background: transparent;"> **Architecture Overview**

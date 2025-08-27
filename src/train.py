@@ -101,7 +101,7 @@ class ModelTrainer:
         self.feature_names = []
         self.preprocessing_metadata = {}
         
-    def _generate_model_name(self, run_type: str = "initial") -> str:
+    def _generate_model_name(self, run_type: str = "initial", include_timestamp: bool = True) -> str:
         """Generate a descriptive model name for WandB runs."""
         current_date = datetime.now().strftime("%Y-%m-%d")
         current_time = datetime.now().strftime("%H:%M")
@@ -123,7 +123,11 @@ class ModelTrainer:
         features_str = f"{self.config.max_features}feat"
         
         # Create meaningful run name
-        run_name = f"{description} | {models_str} | {features_str} | {current_date} {current_time}"
+        if include_timestamp:
+            run_name = f"{description} | {models_str} | {features_str} | {current_date} {current_time}"
+        else:
+            # Deterministic version without timestamp
+            run_name = f"{description} | {models_str} | {features_str} | seed_{self.config.random_state}"
         
         return run_name
         
@@ -789,7 +793,7 @@ class ModelTrainer:
         print("🚀 Starting model training pipeline...")
         
         # Initialize wandb with descriptive run name
-        run_name = self._generate_model_name(run_type)
+        run_name = self._generate_model_name(run_type, include_timestamp=True)
         
         # Initialize experiment tracking
         self.tracker_enabled = tracker_type != "none"
@@ -924,7 +928,7 @@ class ModelTrainer:
             # Model validation metrics logged
         
         # Save plots for each model
-        descriptive_name = self._generate_model_name(run_type)
+        descriptive_name = self._generate_model_name(run_type, include_timestamp=False)
         for model_name, model in self.models.items():
             self._save_plots(model_name, model, X_test_selected, y_test, descriptive_name)
         

@@ -2,13 +2,52 @@
 Utility functions for the Alzearly pipeline.
 """
 
-import logging
+import os
+import subprocess
 import sys
 from pathlib import Path
-from typing import List, Optional
+from typing import List, Optional, Tuple, Any
+
+def set_seed(seed: int) -> None:
+    """Set random seeds for deterministic runs across all libraries."""
+    import random
+    import numpy as np
+    
+    # Set Python random seed
+    random.seed(seed)
+    
+    # Set NumPy seed
+    np.random.seed(seed)
+    
+    # Set XGBoost seed if available
+    try:
+        import xgboost as xgb
+        # XGBoost doesn't have a global set_random_state, but we can set it in model params
+        # The seed will be used when creating XGBoost models
+        pass
+    except ImportError:
+        pass
+    
+    # Set LightGBM seed if available
+    try:
+        import lightgbm as lgb
+        lgb.set_random_state(seed)
+    except ImportError:
+        pass
+    
+    # Set scikit-learn seed
+    try:
+        from sklearn.utils import check_random_state
+        check_random_state(seed)
+    except ImportError:
+        pass
+    
+    print(f"🌱 Random seed set to: {seed}")
 
 def setup_logging(level: str = "INFO") -> None:
     """Setup logging configuration."""
+    import logging
+    
     logging.basicConfig(
         level=getattr(logging, level.upper()),
         format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
@@ -329,17 +368,7 @@ def start_run(run_name=None, config=None):
     if tracker_type == "wandb" and tracker:
         if config is None:
             config = {}
-        # Set up meaningful project and entity names
-        project_name = "alzheimers-detection"
-        entity_name = None  # Use default entity (user's account)
-        
-        tracker.init(
-            project=project_name,
-            entity=entity_name,
-            name=run_name,
-            config=config,
-            tags=["alzheimers", "ml", "healthcare"]
-        )
+        tracker.init(name=run_name, config=config)
     elif tracker_type == "mlflow" and tracker:
         tracker.start_run(run_name=run_name)
 
