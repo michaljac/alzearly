@@ -253,7 +253,7 @@ class ModelTrainer:
 
 The pipeline compares XGBoost and Logistic Regression models to demonstrate their different characteristics:
 
-![Model Comparison](readme_images/model_comparison.png)
+![Model Comparison](readme_images/model_comparison.jpeg)
 
 **What this visualization shows:**
 - **Probability Distributions**: How each model assigns risk probabilities to patients
