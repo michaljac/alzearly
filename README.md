@@ -562,10 +562,13 @@ After training your models, you can deploy the prediction API:
 # Option 1: Run with Python (development)
 python run_serve.py
 
-# Option 2: Run with Docker (production)
+# Option 2: Run with uvicorn directly (acceptance criteria)
+uvicorn run_serve:app --port 8000
+
+# Option 3: Run with Docker (production)
 docker-compose up serve
 
-# Option 3: Run with custom port
+# Option 4: Run with custom port
 python run_serve.py --port 9000 --host 127.0.0.1 --reload
 ```
 
@@ -584,39 +587,20 @@ The FastAPI server provides these endpoints:
 
 #### **Example Prediction Request**
 ```bash
-curl -X POST "http://localhost:8000/predict" \
-  -H "Content-Type: application/json" \
-  -d '{
-    "patient_id": "P123456",
-    "age": 65.0,
-    "bmi": 26.5,
-    "systolic_bp": 140.0,
-    "diastolic_bp": 85.0,
-    "heart_rate": 72.0,
-    "temperature": 98.6,
-    "glucose": 95.0,
-    "cholesterol_total": 200.0,
-    "hdl": 45.0,
-    "ldl": 130.0,
-    "triglycerides": 150.0,
-    "creatinine": 1.2,
-    "hemoglobin": 14.5,
-    "white_blood_cells": 7.5,
-    "platelets": 250.0,
-    "num_encounters": 3,
-    "num_medications": 2,
-    "num_lab_tests": 5
-  }'
+curl -X POST http://localhost:8000/predict \
+ -H "Content-Type: application/json" \
+ -d '{"items":[{"age":65,"bmi":26.5,"systolic_bp":140,"diastolic_bp":85,"heart_rate":72,"temperature":37.0,"glucose":95,"cholesterol_total":200,"hdl":45,"ldl":130,"triglycerides":150,"creatinine":1.2,"hemoglobin":14.5,"white_blood_cells":7.5,"platelets":250,"num_encounters":3,"num_medications":2,"num_lab_tests":5}]}'
 ```
 
 #### **Example Prediction Response**
 ```json
 {
-  "patient_id": "P123456",
-  "probability": 0.75,
-  "label": 1,
-  "threshold_used": "optimal",
-  "threshold_value": 0.55
+  "predictions": [
+    {
+      "probability": 0.75,
+      "label": 1
+    }
+  ]
 }
 ```
 

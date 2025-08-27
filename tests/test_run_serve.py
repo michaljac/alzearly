@@ -116,7 +116,7 @@ class TestRunServe(unittest.TestCase):
         
         # Verify uvicorn.run was called with correct arguments
         mock_uvicorn_run.assert_called_once_with(
-            "src.serve:app",
+            "run_serve:app",
             host="0.0.0.0",
             port=8000,
             reload=False,
@@ -138,7 +138,7 @@ class TestRunServe(unittest.TestCase):
         
         # Verify uvicorn.run was called with correct arguments
         mock_uvicorn_run.assert_called_once_with(
-            "src.serve:app",
+            "run_serve:app",
             host="127.0.0.1",
             port=9000,
             reload=True,
@@ -292,7 +292,7 @@ class TestRunServe(unittest.TestCase):
             
             # Verify uvicorn.run was called with correct parameters
             call_args = mock_uvicorn_run.call_args
-            self.assertEqual(call_args[0][0], "src.serve:app")  # app string
+            self.assertEqual(call_args[0][0], "run_serve:app")  # app string
             self.assertEqual(call_args[1]['host'], "0.0.0.0")
             self.assertEqual(call_args[1]['port'], 8000)
             self.assertEqual(call_args[1]['reload'], False)
@@ -338,24 +338,26 @@ class TestRunServeIntegration(unittest.TestCase):
     def test_fastapi_app_import(self):
         """Test that the FastAPI app can be imported."""
         try:
-            from src.serve import app
+            from run_serve import app
             self.assertIsNotNone(app)
             self.assertTrue(hasattr(app, 'routes'))
+            print("✅ FastAPI app imported successfully")
         except ImportError as e:
             self.fail(f"Failed to import FastAPI app: {e}")
 
     def test_fastapi_app_routes(self):
         """Test that the FastAPI app has expected routes."""
         try:
-            from src.serve import app
+            from run_serve import app
             
             # Get all route paths
             routes = [route.path for route in app.routes]
             
             # Check for expected routes
-            expected_routes = ['/', '/health', '/predict', '/docs', '/openapi.json']
+            expected_routes = ['/', '/health', '/version', '/predict', '/docs', '/openapi.json']
             for route in expected_routes:
                 self.assertIn(route, routes, f"Expected route {route} not found")
+            print("✅ All expected routes found")
                 
         except ImportError as e:
             self.fail(f"Failed to import FastAPI app: {e}")
@@ -365,7 +367,7 @@ class TestRunServeIntegration(unittest.TestCase):
         try:
             # Try to import the app using the same string as run_serve.py
             import importlib
-            module_name, app_name = "src.serve:app".split(":")
+            module_name, app_name = "run_serve:app".split(":")
             
             # Import the module
             module = importlib.import_module(module_name)
@@ -376,9 +378,357 @@ class TestRunServeIntegration(unittest.TestCase):
             # Verify it's a FastAPI app
             from fastapi import FastAPI
             self.assertIsInstance(app, FastAPI)
+            print("✅ Uvicorn app string is valid")
             
         except (ImportError, AttributeError) as e:
-            self.fail(f"Invalid app string 'src.serve:app': {e}")
+            self.fail(f"Invalid app string 'run_serve:app': {e}")
+
+
+class TestServeFunctionality(unittest.TestCase):
+    """Additional functionality tests for the serve module."""
+    
+    def setUp(self):
+        """Set up test environment."""
+        sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+    
+    def test_imports(self):
+        """Test if all required imports work."""
+        try:
+            import fastapi
+            import uvicorn
+            import numpy as np
+            import pandas as pd
+            import pickle
+            print("✅ All required imports successful")
+        except ImportError as e:
+            self.fail(f"Import failed: {e}")
+    
+    def test_model_loading_function(self):
+        """Test model loading functionality."""
+        try:
+            from run_serve import load_model_and_metadata
+            print("✅ Model loading function imported successfully")
+        except Exception as e:
+            self.fail(f"Model loading function import failed: {e}")
+    
+    def test_docker_compose_configuration(self):
+        """Test if docker-compose configuration is valid."""
+        docker_compose_path = Path(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))) / "docker-compose.yml"
+        self.assertTrue(docker_compose_path.exists(), "docker-compose.yml not found")
+        
+        with open(docker_compose_path, 'r') as f:
+            content = f.read()
+            self.assertIn("serve:", content, "Serve service not found in docker-compose.yml")
+    
+    def test_requirements_file(self):
+        """Test if requirements file exists and contains necessary packages."""
+        req_path = Path(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))) / "requirements-serve.txt"
+        self.assertTrue(req_path.exists(), "Requirements file not found")
+        
+        with open(req_path, 'r') as f:
+            content = f.read().lower()
+            self.assertIn("fastapi", content, "FastAPI not in requirements-serve.txt")
+            self.assertIn("uvicorn", content, "Uvicorn not in requirements-serve.txt")
+
+
+class TestAPIEndpoints(unittest.TestCase):
+    """API endpoint structure and validation tests."""
+    
+    def setUp(self):
+        """Set up test environment."""
+        sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+    
+    def test_health_endpoint_function(self):
+        """Test that health endpoint function exists and returns correct structure."""
+        try:
+            from run_serve import app
+            
+            # Find the health endpoint
+            health_route = None
+            for route in app.routes:
+                if hasattr(route, 'path') and route.path == '/health':
+                    health_route = route
+                    break
+            
+            self.assertIsNotNone(health_route, "Health endpoint not found")
+            self.assertEqual(health_route.methods, {'GET'}, "Health endpoint should be GET")
+            print("✅ Health endpoint function exists")
+            
+        except Exception as e:
+            self.fail(f"Health endpoint test failed: {e}")
+    
+    def test_version_endpoint_function(self):
+        """Test that version endpoint function exists and returns correct structure."""
+        try:
+            from run_serve import app
+            
+            # Find the version endpoint
+            version_route = None
+            for route in app.routes:
+                if hasattr(route, 'path') and route.path == '/version':
+                    version_route = route
+                    break
+            
+            self.assertIsNotNone(version_route, "Version endpoint not found")
+            self.assertEqual(version_route.methods, {'GET'}, "Version endpoint should be GET")
+            print("✅ Version endpoint function exists")
+            
+        except Exception as e:
+            self.fail(f"Version endpoint test failed: {e}")
+    
+    def test_predict_endpoint_function(self):
+        """Test that predict endpoint function exists and accepts correct payload structure."""
+        try:
+            from run_serve import app
+            from run_serve import PredictionRequest, PredictionResponse
+            
+            # Find the predict endpoint
+            predict_route = None
+            for route in app.routes:
+                if hasattr(route, 'path') and route.path == '/predict':
+                    predict_route = route
+                    break
+            
+            self.assertIsNotNone(predict_route, "Predict endpoint not found")
+            self.assertEqual(predict_route.methods, {'POST'}, "Predict endpoint should be POST")
+            print("✅ Predict endpoint function exists")
+            
+            # Test that the request model can be instantiated
+            payload = {
+                "items": [{
+                    "age": 65,
+                    "bmi": 26.5,
+                    "systolic_bp": 140,
+                    "diastolic_bp": 85,
+                    "heart_rate": 72,
+                    "temperature": 37.0,
+                    "glucose": 95,
+                    "cholesterol_total": 200,
+                    "hdl": 45,
+                    "ldl": 130,
+                    "triglycerides": 150,
+                    "creatinine": 1.2,
+                    "hemoglobin": 14.5,
+                    "white_blood_cells": 7.5,
+                    "platelets": 250,
+                    "num_encounters": 3,
+                    "num_medications": 2,
+                    "num_lab_tests": 5
+                }]
+            }
+            
+            # This should not raise an exception
+            request = PredictionRequest(**payload)
+            self.assertIsNotNone(request)
+            print("✅ Predict endpoint payload structure valid")
+            
+        except Exception as e:
+            self.fail(f"Predict endpoint test failed: {e}")
+    
+    def test_predict_endpoint_validation(self):
+        """Test that predict endpoint validates input correctly."""
+        try:
+            from run_serve import PredictionRequest
+            
+            # Test invalid payload (missing required fields)
+            invalid_payload = {
+                "items": [{
+                    "age": 65,
+                    # Missing other required fields
+                }]
+            }
+            
+            # This should raise a validation error
+            with self.assertRaises(Exception):
+                PredictionRequest(**invalid_payload)
+            print("✅ Predict endpoint validation working")
+            
+        except Exception as e:
+            self.fail(f"Predict endpoint validation test failed: {e}")
+    
+    def test_root_endpoint_function(self):
+        """Test that root endpoint function exists."""
+        try:
+            from run_serve import app
+            
+            # Find the root endpoint
+            root_route = None
+            for route in app.routes:
+                if hasattr(route, 'path') and route.path == '/':
+                    root_route = route
+                    break
+            
+            self.assertIsNotNone(root_route, "Root endpoint not found")
+            self.assertEqual(root_route.methods, {'GET'}, "Root endpoint should be GET")
+            print("✅ Root endpoint function exists")
+            
+        except Exception as e:
+            self.fail(f"Root endpoint test failed: {e}")
+
+
+class TestAPIIntegration(unittest.TestCase):
+    """Integration tests for API endpoints that require the server to be running."""
+    
+    def setUp(self):
+        """Set up test fixtures."""
+        self.base_url = "http://localhost:8000"
+        # Check if server is running
+        try:
+            import requests
+            response = requests.get(f"{self.base_url}/health", timeout=2)
+            self.server_running = response.status_code == 200
+        except:
+            self.server_running = False
+    
+    def skip_if_server_not_running(self):
+        """Skip test if server is not running."""
+        if not self.server_running:
+            self.skipTest("Server not running. Start with: uvicorn run_serve:app --port 8000")
+    
+    def test_health_endpoint_integration(self):
+        """Test the health endpoint with actual HTTP request."""
+        self.skip_if_server_not_running()
+        
+        import requests
+        response = requests.get(f"{self.base_url}/health")
+        self.assertEqual(response.status_code, 200)
+        
+        data = response.json()
+        self.assertIn("status", data)
+        self.assertEqual(data["status"], "ok")
+        print("✅ Health endpoint integration test passed")
+    
+    def test_version_endpoint_integration(self):
+        """Test the version endpoint with actual HTTP request."""
+        self.skip_if_server_not_running()
+        
+        import requests
+        response = requests.get(f"{self.base_url}/version")
+        self.assertEqual(response.status_code, 200)
+        
+        data = response.json()
+        self.assertIn("model_version", data)
+        self.assertIsInstance(data["model_version"], str)
+        print("✅ Version endpoint integration test passed")
+    
+    def test_predict_endpoint_integration(self):
+        """Test the predict endpoint with actual HTTP request."""
+        self.skip_if_server_not_running()
+        
+        import requests
+        import json
+        
+        payload = {
+            "items": [{
+                "age": 65,
+                "bmi": 26.5,
+                "systolic_bp": 140,
+                "diastolic_bp": 85,
+                "heart_rate": 72,
+                "temperature": 37.0,
+                "glucose": 95,
+                "cholesterol_total": 200,
+                "hdl": 45,
+                "ldl": 130,
+                "triglycerides": 150,
+                "creatinine": 1.2,
+                "hemoglobin": 14.5,
+                "white_blood_cells": 7.5,
+                "platelets": 250,
+                "num_encounters": 3,
+                "num_medications": 2,
+                "num_lab_tests": 5
+            }]
+        }
+        
+        response = requests.post(
+            f"{self.base_url}/predict",
+            headers={"Content-Type": "application/json"},
+            json=payload
+        )
+        self.assertEqual(response.status_code, 200)
+        
+        data = response.json()
+        self.assertIn("predictions", data)
+        self.assertIsInstance(data["predictions"], list)
+        self.assertEqual(len(data["predictions"]), 1)
+        
+        prediction = data["predictions"][0]
+        self.assertIn("probability", prediction)
+        self.assertIn("label", prediction)
+        self.assertIsInstance(prediction["probability"], (int, float))
+        self.assertIn(prediction["label"], [0, 1])
+        print("✅ Predict endpoint integration test passed")
+    
+    def test_predict_endpoint_multiple_items(self):
+        """Test the predict endpoint with multiple items."""
+        self.skip_if_server_not_running()
+        
+        import requests
+        
+        payload = {
+            "items": [
+                {
+                    "age": 65,
+                    "bmi": 26.5,
+                    "systolic_bp": 140,
+                    "diastolic_bp": 85,
+                    "heart_rate": 72,
+                    "temperature": 37.0,
+                    "glucose": 95,
+                    "cholesterol_total": 200,
+                    "hdl": 45,
+                    "ldl": 130,
+                    "triglycerides": 150,
+                    "creatinine": 1.2,
+                    "hemoglobin": 14.5,
+                    "white_blood_cells": 7.5,
+                    "platelets": 250,
+                    "num_encounters": 3,
+                    "num_medications": 2,
+                    "num_lab_tests": 5
+                },
+                {
+                    "age": 45,
+                    "bmi": 24.0,
+                    "systolic_bp": 120,
+                    "diastolic_bp": 80,
+                    "heart_rate": 68,
+                    "temperature": 36.8,
+                    "glucose": 90,
+                    "cholesterol_total": 180,
+                    "hdl": 50,
+                    "ldl": 110,
+                    "triglycerides": 120,
+                    "creatinine": 1.0,
+                    "hemoglobin": 15.0,
+                    "white_blood_cells": 6.8,
+                    "platelets": 220,
+                    "num_encounters": 1,
+                    "num_medications": 0,
+                    "num_lab_tests": 3
+                }
+            ]
+        }
+        
+        response = requests.post(
+            f"{self.base_url}/predict",
+            headers={"Content-Type": "application/json"},
+            json=payload
+        )
+        self.assertEqual(response.status_code, 200)
+        
+        data = response.json()
+        self.assertIn("predictions", data)
+        self.assertIsInstance(data["predictions"], list)
+        self.assertEqual(len(data["predictions"]), 2)
+        
+        for prediction in data["predictions"]:
+            self.assertIn("probability", prediction)
+            self.assertIn("label", prediction)
+            self.assertIsInstance(prediction["probability"], (int, float))
+            self.assertIn(prediction["label"], [0, 1])
+        print("✅ Predict endpoint multiple items test passed")
 
 
 if __name__ == '__main__':

@@ -37,3 +37,5 @@ pydantic==2.5.0
 
 # Parallel processing
 joblib==1.3.2
+
+
