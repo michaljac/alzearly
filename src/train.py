@@ -102,21 +102,30 @@ class ModelTrainer:
         self.preprocessing_metadata = {}
         
     def _generate_model_name(self, run_type: str = "initial") -> str:
-        """Generate a descriptive model name based on date and run type."""
+        """Generate a descriptive model name for WandB runs."""
         current_date = datetime.now().strftime("%Y-%m-%d")
+        current_time = datetime.now().strftime("%H:%M")
         
         # Define descriptive names based on run type
         run_descriptions = {
-            "initial": "initial_run",
-            "balanced": "balanced_data", 
-            "feature_optimized": "feature_optimized",
-            "hyperparameter_tuned": "hyperparameter_tuned",
-            "final": "final_model",
-            "production": "production_ready"
+            "initial": "Alzheimer's Detection - Initial Training",
+            "balanced": "Alzheimer's Detection - Balanced Data", 
+            "feature_optimized": "Alzheimer's Detection - Feature Optimized",
+            "hyperparameter_tuned": "Alzheimer's Detection - Hyperparameter Tuned",
+            "final": "Alzheimer's Detection - Final Model",
+            "production": "Alzheimer's Detection - Production Ready"
         }
         
-        description = run_descriptions.get(run_type, run_type)
-        return f"{current_date}_{description}"
+        description = run_descriptions.get(run_type, f"Alzheimer's Detection - {run_type}")
+        
+        # Add model configuration info
+        models_str = "+".join(self.config.models)
+        features_str = f"{self.config.max_features}feat"
+        
+        # Create meaningful run name
+        run_name = f"{description} | {models_str} | {features_str} | {current_date} {current_time}"
+        
+        return run_name
         
     def _load_data(self) -> pd.DataFrame:
         """Load featurized data from partitioned Parquet files."""

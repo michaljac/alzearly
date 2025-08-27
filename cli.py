@@ -181,21 +181,26 @@ def run_with_python(args, modules) -> int:
         timestamped_dir = Path(f"artifacts/{timestamp}")
         timestamped_dir.mkdir(parents=True, exist_ok=True)
         
-        # Set up experiment tracking
+        # Set up experiment tracking based on tracker parameter
         if args.tracker == "wandb":
-            os.environ['NON_INTERACTIVE'] = 'true'
+            print(f"🔬 Setting up experiment tracking: {args.tracker}")
             from utils import setup_wandb
             global_tracker, tracker_type = setup_wandb()
         elif args.tracker == "mlflow":
-            os.environ['NON_INTERACTIVE'] = 'true'
+            print(f"🔬 Setting up experiment tracking: {args.tracker}")
             from utils import setup_mlflow
             global_tracker, tracker_type = setup_mlflow()
         elif args.tracker == "none":
-            os.environ['NON_INTERACTIVE'] = 'true'
+            print(f"🔬 Setting up experiment tracking: {args.tracker}")
             global_tracker, tracker_type = None, "none"
         else:
             print(f"❌ Invalid tracker option: {args.tracker}")
             return 1
+        
+        # Set global tracker variables for the training module
+        import utils
+        utils.tracker = global_tracker
+        utils.tracker_type = tracker_type
         
         # Load config and create trainer
         from src.config import load_config

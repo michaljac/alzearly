@@ -61,6 +61,15 @@ uvicorn src.serve:app --port 8000
 - **MLflow logs**: `./mlruns/` (if using `--tracker mlflow`)
 - **Cache behavior**: If `./data/featurized` exists, reuses cached data (logs "cache hit")
 
+### **Tracking Options**
+
+| **Mode** | **Command** | **Behavior** | **Requirements** |
+|----------|-------------|--------------|------------------|
+| **None** | `python cli.py train --tracker none` | No tracking, fastest execution | None |
+| **MLflow** | `python cli.py train --tracker mlflow` | Local tracking in `./mlruns/` | MLflow installed |
+| **WandB** | `python cli.py train --tracker wandb` | Cloud tracking (if API key) or disabled mode | WandB installed |
+| **WandB (with key)** | `WANDB_API_KEY=your_key python cli.py train --tracker wandb` | Full cloud tracking | WandB API key |
+
 ### **Expected Output**
 ```
 🚀 Starting Alzearly Training Pipeline

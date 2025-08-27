@@ -163,12 +163,9 @@ def setup_wandb():
         print("🔄 Falling back to no tracking")
         return None, "none"
     
-    # Ask for API key
-    print("\n📝 Weights & Biases API Key:")
-    print("   - Get your key from: https://wandb.ai/settings")
-    print("   - Or press Enter to run in offline mode")
-    
-    api_key = input("Enter API key (or press Enter for offline): ").strip()
+    # Check for API key in environment
+    import os
+    api_key = os.environ.get('WANDB_API_KEY')
     
     if api_key:
         try:
@@ -177,20 +174,48 @@ def setup_wandb():
             return wandb, "wandb"
         except Exception as e:
             print(f"❌ Wandb login failed: {e}")
-            print("🔄 Falling back to offline mode")
+            print("🔄 Falling back to interactive setup")
     
-    # Offline mode
-    print("🔄 Running wandb in offline mode...")
-    import os
-    os.environ["WANDB_MODE"] = "offline"
+    # No API key in environment - ask user
+    print("\n📝 Weights & Biases Setup:")
+    print("   - Get your API key from: https://wandb.ai/settings")
+    print("   - Or press Enter to run in disabled mode")
+    
     try:
-        wandb.init(mode="offline")
-        print("✅ Wandb offline mode initialized")
-        return wandb, "wandb"
-    except Exception as e:
-        print(f"❌ Wandb offline mode failed: {e}")
-        print("🔄 Falling back to no tracking")
-        return None, "none"
+        user_key = input("Enter API key (or press Enter for disabled mode): ").strip()
+        
+        if user_key:
+            try:
+                wandb.login(key=user_key)
+                print("✅ Wandb login successful")
+                return wandb, "wandb"
+            except Exception as e:
+                print(f"❌ Wandb login failed: {e}")
+                print("🔄 Falling back to disabled mode")
+        
+        # User chose disabled mode or login failed
+        print("🔄 Running wandb in disabled mode...")
+        os.environ["WANDB_MODE"] = "disabled"
+        try:
+            wandb.init(mode="disabled")
+            print("✅ Wandb disabled mode initialized")
+            return wandb, "wandb"
+        except Exception as e:
+            print(f"❌ Wandb disabled mode failed: {e}")
+            print("🔄 Falling back to no tracking")
+            return None, "none"
+            
+    except (KeyboardInterrupt, EOFError):
+        print("\n🔄 User cancelled - running in disabled mode...")
+        os.environ["WANDB_MODE"] = "disabled"
+        try:
+            wandb.init(mode="disabled")
+            print("✅ Wandb disabled mode initialized")
+            return wandb, "wandb"
+        except Exception as e:
+            print(f"❌ Wandb disabled mode failed: {e}")
+            print("🔄 Falling back to no tracking")
+            return None, "none"
 
 
 def setup_mlflow():
@@ -304,7 +329,17 @@ def start_run(run_name=None, config=None):
     if tracker_type == "wandb" and tracker:
         if config is None:
             config = {}
-        tracker.init(name=run_name, config=config)
+        # Set up meaningful project and entity names
+        project_name = "alzheimers-detection"
+        entity_name = None  # Use default entity (user's account)
+        
+        tracker.init(
+            project=project_name,
+            entity=entity_name,
+            name=run_name,
+            config=config,
+            tags=["alzheimers", "ml", "healthcare"]
+        )
     elif tracker_type == "mlflow" and tracker:
         tracker.start_run(run_name=run_name)
 
