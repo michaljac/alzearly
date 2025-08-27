@@ -484,7 +484,7 @@ export WANDB_API_KEY=your_key_here
 
 
 ```
-#### Build setup**
+#### Build setup
 
 ```bash
 
