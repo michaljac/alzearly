@@ -1,0 +1,73 @@
+# Use Python 3.10 slim image as base
+FROM python:3.10-slim
+
+# Set environment variables
+ENV PYTHONUNBUFFERED=1
+ENV PYTHONDONTWRITEBYTECODE=1
+ENV DEBIAN_FRONTEND=noninteractive
+ENV PIP_NO_CACHE_DIR=1
+ENV PIP_DEFAULT_TIMEOUT=120
+
+# Install system dependencies and ca-certificates for DNS issues
+RUN apt-get update && apt-get install -y \
+    build-essential \
+    curl \
+    git \
+    wget \
+    vim \
+    nano \
+    htop \
+    procps \
+    ca-certificates \
+    && rm -rf /var/lib/apt/lists/*
+
+# Upgrade pip to latest version
+RUN python -m pip install --upgrade pip setuptools wheel
+
+# Set working directory
+WORKDIR /workspace
+
+# Copy requirements file
+COPY requirements-datagen.txt .
+
+# Install Python dependencies with DNS fixes
+RUN pip install -r requirements-datagen.txt \
+    --trusted-host pypi.org \
+    --trusted-host pypi.python.org \
+    --trusted-host files.pythonhosted.org \
+    --index-url https://pypi.org/simple/
+
+# Install debugging tools
+RUN pip install \
+    ipdb==0.13.13 \
+    pdb++==0.10.3 \
+    pudb==2022.1.3 \
+    ipython==8.14.0 \
+    --trusted-host pypi.org \
+    --trusted-host pypi.python.org \
+    --trusted-host files.pythonhosted.org
+
+# Copy source code (copy only what's needed for data generation)
+COPY src/ ./src/
+COPY config/ ./config/
+# Only copy utils.py if it exists and is needed
+COPY utils.py* ./
+
+# Create necessary directories
+RUN mkdir -p data/raw data/featurized models artifacts plots mlruns wandb
+
+# Set Python path
+ENV PYTHONPATH=/workspace
+
+# Create a non-root user for better security (but stay as root for flexibility)
+RUN useradd -m -u 1000 datagen && \
+    chown -R datagen:datagen /workspace
+
+# Stay as root for Docker volume mounts compatibility
+USER root
+
+# Expose port for debugging (if needed)
+EXPOSE 5678
+
+# Set default command
+CMD ["python", "src/data_gen.py"]

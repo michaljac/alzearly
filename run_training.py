@@ -1,15 +1,14 @@
 #!/usr/bin/env python3
 """
-Complete Alzearly Pipeline Runner
+Alzearly Training Pipeline Runner
 
-This script is a self-contained solution that:
-1. Detects your environment (Docker vs local Python)
-2. Handles all setup automatically
-3. Runs the complete ML pipeline
+This script focuses on model training only:
+1. Validates that featurized data exists (created by run_datagen.py)
+2. Runs model training with experiment tracking
+3. Validates artifacts are created
 4. Provides comprehensive error handling
-5. Validates everything before and after execution
 
-No additional scripts needed - everything is included here!
+Data generation is handled separately by run_datagen.py
 """
 
 import argparse
@@ -19,6 +18,22 @@ import subprocess
 import platform
 from pathlib import Path
 from typing import Optional, Tuple
+
+
+def run_data_generation() -> bool:
+    """Run data generation subprocess."""
+    try:
+        print("🔄 Running data generation...")
+        result = subprocess.run([sys.executable, 'run_datagen.py', '--force-regen'], 
+                              check=True, capture_output=False, text=True)
+        return result.returncode == 0
+    except subprocess.CalledProcessError:
+        print("❌ Data generation subprocess failed")
+        return False
+    except FileNotFoundError:
+        print("❌ run_datagen.py not found")
+        print("💡 Make sure run_datagen.py exists in the current directory")
+        return False
 
 
 def detect_environment() -> Tuple[bool, str]:
@@ -54,7 +69,7 @@ def check_dependencies() -> bool:
     """Check if required Python dependencies are installed."""
     print("🔍 Checking dependencies...")
     
-    required_packages = ['pandas', 'numpy', 'sklearn', 'polars']
+    required_packages = ['pandas', 'numpy', 'sklearn', 'xgboost']
     missing_packages = []
     
     for package in required_packages:
@@ -98,22 +113,20 @@ def setup_paths() -> bool:
         return False
 
 
-def import_modules() -> bool:
+def import_modules() -> Tuple[bool, object, object]:
     """Import required modules with comprehensive error handling."""
     print("🔍 Importing modules...")
     
     try:
-        from src.data_gen import generate as generate_data
-        from src.preprocess import preprocess as preprocess_data
         from src.train import train as train_model
         from utils import setup_experiment_tracker
-        print("✅ All modules imported successfully")
-        return True, generate_data, preprocess_data, train_model, setup_experiment_tracker
+        print("✅ Training modules imported successfully")
+        return True, train_model, setup_experiment_tracker
     except ImportError as e:
         print(f"❌ Import error: {e}")
         print("💡 Make sure all dependencies are installed:")
         print("   pip install -r requirements-train.txt")
-        return False, None, None, None, None
+        return False, None, None
 
 
 def run_with_docker(args) -> int:
@@ -122,7 +135,7 @@ def run_with_docker(args) -> int:
     
     try:
         # Build Docker image
-        build_cmd = ['docker', 'build', '-f', 'Dockerfile.train', '-t', 'alzearly-train', '.']
+        build_cmd = ['docker', 'build', '-f', 'Dockerfile.train', '-t', 'alzearly-train', '.', '--network=host']
         result = subprocess.run(build_cmd, check=True, capture_output=True, text=True)
         print("✅ Docker image built successfully")
         
@@ -146,10 +159,6 @@ def run_with_docker(args) -> int:
         # Add command line arguments
         if args.tracker:
             docker_cmd.extend(['--tracker', args.tracker])
-        if args.skip_data_gen:
-            docker_cmd.append('--skip-data-gen')
-        if args.skip_preprocess:
-            docker_cmd.append('--skip-preprocess')
         if args.config != "config/model.yaml":
             docker_cmd.extend(['--config', args.config])
         
@@ -169,33 +178,109 @@ def run_with_python(args, modules) -> int:
     """Run the pipeline using local Python."""
     print("🐍 Running pipeline with local Python...")
     
-    generate_data, preprocess_data, train_model, setup_experiment_tracker = modules
+    train_model, setup_experiment_tracker = modules
     
     # Now call the main pipeline function
-    return main_pipeline(args, generate_data, preprocess_data, train_model, setup_experiment_tracker)
+    return main_pipeline(args, train_model, setup_experiment_tracker)
 
 
-def main_pipeline(args, generate_data, preprocess_data, train_model, setup_experiment_tracker) -> int:
-    """The main pipeline logic - extracted for reuse."""
-    print("🧠 Alzheimer's Prediction Pipeline")
+def main_pipeline(args, train_model, setup_experiment_tracker) -> int:
+    """The main pipeline logic - TRAINING ONLY (data generation removed)."""
+    print("🤖 Alzheimer's Training Pipeline")
     print("=" * 60)
     
-    # Check if featurized data already exists - FIXED: More robust data detection
+    # Check if featurized data exists and ask user what to do
     featurized_dir = Path("data/featurized")
-    featurized_data_exists = False
+    data_files = []
     
     if featurized_dir.exists():
-        # Check for actual data files, not just empty directory
         data_files = list(featurized_dir.glob("*.parquet")) + list(featurized_dir.glob("*.csv"))
-        if data_files:
-            featurized_data_exists = True
-            print(f"✅ Found existing featurized data ({len(data_files)} files) - skipping data generation and preprocessing")
-            args.skip_data_gen = True
-            args.skip_preprocess = True
-        else:
-            print("⚠️  Found data/featurized directory but no data files - will regenerate")
+    
+    # Handle non-interactive modes first
+    if args.use_existing and data_files:
+        print(f"✅ Using existing data ({len(data_files)} files) - non-interactive mode")
+    elif args.auto_generate:
+        print("🔄 Auto-generating data - non-interactive mode")
+        success = run_data_generation()
+        if not success:
+            print("❌ Data generation failed")
+            return 1
+        data_files = list(featurized_dir.glob("*.parquet")) + list(featurized_dir.glob("*.csv"))
+    elif data_files:
+        # Data exists - ask user what to do
+        print(f"✅ Found existing featurized data ({len(data_files)} files)")
+        print("\nWhat would you like to do?")
+        print("1. Use existing data (recommended for quick training)")
+        print("2. Generate new data (will overwrite existing data)")
+        print("3. Exit and run data generation manually")
+        
+        while True:
+            try:
+                choice = input("\nEnter your choice (1/2/3): ").strip()
+                
+                if choice == "1":
+                    print("✅ Using existing data - proceeding with training")
+                    break
+                elif choice == "2":
+                    print("🔄 Generating new data...")
+                    success = run_data_generation()
+                    if success:
+                        print("✅ New data generated successfully")
+                        # Refresh data files list
+                        data_files = list(featurized_dir.glob("*.parquet")) + list(featurized_dir.glob("*.csv"))
+                        break
+                    else:
+                        print("❌ Data generation failed")
+                        return 1
+                elif choice == "3":
+                    print("✋ Exiting. Run 'python run_datagen.py' when ready")
+                    return 0
+                else:
+                    print("❌ Invalid choice. Please enter 1, 2, or 3")
+            except KeyboardInterrupt:
+                print("\n✋ Process interrupted by user")
+                return 0
+            except EOFError:
+                print("\n❌ Invalid input")
+                return 1
     else:
-        print("📁 No existing featurized data found - will generate new data")
+        # No data exists - must generate
+        print("❌ No featurized data found!")
+        print("\nWhat would you like to do?")
+        print("1. Generate data now")
+        print("2. Exit and run data generation manually")
+        
+        while True:
+            try:
+                choice = input("\nEnter your choice (1/2): ").strip()
+                
+                if choice == "1":
+                    print("🔄 Generating data...")
+                    success = run_data_generation()
+                    if success:
+                        print("✅ Data generated successfully")
+                        # Refresh data files list
+                        data_files = list(featurized_dir.glob("*.parquet")) + list(featurized_dir.glob("*.csv"))
+                        break
+                    else:
+                        print("❌ Data generation failed")
+                        return 1
+                elif choice == "2":
+                    print("✋ Exiting. Run 'python run_datagen.py' when ready")
+                    return 0
+                else:
+                    print("❌ Invalid choice. Please enter 1 or 2")
+            except KeyboardInterrupt:
+                print("\n✋ Process interrupted by user")
+                return 0
+            except EOFError:
+                print("\n❌ Invalid input")
+                return 1
+    
+    # Final check that we have data
+    if not data_files:
+        print("❌ No data available for training")
+        return 1
     
     # Setup experiment tracking
     if args.tracker is None:
@@ -206,53 +291,12 @@ def main_pipeline(args, generate_data, preprocess_data, train_model, setup_exper
         tracker_type = args.tracker
         tracker = None  # Will be set up in the training module
     
-    # Step 1: Data Generation (if needed) - FIXED: Better error handling and directory creation
-    if not args.skip_data_gen:
-        print("\n📊 Step 1: Data Generation")
-        print("-" * 30)
-        
-        # Ensure data directories exist
-        Path("data/raw").mkdir(parents=True, exist_ok=True)
-        Path("data/featurized").mkdir(parents=True, exist_ok=True)
-        
-        try:
-            generate_data()
-            print("✅ Data generation completed")
-        except FileNotFoundError as e:
-            print(f"❌ Data generation failed - missing file: {e}")
-            print("💡 Check if config/data_gen.yaml exists and is valid")
-            return 1
-        except Exception as e:
-            print(f"❌ Data generation failed: {e}")
-            print("💡 Check your data generation configuration")
-            return 1
-    else:
-        print("\n⏭️  Step 1: Data Generation (skipped)")
+    # Info about data generation
+    print("\n⚠️  Data generation and preprocessing handled separately")
+    print("💡 Use: python run_datagen.py to generate/update data")
     
-    # Step 2: Data Preprocessing (if needed) - FIXED: Better error handling
-    if not args.skip_preprocess:
-        print("\n🔧 Step 2: Data Preprocessing")
-        print("-" * 30)
-        
-        # Check if raw data exists before preprocessing
-        raw_data_files = list(Path("data/raw").glob("*.parquet")) + list(Path("data/raw").glob("*.csv"))
-        if not raw_data_files:
-            print("❌ No raw data found for preprocessing")
-            print("💡 Run data generation first or check data/raw directory")
-            return 1
-        
-        try:
-            preprocess_data()
-            print("✅ Data preprocessing completed")
-        except Exception as e:
-            print(f"❌ Data preprocessing failed: {e}")
-            print("💡 Check your preprocessing configuration")
-            return 1
-    else:
-        print("\n⏭️  Step 2: Data Preprocessing (skipped)")
-    
-    # Step 3: Model Training - FIXED: Better error handling and config validation
-    print("\n🤖 Step 3: Model Training")
+    # Step 1: Model Training (main focus now)
+    print("\n🤖 Step 1: Model Training")
     print("-" * 30)
     
     # Validate config file exists
@@ -280,8 +324,8 @@ def main_pipeline(args, generate_data, preprocess_data, train_model, setup_exper
         print("💡 Check your model configuration and data")
         return 1
     
-    # Step 4: Verify artifacts were created - FIXED: Artifact validation
-    print("\n📦 Step 4: Verifying artifacts")
+    # Step 2: Verify artifacts were created
+    print("\n📦 Step 2: Verifying artifacts")
     print("-" * 30)
     
     artifacts_dir = Path("artifacts/latest")
@@ -305,27 +349,28 @@ def main_pipeline(args, generate_data, preprocess_data, train_model, setup_exper
         print("\n✅ All artifacts successfully created!")
     
     print("\n🎉 Training pipeline completed successfully!")
-    print("📤 Ready for model serving with: uvicorn src.serve:app --host 0.0.0.0 --port 8000")
+    print("📤 Ready for model serving with: python run_serve.py")
     
     return 0
 
 
 def main():
-    """Complete Alzearly Pipeline Runner - Self-contained solution."""
-    print("🧠 Alzearly Pipeline Runner")
-    print("==========================")
+    """Training Pipeline Runner - Training focused (data generation separate)."""
+    print("🤖 Alzearly Training Runner")
+    print("===========================")
     
-    # Parse command line arguments
+    # Parse command line arguments (UPDATED - removed data gen options)
     parser = argparse.ArgumentParser(
-        description="Complete Alzearly Pipeline Runner - Self-contained solution",
+        description="Alzearly Training Pipeline - Training Only",
         formatter_class=argparse.RawDescriptionHelpFormatter,
         epilog="""
 Examples:
   python run_training.py                    # Interactive mode
   python run_training.py --tracker none     # No tracking
   python run_training.py --tracker wandb    # With Weights & Biases
-  python run_training.py --skip-data-gen    # Use existing data
   python run_training.py --help             # Show this help
+
+Note: Data generation is now separate - use run_datagen.py first
         """
     )
     parser.add_argument(
@@ -336,25 +381,25 @@ Examples:
         help="Experiment tracker to use (none, wandb, mlflow). If None, will prompt interactively."
     )
     parser.add_argument(
-        "--skip-data-gen", 
-        action="store_true",
-        help="Skip data generation step"
-    )
-    parser.add_argument(
-        "--skip-preprocess", 
-        action="store_true",
-        help="Skip preprocessing step"
-    )
-    parser.add_argument(
         "--config",
         type=str,
         default="config/model.yaml",
-        help="Configuration file path"
+        help="Training configuration file path"
     )
     parser.add_argument(
         "--force-python",
         action="store_true",
         help="Force local Python execution even if Docker is available"
+    )
+    parser.add_argument(
+        "--auto-generate",
+        action="store_true",
+        help="Automatically generate data if missing (non-interactive mode)"
+    )
+    parser.add_argument(
+        "--use-existing",
+        action="store_true",
+        help="Use existing data without asking (non-interactive mode)"
     )
     
     args = parser.parse_args()
@@ -376,9 +421,10 @@ Examples:
     
     # Step 4: Import modules (only for local Python)
     if not use_docker or args.force_python:
-        import_success, modules = import_modules()
+        import_success, train_model, setup_experiment_tracker = import_modules()
         if not import_success:
             return 1
+        modules = (train_model, setup_experiment_tracker)
     else:
         modules = None
     

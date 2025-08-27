@@ -482,7 +482,12 @@ This section tells you exactly when and why to modify each parameter. All change
 # Set API key
 export WANDB_API_KEY=your_key_here
 
-# Run with cloud tracking
+
+
+# Build the train image
+
+docker build -f Dockerfile.train -t alzearly-train . --network=host
+
 docker run -it --gpus all --ipc=host --net=host \
   -v "$(pwd):/workspace" \
   -v "$(dirname $(pwd))/Data:/Data" \
