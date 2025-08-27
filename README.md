@@ -484,6 +484,8 @@ export WANDB_API_KEY=your_key_here
 
 
 ```
+#### Build setup**
+
 ```bash
 
 # Build the generate data image
