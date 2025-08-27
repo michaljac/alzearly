@@ -189,63 +189,155 @@ def main_pipeline(args, train_model, setup_experiment_tracker) -> int:
     print("🤖 Alzheimer's Training Pipeline")
     print("=" * 60)
     
-    # Check if featurized data exists and ask user what to do
-    featurized_dir = Path("data/featurized")
-    data_files = []
+    # Check for data in multiple locations
+    local_featurized_dir = Path("data/featurized")
+    docker_data_dir = Path("/Data")  # Docker mount point
+    docker_featurized_dir = docker_data_dir / "featurized" if docker_data_dir.exists() else None
     
-    if featurized_dir.exists():
-        data_files = list(featurized_dir.glob("*.parquet")) + list(featurized_dir.glob("*.csv"))
+    local_data_files = []
+    docker_data_files = []
+    
+    # Check local data
+    if local_featurized_dir.exists():
+        local_data_files = list(local_featurized_dir.glob("*.parquet")) + list(local_featurized_dir.glob("*.csv"))
+    
+    # Check Docker data
+    if docker_featurized_dir and docker_featurized_dir.exists():
+        docker_data_files = list(docker_featurized_dir.glob("*.parquet")) + list(docker_featurized_dir.glob("*.csv"))
     
     # Handle non-interactive modes first
-    if args.use_existing and data_files:
-        print(f"✅ Using existing data ({len(data_files)} files) - non-interactive mode")
+    if args.use_existing and (local_data_files or docker_data_files):
+        if local_data_files:
+            print(f"✅ Using existing local data ({len(local_data_files)} files) - non-interactive mode")
+        else:
+            print(f"✅ Using existing Docker data ({len(docker_data_files)} files) - non-interactive mode")
     elif args.auto_generate:
         print("🔄 Auto-generating data - non-interactive mode")
         success = run_data_generation()
         if not success:
             print("❌ Data generation failed")
             return 1
-        data_files = list(featurized_dir.glob("*.parquet")) + list(featurized_dir.glob("*.csv"))
-    elif data_files:
+        local_data_files = list(local_featurized_dir.glob("*.parquet")) + list(local_featurized_dir.glob("*.csv"))
+    elif local_data_files or docker_data_files:
         # Data exists - ask user what to do
-        print(f"✅ Found existing featurized data ({len(data_files)} files)")
-        print("\nWhat would you like to do?")
-        print("1. Use existing data (recommended for quick training)")
-        print("2. Generate new data (will overwrite existing data)")
-        print("3. Exit and run data generation manually")
-        
-        while True:
-            try:
-                choice = input("\nEnter your choice (1/2/3): ").strip()
-                
-                if choice == "1":
-                    print("✅ Using existing data - proceeding with training")
-                    break
-                elif choice == "2":
-                    print("🔄 Generating new data...")
-                    success = run_data_generation()
-                    if success:
-                        print("✅ New data generated successfully")
-                        # Refresh data files list
-                        data_files = list(featurized_dir.glob("*.parquet")) + list(featurized_dir.glob("*.csv"))
+        if local_data_files and docker_data_files:
+            print(f"✅ Found data in multiple locations:")
+            print(f"   Local: {len(local_data_files)} files")
+            print(f"   Docker: {len(docker_data_files)} files")
+            print("\nWhat would you like to do?")
+            print("1. Use local data (data/featurized)")
+            print("2. Use Docker data (/Data/featurized)")
+            print("3. Generate new data (will overwrite local data)")
+            print("4. Exit and run data generation manually")
+            
+            while True:
+                try:
+                    choice = input("\nEnter your choice (1/2/3/4): ").strip()
+                    
+                    if choice == "1":
+                        print("✅ Using local data - proceeding with training")
+                        data_files = local_data_files
                         break
+                    elif choice == "2":
+                        print("✅ Using Docker data - proceeding with training")
+                        data_files = docker_data_files
+                        break
+                    elif choice == "3":
+                        print("🔄 Generating new data...")
+                        success = run_data_generation()
+                        if success:
+                            print("✅ New data generated successfully")
+                            data_files = list(local_featurized_dir.glob("*.parquet")) + list(local_featurized_dir.glob("*.csv"))
+                            break
+                        else:
+                            print("❌ Data generation failed")
+                            return 1
+                    elif choice == "4":
+                        print("✋ Exiting. Run 'python run_datagen.py' when ready")
+                        return 0
                     else:
-                        print("❌ Data generation failed")
-                        return 1
-                elif choice == "3":
-                    print("✋ Exiting. Run 'python run_datagen.py' when ready")
+                        print("❌ Invalid choice. Please enter 1, 2, 3, or 4")
+                except KeyboardInterrupt:
+                    print("\n✋ Process interrupted by user")
                     return 0
-                else:
-                    print("❌ Invalid choice. Please enter 1, 2, or 3")
-            except KeyboardInterrupt:
-                print("\n✋ Process interrupted by user")
-                return 0
-            except EOFError:
-                print("\n❌ Invalid input")
-                return 1
+                except EOFError:
+                    print("\n❌ Invalid input")
+                    return 1
+        elif local_data_files:
+            print(f"✅ Found existing local featurized data ({len(local_data_files)} files)")
+            print("\nWhat would you like to do?")
+            print("1. Use existing local data (recommended for quick training)")
+            print("2. Generate new data (will overwrite existing data)")
+            print("3. Exit and run data generation manually")
+            
+            while True:
+                try:
+                    choice = input("\nEnter your choice (1/2/3): ").strip()
+                    
+                    if choice == "1":
+                        print("✅ Using existing local data - proceeding with training")
+                        data_files = local_data_files
+                        break
+                    elif choice == "2":
+                        print("🔄 Generating new data...")
+                        success = run_data_generation()
+                        if success:
+                            print("✅ New data generated successfully")
+                            data_files = list(local_featurized_dir.glob("*.parquet")) + list(local_featurized_dir.glob("*.csv"))
+                            break
+                        else:
+                            print("❌ Data generation failed")
+                            return 1
+                    elif choice == "3":
+                        print("✋ Exiting. Run 'python run_datagen.py' when ready")
+                        return 0
+                    else:
+                        print("❌ Invalid choice. Please enter 1, 2, or 3")
+                except KeyboardInterrupt:
+                    print("\n✋ Process interrupted by user")
+                    return 0
+                except EOFError:
+                    print("\n❌ Invalid input")
+                    return 1
+        else:  # docker_data_files only
+            print(f"✅ Found existing Docker featurized data ({len(docker_data_files)} files)")
+            print("\nWhat would you like to do?")
+            print("1. Use existing Docker data (recommended for quick training)")
+            print("2. Generate new local data")
+            print("3. Exit and run data generation manually")
+            
+            while True:
+                try:
+                    choice = input("\nEnter your choice (1/2/3): ").strip()
+                    
+                    if choice == "1":
+                        print("✅ Using existing Docker data - proceeding with training")
+                        data_files = docker_data_files
+                        break
+                    elif choice == "2":
+                        print("🔄 Generating new local data...")
+                        success = run_data_generation()
+                        if success:
+                            print("✅ New local data generated successfully")
+                            data_files = list(local_featurized_dir.glob("*.parquet")) + list(local_featurized_dir.glob("*.csv"))
+                            break
+                        else:
+                            print("❌ Data generation failed")
+                            return 1
+                    elif choice == "3":
+                        print("✋ Exiting. Run 'python run_datagen.py' when ready")
+                        return 0
+                    else:
+                        print("❌ Invalid choice. Please enter 1, 2, or 3")
+                except KeyboardInterrupt:
+                    print("\n✋ Process interrupted by user")
+                    return 0
+                except EOFError:
+                    print("\n❌ Invalid input")
+                    return 1
     else:
         # No data exists - must generate
-        print("❌ No featurized data found!")
+        print("❌ No featurized data found in any location!")
         print("\nWhat would you like to do?")
         print("1. Generate data now")
         print("2. Exit and run data generation manually")
@@ -259,8 +351,7 @@ def main_pipeline(args, train_model, setup_experiment_tracker) -> int:
                     success = run_data_generation()
                     if success:
                         print("✅ Data generated successfully")
-                        # Refresh data files list
-                        data_files = list(featurized_dir.glob("*.parquet")) + list(featurized_dir.glob("*.csv"))
+                        data_files = list(local_featurized_dir.glob("*.parquet")) + list(local_featurized_dir.glob("*.csv"))
                         break
                     else:
                         print("❌ Data generation failed")

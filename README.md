@@ -8,16 +8,6 @@ A comprehensive machine learning pipeline that predicts Alzheimer's disease risk
 
 **Python 3.10, API :8000, artifacts in ./artifacts/latest, MLflow in ./mlruns.**
 
-### **MUST Items Checklist:**
-
-- [ ] **Single-command run & Quick Start**
-- [ ] **Tracker choice works w/o secrets**
-- [ ] **Determinism & data cache**
-- [ ] **FastAPI /health & /version + predict example**
-- [ ] **Minimal tests (pipeline, API, serialize)**
-- [ ] **Pinned deps & Docker notes**
-- [ ] **Minimal CI**
-
 ## <img src="readme_images/hippo.jpeg" alt="🎯" width="20" height="20" style="background: transparent;"> **What This Project Does**
 
 Alzheimer's disease is a progressive brain disorder that affects memory, thinking, and behavior. Early detection is crucial for better treatment outcomes. This project:
@@ -49,11 +39,12 @@ uvicorn src.serve:app --port 8000
 
 ### **What Happens During Training**
 
-1. **📊 Data Generation**: Creates synthetic patient data with realistic health patterns
-2. **🔧 Feature Engineering**: Transforms raw data into predictive features  
-3. **🤖 Model Training**: Trains XGBoost and Logistic Regression models
-4. **📈 Evaluation**: Calculates performance metrics and creates visualizations
-5. **💾 Artifact Export**: Saves trained models to `./artifacts/latest/` and `./artifacts/{timestamp}/`
+1. **🔍 Data Detection**: Intelligently detects existing data in local and Docker locations
+2. **🤖 Model Training**: Trains XGBoost and Logistic Regression models
+3. **📈 Evaluation**: Calculates performance metrics and creates visualizations
+4. **💾 Artifact Export**: Saves trained models to `./artifacts/latest/` and `./artifacts/{timestamp}/`
+
+**Note**: Data generation is now handled separately by `run_datagen.py` for better workflow control
 
 ### **Artifacts & Output**
 
@@ -487,30 +478,92 @@ export WANDB_API_KEY=your_key_here
 #### Build setup
 
 ```bash
+# Create Data directory if it doesn't exist (works on Linux/Mac/Windows)
+mkdir -p ../Data/alzearly
 
-# Build the generate data image
+# Build the data generation image
 docker build -f Dockerfile.datagen -t alzearly-datagen . --network=host
 
-# Run the generate data container
-docker run -it --gpus all --ipc=host --net=host \
-  -v "$(pwd):/workspace" \
-  -v "$(dirname $(pwd))/Data:/Data" \
-  --name alz_datagen \
-  alzearly-datagen:latest /bin/bash
-
-```
-```bash
-
-# Build the train image
-
+# Build the training image
 docker build -f Dockerfile.train -t alzearly-train . --network=host
 
-docker run -it --gpus all --ipc=host --net=host \
+# Build the serve image
+docker build -f Dockerfile.serve -t alzearly-serve . --network=host
+```
+
+```bash
+# Run the data generation container
+docker run -it --ipc=host --net=host \
   -v "$(pwd):/workspace" \
-  -v "$(dirname $(pwd))/Data:/Data" \
+  -v "$(dirname "$(pwd)")/Data/alzearly:/Data" \
+  --name alz_datagen \
+  alzearly-datagen:latest /bin/bash
+```
+
+```bash
+# Run the training container
+docker run -it --ipc=host --net=host \
+  -v "$(pwd):/workspace" \
+  -v "$(dirname "$(pwd)")/Data/alzearly:/Data" \
   --name alz_train \
   alzearly-train:latest /bin/bash
 
+# After training, run slice analysis in the same container:
+python slice_analysis.py
+```
+
+```bash
+# Run the serve container
+docker run -it --ipc=host --net=host \
+  -v "$(pwd):/workspace" \
+  -v "$(pwd)/artifacts:/app/artifacts" \
+  -v "$(pwd)/models:/app/models" \
+  -p 8000:8000 \
+  --name alz_serve \
+  alzearly-serve:latest
+```
+
+**Container Purposes & Mount Requirements:**
+
+| **Container** | **Purpose** | **Required Mounts** | **Why** |
+|---------------|-------------|-------------------|---------|
+| **alzearly-datagen** | Generate synthetic patient data | `/workspace`, `/Data` | Needs workspace for code, Data for output |
+| **alzearly-train** | Train ML models | `/workspace`, `/Data` | Needs workspace for code, Data for input data |
+| **alzearly-serve** | Serve prediction API | `/workspace`, `/artifacts`, `/models` | Needs workspace for code, artifacts/models for trained models |
+| **alzearly-train** | Train ML models + Analysis | `/workspace`, `/Data` | Needs workspace for code, Data for input, can run slice analysis |
+
+**Cross-platform compatibility:**
+
+For Windows (PowerShell):
+```powershell
+# Create Data directory
+New-Item -ItemType Directory -Force -Path "..\Data\alzearly"
+
+# Build images
+docker build -f Dockerfile.datagen -t alzearly-datagen . --network=host
+docker build -f Dockerfile.train -t alzearly-train . --network=host
+docker build -f Dockerfile.serve -t alzearly-serve . --network=host
+
+# Run containers (Windows)
+docker run -it --ipc=host --net=host -v "${PWD}:/workspace" -v "$(Split-Path (Split-Path $PWD))\Data\alzearly:/Data" --name alz_datagen alzearly-datagen:latest /bin/bash
+docker run -it --ipc=host --net=host -v "${PWD}:/workspace" -v "$(Split-Path (Split-Path $PWD))\Data\alzearly:/Data" --name alz_train alzearly-train:latest /bin/bash
+docker run -it --ipc=host --net=host -v "${PWD}:/workspace" -v "${PWD}\artifacts:/app/artifacts" -v "${PWD}\models:/app/models" -p 8000:8000 --name alz_serve alzearly-serve:latest
+```
+
+For Windows (Command Prompt):
+```cmd
+# Create Data directory
+if not exist "..\Data\alzearly" mkdir "..\Data\alzearly"
+
+# Build images
+docker build -f Dockerfile.datagen -t alzearly-datagen . --network=host
+docker build -f Dockerfile.train -t alzearly-train . --network=host
+docker build -f Dockerfile.serve -t alzearly-serve . --network=host
+
+# Run containers (Windows CMD)
+docker run -it --ipc=host --net=host -v "%cd%:/workspace" -v "%cd%\..\Data\alzearly:/Data" --name alz_datagen alzearly-datagen:latest /bin/bash
+docker run -it --ipc=host --net=host -v "%cd%:/workspace" -v "%cd%\..\Data\alzearly:/Data" --name alz_train alzearly-train:latest /bin/bash
+docker run -it --ipc=host --net=host -v "%cd%:/workspace" -v "%cd%\artifacts:/app/artifacts" -v "%cd%\models:/app/models" -p 8000:8000 --name alz_serve alzearly-serve:latest
 ```
 
 #### **MLflow (Local)**
@@ -553,11 +606,34 @@ python -m pytest tests/test_run_training.py::TestRunTraining::test_main_successf
 
 ### **Smart Data Detection**
 
-The script intelligently detects existing data:
+The training script intelligently detects existing data in multiple locations and gives you choices:
+
+#### **Data Location Detection**
 ```bash
-✅ Found existing featurized data (3 files) - skipping data generation and preprocessing
-⚠️  Found data/featurized directory but no data files - will regenerate
-📁 No existing featurized data found - will generate new data
+✅ Found data in multiple locations:
+   Local: 3 files
+   Docker: 2 files
+
+What would you like to do?
+1. Use local data (data/featurized)
+2. Use Docker data (/Data/featurized)  
+3. Generate new data (will overwrite local data)
+4. Exit and run data generation manually
+```
+
+#### **Different Scenarios**
+- **Both local and Docker data**: Choose which source to use
+- **Local data only**: Use existing or generate new
+- **Docker data only**: Use existing or generate new local data
+- **No data**: Generate new data automatically
+
+#### **Non-interactive Modes**
+```bash
+# Use existing data without asking
+python run_training.py --use-existing
+
+# Auto-generate if missing
+python run_training.py --auto-generate
 ```
 
 ### **Artifact Verification**
@@ -578,6 +654,28 @@ After training, the script verifies all artifacts were created:
 - **Fast iteration**: Use `--tracker none` for no experiment tracking
 - **Memory issues**: Reduce `max_features` in config
 - **GPU training**: Modify Dockerfile to include CUDA support
+
+### **Slice Analysis Workflow**
+
+After training your models, you can perform slice analysis to understand model performance across demographic subgroups:
+
+```bash
+# 1. Train the model first
+python cli.py train --tracker none
+
+# 2. Run slice analysis in the same container
+python slice_analysis.py
+
+# 3. View the analysis results
+# - slice_analysis_plot.png (visualization)
+# - Console output with performance metrics by demographic groups
+```
+
+**What slice analysis provides:**
+- **Demographic breakdown**: Performance by age groups, gender, education level
+- **Bias detection**: Identify if model performs differently across groups
+- **Fairness metrics**: AUC, precision, recall for each subgroup
+- **Visual insights**: Plots showing performance disparities
 
 ## <img src="readme_images/hippo.jpeg" alt="🚀" width="20" height="20" style="background: transparent;"> **Serving Endpoint - API Deployment**
 
@@ -639,7 +737,7 @@ curl -X POST http://localhost:8000/predict \
 docker build -f Dockerfile.serve -t alzearly-serve . --network=host
 
 # Run the container
-docker run -it --gpus all --ipc=host --net=host \
+docker run -it --ipc=host --net=host \
   --dns=8.8.8.8 --dns=1.1.1.1 \
   -v "$(pwd):/workspace" \
   -v "$(dirname $(pwd))/Data:/Data" \
