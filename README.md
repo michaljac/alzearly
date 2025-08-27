@@ -483,6 +483,20 @@ This section tells you exactly when and why to modify each parameter. All change
 export WANDB_API_KEY=your_key_here
 
 
+```
+
+# Build the generate data image
+docker build -f Dockerfile.datagen -t alzearly-datagen . --network=host
+
+# Run the generate data container
+docker run -it --gpus all --ipc=host --net=host \
+  -v "$(pwd):/workspace" \
+  -v "$(dirname $(pwd))/Data:/Data" \
+  --name alz_datagen \
+  alzearly-datagen:latest /bin/bash
+
+```
+```
 
 # Build the train image
 
