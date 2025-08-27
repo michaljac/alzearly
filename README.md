@@ -1,486 +1,587 @@
-# Alzearly 🧠
+# Alzearly <img src="readme_images/hippo.jpeg" alt="🧠" width="25" height="25" style="background: transparent;">
 
-> **Early Detection of Alzheimer's Disease**
+> **Early Detection of Alzheimer's Disease using Machine Learning**
 
+A comprehensive machine learning pipeline that predicts Alzheimer's disease risk from patient health data. This project demonstrates how to build, train, and evaluate predictive models for early disease detection using synthetic patient data.
 
-A comprehensive machine learning pipeline for early detection of Alzheimer's disease using synthetic patient data, featuring XGBoost and Logistic Regression models with automated evaluation and API serving capabilities.
+## <img src="readme_images/hippo.jpeg" alt="🎯" width="20" height="20" style="background: transparent;"> **What This Project Does**
 
-## Quickstart (local, no accounts)
+Alzheimer's disease is a progressive brain disorder that affects memory, thinking, and behavior. Early detection is crucial for better treatment outcomes. This project:
+
+- **Generates realistic patient data** with health indicators that correlate with Alzheimer's risk
+- **Trains machine learning models** to predict disease probability from patient features
+- **Evaluates model performance** using medical-grade metrics
+- **Provides a complete pipeline** from data generation to model deployment
+
+## <img src="readme_images/hippo.jpeg" alt="🚀" width="20" height="20" style="background: transparent;"> **Quick Start - Run the Complete Pipeline**
+
+### **Prerequisites**
+- Docker installed on your system
+- Git for cloning the repository
+
+### **Step-by-Step Instructions**
 
 ```bash
+# 1. Clone and enter the project
 git clone https://github.com/michaljac/alz-detect
 cd alz-detect
 
-# Training pipeline (with interactive tracker selection)
+# 2. Build the training container
 docker build -f Dockerfile.train -t alzearly-train .
+
+# 3. Run the complete training pipeline
 docker run -it alzearly-train python run_training.py
 
-# Training with specific tracker
-docker run -it alzearly-train python run_training.py --tracker none
-docker run -it alzearly-train python run_training.py --tracker wandb
-docker run -it alzearly-train python run_training.py --tracker mlflow
-
-# Direct training (bypasses data generation)
-docker run -it alzearly-train python src/train.py --tracker none
-
-# Serve latest model (after training)
-docker build -f Dockerfile.serve -t alzearly-serve .
-docker run -p 8000:8000 alzearly-serve
-# Open http://localhost:8000/docs
+# 4. Choose your experiment tracker when prompted:
+#    - Option 1: Weights & Biases (cloud tracking)
+#    - Option 2: MLflow (local tracking) 
+#    - Option 3: No tracking (fastest)
 ```
 
-**Notes:**
-- Python 3.10 inside all Docker images
-- API exposed on port 8000
-- Trained artifacts written to `./artifacts/latest/`
-- MLflow runs stored in `./mlruns/`
-- For Weights & Biases tracking, set `WANDB_API_KEY` environment variable in the docker run command: `-e WANDB_API_KEY=your_key_here`
+### **What Happens During Training**
 
-## <img src="readme_images/hippo.jpeg" alt="🔧" width="25" height="25" style="background: transparent;"> **CLI Commands & Experiment Tracking**
+1. **📊 Data Generation**: Creates synthetic patient data with realistic health patterns
+2. **🔧 Feature Engineering**: Transforms raw data into predictive features
+3. **🤖 Model Training**: Trains XGBoost and Logistic Regression models
+4. **📈 Evaluation**: Calculates performance metrics and creates visualizations
+5. **💾 Artifact Saving**: Saves trained models and results to `artifacts/latest/`
 
-### **Training Commands**
+### **Expected Output**
+```
+🧠 Alzheimer's Prediction Pipeline
+============================================================
+🔬 Setting up experiment tracking...
+📊 Step 1: Data Generation
+✅ Data generation completed
+🔧 Step 2: Data Preprocessing  
+✅ Data preprocessing completed
+🤖 Step 3: Model Training
+✅ Model training completed
+📦 Step 4: Model artifacts automatically saved to artifacts/latest/
+🎉 Training pipeline completed successfully!
+```
 
-#### **Interactive Tracker Selection (Recommended)**
+## <img src="readme_images/hippo.jpeg" alt="🏗️" width="20" height="20" style="background: transparent;"> **Architecture Overview**
+
+### **Pipeline Components**
+
+```
+┌─────────────────┐    ┌──────────────────┐    ┌─────────────────┐
+│   Data Gen      │    │   Preprocessing  │    │   Model Train   │
+│                 │    │                  │    │                 │
+│ • Patient data  │───▶│ • Feature eng.   │───▶│ • XGBoost       │
+│ • Health metrics│    │ • Rolling stats  │    │ • Logistic Reg  │
+│ • Demographics  │    │ • Encoding       │    │ • Threshold opt │
+└─────────────────┘    └──────────────────┘    └─────────────────┘
+                                │
+                                ▼
+                       ┌─────────────────┐
+                       │   Evaluation    │
+                       │                 │
+                       │ • ROC curves    │
+                       │ • Confusion mat │
+                       │ • Feature imp.  │
+                       └─────────────────┘
+```
+
+### **Key Design Decisions**
+
+#### **1. Data Generation Strategy**
+- **Why synthetic data?** Real patient data is sensitive and hard to obtain
+- **Realistic patterns**: Based on medical research linking health metrics to Alzheimer's risk
+- **Temporal features**: Includes year-over-year changes to capture disease progression
+
+#### **2. Model Selection**
+- **XGBoost**: Handles complex non-linear relationships in health data
+- **Logistic Regression**: Provides interpretable results for medical professionals
+- **Ensemble approach**: Combines strengths of both models for better predictions
+
+#### **3. Feature Engineering**
+- **Rolling statistics**: Captures trends over time (e.g., 3-year averages)
+- **Categorical encoding**: Converts text data (region, occupation) to numerical features
+- **Feature selection**: Reduces dimensionality while preserving predictive power
+
+#### **4. Threshold Optimization**
+- **Medical context**: Balances false positives vs. false negatives
+- **Cost-sensitive**: Prioritizes catching true cases over avoiding false alarms
+- **ROC analysis**: Finds optimal decision boundary for clinical use
+
+## <img src="readme_images/hippo.jpeg" alt="🔬" width="20" height="20" style="background: transparent;"> **Technical Choices Explained**
+
+### **Health Parameters for Alzheimer's Detection**
+
+The model uses these key health indicators, chosen based on medical research:
+
+| **Category** | **Parameters** | **Why Important** |
+|--------------|----------------|-------------------|
+| **Demographics** | Age, Sex, Education, Region | Age is the strongest risk factor |
+| **Vital Signs** | Blood pressure, Heart rate, BMI | Cardiovascular health affects brain function |
+| **Lab Results** | Glucose, Cholesterol, Creatinine | Metabolic health correlates with cognitive decline |
+| **Medical History** | Encounters, Medications, Lab tests | Healthcare utilization indicates health status |
+
+### **Model Architecture Details**
+
+#### **XGBoost Configuration**
+```python
+# Key parameters optimized for medical data
+xgb_params = {
+    "n_estimators": 100,      # Number of trees
+    "max_depth": 6,           # Prevent overfitting
+    "learning_rate": 0.1,     # Gradual learning
+    "subsample": 0.8,         # Random sampling
+    "colsample_bytree": 0.8,  # Feature sampling
+    "eval_metric": "logloss"  # Medical-grade metric
+}
+```
+
+#### **Logistic Regression**
+```python
+# Interpretable model for medical professionals
+lr_params = {
+    "random_state": 42,       # Reproducibility
+    "max_iter": 1000,         # Convergence
+    "class_weight": "balanced" # Handle class imbalance
+}
+```
+
+### **Threshold Selection Strategy**
+```python
+# Medical decision making
+def select_optimal_threshold(y_true, y_pred):
+    """
+    Find threshold that balances:
+    - Sensitivity (catch true cases)
+    - Specificity (avoid false alarms)
+    - Medical cost considerations
+    """
+    thresholds = np.arange(0.1, 0.9, 0.05)
+    best_f1 = 0
+    optimal_threshold = 0.5
+    
+    for threshold in thresholds:
+        y_pred_binary = (y_pred >= threshold).astype(int)
+        f1 = f1_score(y_true, y_pred_binary)
+        
+        if f1 > best_f1:
+            best_f1 = f1
+            optimal_threshold = threshold
+    
+    return optimal_threshold
+```
+
+## <img src="readme_images/hippo.jpeg" alt="📊" width="20" height="20" style="background: transparent;"> **Key Code Areas**
+
+### **Main Training Pipeline (`run_training.py`)**
+
+```python
+def main():
+    """Orchestrates the complete ML pipeline."""
+    parser = argparse.ArgumentParser()
+    parser.add_argument("--tracker", choices=["none", "wandb", "mlflow"])
+    parser.add_argument("--skip-data-gen", action="store_true")
+    parser.add_argument("--skip-preprocess", action="store_true")
+    
+    args = parser.parse_args()
+    
+    # Smart data detection - skip if already exists
+    if Path("data/featurized").exists():
+        args.skip_data_gen = True
+        args.skip_preprocess = True
+    
+    # Execute pipeline steps
+    if not args.skip_data_gen:
+        generate_data()  # Create synthetic patient data
+    
+    if not args.skip_preprocess:
+        preprocess_data()  # Feature engineering
+    
+    train_model(tracker=args.tracker)  # Train and evaluate models
+```
+
+### **Feature Engineering (`src/preprocess.py`)**
+
+```python
+def create_rolling_features(df):
+    """Create temporal features for disease progression tracking."""
+    numeric_cols = ["age", "bmi", "glucose", "cholesterol_total"]
+    
+    for col in numeric_cols:
+        # 3-year rolling average
+        df[f"{col}_3y_avg"] = df.groupby("patient_id")[col].rolling(3).mean()
+        
+        # Year-over-year change
+        df[f"{col}_yoy_change"] = df.groupby("patient_id")[col].diff()
+        
+        # Trend direction
+        df[f"{col}_trend"] = df.groupby("patient_id")[col].diff(2)
+    
+    return df
+```
+
+### **Model Training (`src/train.py`)**
+
+```python
+class ModelTrainer:
+    def train(self, tracker_type="none"):
+        """Train models with medical-grade evaluation."""
+        # Load and preprocess data
+        X_train, X_test, y_train, y_test = self._prepare_data()
+        
+        # Train multiple models
+        models = {
+            "logistic_regression": LogisticRegression(**self.lr_params),
+            "xgboost": XGBClassifier(**self.xgb_params)
+        }
+        
+        results = {}
+        for name, model in models.items():
+            # Train model
+            model.fit(X_train, y_train)
+            
+            # Evaluate with medical metrics
+            y_pred = model.predict_proba(X_test)[:, 1]
+            results[name] = self._evaluate_model(y_test, y_pred)
+        
+        # Save best model and artifacts
+        self._save_artifacts(results)
+        return results
+```
+
+## <img src="readme_images/hippo.jpeg" alt="📈" width="20" height="20" style="background: transparent;"> **Performance Metrics & Visualizations**
+
+### **Model Comparison Visualization**
+
+The pipeline compares XGBoost and Logistic Regression models to demonstrate their different characteristics:
+
+![Model Comparison](readme_images/model_comparison.png)
+
+**What this visualization shows:**
+- **Probability Distributions**: How each model assigns risk probabilities to patients
+- **ROC Curves**: Model performance in distinguishing between healthy and at-risk patients
+- **Precision-Recall Curves**: Balance between finding true cases and avoiding false alarms
+- **Key Insights**: XGBoost captures complex patterns while Logistic Regression provides interpretable results
+
+### **Medical-Grade Evaluation**
+
+The pipeline automatically generates these key visualizations:
+
+#### **1. ROC Curves**
+- **Purpose**: Shows model's ability to distinguish between healthy and at-risk patients
+- **Interpretation**: Higher area under curve (AUC) = better performance
+- **Medical threshold**: AUC > 0.8 is considered clinically useful
+
+#### **2. Precision-Recall Curves**
+- **Purpose**: Balances finding true cases vs. avoiding false alarms
+- **Medical context**: High recall is crucial for disease detection
+- **Threshold selection**: Optimizes for clinical decision making
+
+#### **3. Feature Importance**
+- **Purpose**: Identifies which health factors most predict Alzheimer's risk
+- **Clinical value**: Helps doctors understand risk factors
+- **Actionable insights**: Guides preventive care recommendations
+
+#### **4. Confusion Matrix**
+- **Purpose**: Shows true positives, false positives, true negatives, false negatives
+- **Medical interpretation**: 
+  - True Positives: Correctly identified at-risk patients
+  - False Negatives: Missed cases (clinically serious)
+  - False Positives: False alarms (less serious but costly)
+
+## <img src="readme_images/hippo.jpeg" alt="🔧" width="20" height="20" style="background: transparent;"> **Advanced Usage**
+
+### **Key Parameters to Modify**
+
+> **💡 Quick Reference**: All parameters are organized by file below. Edit the corresponding YAML files to customize your pipeline.
+
+#### **Data Generation Parameters** (`config/data_gen.yaml`)
+```yaml
+# Main parameters you should adjust:
+data_gen:
+  n_patients: 5000          # Number of patients to generate
+  years: [2023, 2024, 2025] # Years of data to simulate
+  positive_rate: 0.08      # Alzheimer's prevalence rate (8%)
+  seed: 42                  # Random seed for reproducibility
+```
+
+#### **Model Training Parameters** (`config/model.yaml`)
+```yaml
+model:
+  max_features: 150         # Maximum features to use
+  test_size: 0.2           # Test set size (20%)
+  handle_imbalance: "class_weight"  # How to handle class imbalance
+  models: ["logistic_regression", "xgboost"]  # Models to train
+```
+
+#### **Preprocessing Parameters** (`config/preprocess.yaml`)
+```yaml
+preprocess:
+  rolling_window: 3         # Years for rolling statistics
+  chunk_size: 1000         # Memory management for large datasets
+  numeric_columns:          # Health metrics to process
+    - "age", "bmi", "glucose", "cholesterol_total"
+```
+
+### **Custom Training Configuration**
+
 ```bash
-# Shows interactive menu to choose tracker
-python run_training.py
-python src/train.py
-```
-
-**User sees:**
-```
-🔬 Experiment Tracking Setup
-==================================================
-Select experiment tracker:
-1. Weights & Biases (wandb)
-2. MLflow (local)
-3. No tracking
-
-Enter choice (1-3, default=1): 
-```
-
-#### **Non-Interactive Training**
-```bash
-# No experiment tracking
-python src/train.py --tracker none
-python run_training.py --tracker none
-
-# With Weights & Biases
-export WANDB_API_KEY=your_api_key_here
-python src/train.py --tracker wandb
-python run_training.py --tracker wandb
-
-# With MLflow (local)
-python src/train.py --tracker mlflow
-python run_training.py --tracker mlflow
-```
-
-### **Key CLI Parameters**
-
-#### **Training Parameters**
-```bash
-# Basic training
-python src/train.py --tracker none
-
-# With custom configuration
-python src/train.py \
+# Train with specific parameters
+python run_training.py \
   --tracker wandb \
-  --config config/model.yaml \
-  --max-features 100 \
-  --handle-imbalance smote \
-  --run-type production
+  --config config/custom_model.yaml \
+  --skip-data-gen \
+  --skip-preprocess
 
-# Training with specific data
-python src/train.py \
+# Use existing data, custom config
+python run_training.py \
   --tracker none \
-  --input-dir data/featurized \
-  --output-dir models
+  --config config/production.yaml
 ```
 
-#### **Available Options**
-- `--tracker`: `none`, `wandb`, `mlflow` (or omit for interactive menu)
-- `--config`: Configuration file path (default: `config/model.yaml`)
-- `--input-dir`: Input data directory (default: `data/featurized`)
-- `--output-dir`: Output directory (default: `models`)
-- `--max-features`: Maximum features to use (default: 150)
-- `--handle-imbalance`: `class_weight`, `smote`, `none` (default: `class_weight`)
-- `--run-type`: `initial`, `production`, `hyperparameter_tuned` (default: `initial`)
+### **Parameter Modification Examples**
 
-### **Experiment Tracking Setup**
+#### **Quick Testing (Small Dataset)**
+```yaml
+# config/quick_test.yaml
+data_gen:
+  n_patients: 1000          # Small dataset for testing
+  years: [2020]             # Single year
+  positive_rate: 0.15
 
-#### **Weights & Biases (wandb)**
+model:
+  max_features: 50          # Fewer features
+  test_size: 0.2
+```
+
+#### **Production Training (Large Dataset)**
+```yaml
+# config/production.yaml
+data_gen:
+  n_patients: 50000         # Large dataset
+  years: [2015, 2016, 2017, 2018, 2019, 2020]  # 6 years
+  positive_rate: 0.12       # Lower prevalence
+
+model:
+  max_features: 200         # More features
+  test_size: 0.2
+  handle_imbalance: "smote" # Better for imbalanced data
+```
+
+#### **Research Experiment**
+```yaml
+# config/research.yaml
+data_gen:
+  n_patients: 10000
+  years: [2018, 2019, 2020, 2021, 2022]  # 5 years
+  positive_rate: 0.18       # Higher prevalence
+
+preprocess:
+  rolling_window: 5         # Longer trend analysis
+
+model:
+  max_features: 150
+  models: ["xgboost"]       # Focus on one model
+```
+
+### **📝 When to Change Parameters - Complete Guide**
+
+This section tells you exactly when and why to modify each parameter. All changes are made in the corresponding YAML files.
+
+#### **File: `config/data_gen.yaml`**
+| **Parameter** | **Current Value** | **When to Change** | **Recommended Range** |
+|---------------|-------------------|-------------------|----------------------|
+| `n_patients` | 5000 | **Increase for production** | 10,000+ for production, 1,000 for testing |
+| `years` | [2018, 2019, 2020] | **Add more years** | [2015-2022] for longer disease progression |
+| `positive_rate` | 0.15 | **Adjust population** | 0.05-0.1 for typical populations |
+| `seed` | 42 | **For reproducibility** | Any integer (keep same for consistent results) |
+
+#### **File: `config/model.yaml`**
+| **Parameter** | **Current Value** | **When to Change** | **Recommended Range** |
+|---------------|-------------------|-------------------|----------------------|
+| `max_features` | 150 | **Memory issues** | 50-100 for testing, 200+ for production |
+| `test_size` | 0.2 | **Standard medical** | 0.2 (20%) - standard for medical data |
+| `handle_imbalance` | "class_weight" | **Better performance** | "smote" for imbalanced data, "none" for balanced |
+| `models` | ["logistic_regression", "xgboost"] | **Focus on one** | ["xgboost"] for speed, add models for comparison |
+
+#### **File: `config/preprocess.yaml`**
+| **Parameter** | **Current Value** | **When to Change** | **Recommended Range** |
+|---------------|-------------------|-------------------|----------------------|
+| `rolling_window` | 3 | **Slower progression** | 5-7 years for slower disease progression |
+| `chunk_size` | 1000 | **Memory errors** | 500 for large datasets, 2000+ for small datasets |
+| `numeric_columns` | ["age", "bmi", "glucose", "cholesterol_total"] | **Add health metrics** | Add relevant health indicators |
+
+#### **Quick Decision Guide**
+
+**🔬 For Research/Testing:**
+- `n_patients`: 1,000-5,000
+- `max_features`: 50-100
+- `models`: ["xgboost"] (faster)
+- `rolling_window`: 3
+
+**🏭 For Production:**
+- `n_patients`: 10,000+
+- `max_features`: 150-200
+- `models`: ["logistic_regression", "xgboost"]
+- `handle_imbalance`: "smote"
+
+**💾 For Memory-Constrained Systems:**
+- `chunk_size`: 500
+- `max_features`: 50-100
+- `n_patients`: 1,000-2,000
+
+### **Experiment Tracking Options**
+
+#### **Weights & Biases (Recommended)**
 ```bash
 # Set API key
-export WANDB_API_KEY=your_api_key_here
+export WANDB_API_KEY=your_key_here
 
-# Run training
-python src/train.py --tracker wandb
+# Run with cloud tracking
+docker run -it -e WANDB_API_KEY=your_key alzearly-train python run_training.py --tracker wandb
 ```
-
-**Features:**
-- ✅ Automatic metric logging
-- ✅ Model artifact versioning
-- ✅ Hyperparameter tracking
-- ✅ Visualization dashboards
-- ✅ Offline mode support
 
 #### **MLflow (Local)**
 ```bash
-# No setup required
-python src/train.py --tracker mlflow
+# Local experiment tracking
+python run_training.py --tracker mlflow
+
+# View results
+mlflow ui
 ```
 
-**Features:**
-- ✅ Local experiment tracking
-- ✅ Model registry
-- ✅ Metric logging
-- ✅ Artifact storage in `./mlruns/`
-
-#### **No Tracking**
+#### **No Tracking (Fastest)**
 ```bash
-# Fastest option, no external dependencies
-python src/train.py --tracker none
+# Skip experiment tracking for speed
+python run_training.py --tracker none
 ```
 
-**Features:**
-- ✅ Local artifact saving
-- ✅ No external API calls
-- ✅ Perfect for development/testing
+### **Data Pipeline Options**
 
-### **Artifacts & Outputs**
-
-All training runs save artifacts to `artifacts/latest/`:
 ```bash
-artifacts/latest/
-├── model.pkl              # Trained model
-├── feature_names.json     # Feature names
-├── threshold.json         # Optimal threshold
-└── metrics.json          # Training metrics
+# Skip data generation (use existing data)
+python run_training.py --skip-data-gen
+
+# Skip preprocessing (use existing features)
+python run_training.py --skip-preprocess
+
+# Skip both (train only)
+python run_training.py --skip-data-gen --skip-preprocess
 ```
 
-### **Docker Commands**
+## <img src="readme_images/hippo.jpeg" alt="📁" width="20" height="20" style="background: transparent;"> **Project Structure**
 
-#### **Training with Interactive Menu**
+```
+alz-detect/
+├── run_training.py              # Main pipeline orchestrator
+├── src/
+│   ├── data_gen.py             # Synthetic data generation
+│   ├── preprocess.py           # Feature engineering
+│   ├── train.py               # Model training & evaluation
+│   ├── serve.py               # Model serving (optional)
+│   └── config.py              # Configuration management
+├── config/
+│   └── model.yaml             # Training configuration
+├── tests/
+│   └── test_run_training.py   # Pipeline tests
+├── artifacts/
+│   └── latest/                # Trained models & results
+├── data/
+│   ├── raw/                   # Generated patient data
+│   └── featurized/            # Processed features
+└── plots/                     # Performance visualizations
+```
+
+## <img src="readme_images/hippo.jpeg" alt="🧪" width="20" height="20" style="background: transparent;"> **Testing the Pipeline**
+
 ```bash
-docker run -it alzearly-train python run_training.py
+# Run unit tests
+python -m pytest tests/test_run_training.py -v
+
+# Test specific functionality
+python -m pytest tests/test_run_training.py::TestRunTraining::test_main_successful_pipeline -v
 ```
 
-#### **Training with Specific Tracker**
+## <img src="readme_images/hippo.jpeg" alt="🚀" width="20" height="20" style="background: transparent;"> **Improved Usage with Built-in Error Handling**
+
+The `run_training.py` script now includes comprehensive error handling and validation:
+
+### **Automatic Problem Detection & Fixes**
+
+✅ **Smart Path Detection**: Automatically detects if you're in the right directory
+✅ **Import Validation**: Checks all dependencies are installed before running
+✅ **Data Validation**: Verifies data files exist before processing
+✅ **Config Validation**: Ensures configuration files are present and valid
+✅ **Artifact Verification**: Confirms all model artifacts were created successfully
+
+### **Enhanced Error Messages**
+
+The script now provides clear, actionable error messages:
+
 ```bash
-# No tracking
-docker run -it alzearly-train python run_training.py --tracker none
+# If you're in the wrong directory:
+❌ Error: src directory not found at /path/to/src
+💡 Make sure you're running from the project root directory
 
-# With wandb
-docker run -it -e WANDB_API_KEY=your_key alzearly-train python run_training.py --tracker wandb
+# If dependencies are missing:
+❌ Import error: No module named 'pandas'
+💡 Make sure all dependencies are installed:
+   pip install -r requirements-train.txt
 
-# With mlflow
-docker run -it alzearly-train python run_training.py --tracker mlflow
+# If config file is missing:
+❌ Configuration file not found: config/model.yaml
+💡 Check if the config file exists or use --config to specify a different file
+
+# If data is missing:
+❌ No raw data found for preprocessing
+💡 Run data generation first or check data/raw directory
 ```
 
-#### **Direct Training (Skip Data Generation)**
+### **Automatic Directory Creation**
+
+The script automatically creates necessary directories:
+- `data/raw/` - For generated patient data
+- `data/featurized/` - For processed features
+- `artifacts/latest/` - For trained models
+
+### **Smart Data Detection**
+
+The script intelligently detects existing data:
 ```bash
-docker run -it alzearly-train python src/train.py --tracker none
+✅ Found existing featurized data (3 files) - skipping data generation and preprocessing
+⚠️  Found data/featurized directory but no data files - will regenerate
+📁 No existing featurized data found - will generate new data
 ```
 
-## <img src="readme_images/hippo.jpeg" alt="🏗️" width="25" height="25" style="background: transparent;"> **Architecture Overview**
+### **Artifact Verification**
 
-### **Core Components:**
-- **Data Generation**: Synthetic patient data with realistic Alzheimer's disease patterns
-- **Data Preprocessing**: Feature engineering, encoding, and scaling
-- **Model Training**: XGBoost and Logistic Regression with hyperparameter optimization
-- **Model Evaluation**: Comprehensive metrics (ROC, PR curves, confusion matrices)
-- **API Serving**: FastAPI development server for real-time predictions
-- **Experiment Tracking**: Weights & Biases integration with descriptive run names
-
-### **Technology Stack:**
-- **ML Framework**: Scikit-learn, XGBoost
-- **Data Processing**: Polars (Lazy), Pandas
-- **API Framework**: FastAPI with Uvicorn
-- **Experiment Tracking**: Weights & Biases
-- **Visualization**: Matplotlib, Seaborn
-- **Containerization**: Docker & Docker Compose
-- **Progress Tracking**: TQDM with single-line updates
-
-### **Pipeline Steps**
-
-#### **1. Data Generation**
-Generates synthetic patient-year data with realistic features for Alzheimer's prediction.
-
-**Key Parameters:**
-- `--n-patients`: Number of patients to generate
-- `--years`: Years to generate (comma-separated)
-- `--positive-rate`: Positive rate for target variable
-- `--seed`: Random seed for reproducibility
-
-**Example:**
+After training, the script verifies all artifacts were created:
 ```bash
-./train.sh data --n-patients 5000 --years "2018,2019,2020" --positive-rate 0.15
+📦 Step 4: Verifying artifacts
+✅ model.pkl
+✅ feature_names.json
+✅ threshold.json
+✅ metrics.json
+✅ All artifacts successfully created!
 ```
 
-#### **2. Data Preprocessing**
-Preprocesses patient-year data with rolling features using Polars Lazy.
+### **Performance Optimization**
 
-**Key Parameters:**
-- `--rolling-window`: Rolling window in years
-- `--chunk-size`: Chunk size for processing
-- `--input-dir`: Input directory (default: data/raw)
-- `--output-dir`: Output directory (default: data/featurized)
+- **Large datasets**: Use `--skip-data-gen` with existing data
+- **Fast iteration**: Use `--tracker none` for no experiment tracking
+- **Memory issues**: Reduce `max_features` in config
+- **GPU training**: Modify Dockerfile to include CUDA support
 
-**Example:**
-```bash
-./train.sh preprocess --rolling-window 3 --chunk-size 1000
-```
+## <img src="readme_images/hippo.jpeg" alt="📚" width="20" height="20" style="background: transparent;"> **Understanding the Results**
 
-#### **3. Model Training**
-Trains machine learning models for Alzheimer's prediction with hyperparameter tuning.
+### **Model Performance Interpretation**
 
-**Key Parameters:**
-- `--max-features`: Maximum number of features
-- `--handle-imbalance`: Imbalance handling method (smote, class_weight, etc.)
-- `--wandb-project`: Weights & Biases project name
-- `--wandb-entity`: Weights & Biases entity
+- **AUC > 0.9**: Excellent performance
+- **AUC 0.8-0.9**: Good performance, clinically useful
+- **AUC 0.7-0.8**: Acceptable performance
+- **AUC < 0.7**: Needs improvement
 
-**Example:**
-```bash
-./train.sh train --wandb-project alzheimers-prediction --handle-imbalance smote
-```
+### **Feature Importance Insights**
 
-#### **4. Model Evaluation**
-Evaluates trained models with comprehensive metrics and visualizations.
-
-**Required Parameters:**
-- Model path (e.g., `models/best_model.pkl`)
-- Data path (e.g., `data/test_data.csv`)
-
-**Example:**
-```bash
-./train.sh evaluate models/best_model.pkl data/test_data.csv
-```
-
-### **Common Use Cases**
-
-#### **Quick Experiment**
-```bash
-# Generate small dataset and run quick training
-./train.sh data --n-patients 1000
-./train.sh preprocess
-./train.sh train --wandb-project quick-exp
-```
-
-#### **Production Training**
-```bash
-# Run complete pipeline with production settings
-./train.sh full --n-patients 10000 --wandb-project production-v1
-```
-
-#### **Hyperparameter Tuning**
-```bash
-# Train with specific hyperparameters
-./train.sh train --max-features 100 --handle-imbalance smote --wandb-project hyperopt
-```
-
-### **Expected Workflow**
-```bash
-# Run complete pipeline with optional API server
-docker-compose --profile pipeline up
-
-# Expected output:
-🧠 Alzearly - Complete Pipeline with Optional API Server
-============================================================
-🚀 Starting Alzearly Training Pipeline...
-[Training completes...]
-🎉 Training Pipeline Completed Successfully!
-
-🤔 Would you like to start the API server now? (y/n): y
-🚀 Starting API server...
-📊 API available at: http://localhost:8000
-📖 Interactive docs at: http://localhost:8000/docs
-```
-
-## <img src="readme_images/hippo.jpeg" alt="📊" width="25" height="25" style="background: transparent;"> **Model Comparison and Visualization**
-
-The pipeline automatically generates comprehensive comparison plots showing:
-- **ROC Curves**: XGBoost vs Logistic Regression performance
-- **Precision-Recall Curves**: Model comparison on imbalanced data
-- **Confusion Matrices**: Detailed classification results
-- **Feature Importance**: Key predictive features
-
-All plots are saved in the `plots/` directory with timestamps for easy tracking.
-
-## <img src="readme_images/hippo.jpeg" alt="🔬" width="25" height="25" style="background: transparent;"> **Experiment Tracking**
-
-The pipeline supports multiple experiment tracking systems:
-
-### **Weights & Biases (wandb)**
-- **Cloud-based tracking** with API key authentication
-- **Offline mode** for local development
-- **Automatic logging** of metrics, plots, and model artifacts
-- **Experiment tracking** with hyperparameters and training history
-
-### **MLflow (Local)**
-- **Local file-based tracking** stored in `./mlruns/`
-- **Automatic setup** and configuration
-- **Artifact management** for models and evaluation results
-- **Experiment organization** with run history
-
-### **No Tracking**
-- **Skip experiment tracking** entirely for faster execution
-- **Local file storage** of models and plots
-- **Suitable for** development and testing
-
-### **Setup**
-When you run the pipeline, you'll be prompted to choose your preferred tracking system:
-```
-🔬 Experiment Tracking Setup
-==================================================
-Select experiment tracker:
-1. Weights & Biases (wandb)
-2. MLflow (local)
-3. No tracking
-
-Enter choice (1-3, default=1):
-```
-
-The system will automatically:
-- Install required packages if needed
-- Configure tracking settings
-- Handle authentication (for wandb)
-- Provide fallback options if setup fails
-
-## <img src="readme_images/hippo.jpeg" alt="🐳" width="25" height="25" style="background: transparent;"> **Docker Architecture**
-
-### **Services**
-- **Training Service**: Handles data generation, preprocessing, training, and evaluation
-- **Serving Service**: FastAPI development server for real-time predictions
-- **Pipeline Service**: Complete pipeline with optional API server startup
-
-### **Shared Volumes**
-- `./models` - Trained models with descriptive names
-- `./artifacts` - Evaluation results
-- `./data` - Generated and processed data
-- `./plots` - Visualization outputs with meaningful names
-- `./config` - Configuration files
-- `./src` - Source code
-
-### **Expected Workflow**
-```bash
-# Run complete pipeline with optional API server
-docker-compose --profile pipeline up
-
-# Expected output:
-🧠 Alzearly - Complete Pipeline with Optional API Server
-============================================================
-🚀 Starting Alzearly Training Pipeline...
-[Training completes...]
-🎉 Training Pipeline Completed Successfully!
-
-🤔 Would you like to start the API server now? (y/n): y
-🚀 Starting API server...
-📊 API available at: http://localhost:8000
-📖 Interactive docs at: http://localhost:8000/docs
-```
-
-
-## <img src="readme_images/hippo.jpeg" alt="🔧" width="25" height="25" style="background: transparent;"> **Configuration**
-
-### **Data Generation** (`config/data_gen.yaml`)
-- Patient demographics and medical history
-- Disease progression patterns
-- Temporal data spanning 2021-2024
-
-### **Preprocessing** (`config/preprocess.yaml`)
-- Feature engineering strategies
-- Categorical encoding methods
-- Data validation rules
-
-### **Model Training** (`config/model.yaml`)
-- Hyperparameter ranges for optimization
-- Cross-validation settings
-- Model-specific parameters
-
-## <img src="readme_images/hippo.jpeg" alt="📈" width="25" height="25" style="background: transparent;"> **Performance Features**
-
-### **Progress Tracking**
-- Single-line TQDM progress bars throughout the pipeline
-- Percentage-based updates for long-running operations
-- Clean, non-verbose output with essential information only
-
-### **Parallel Processing**
-- Dask integration for large-scale data processing
-- Ray for distributed model training
-- Multiprocessing for CPU-intensive tasks
-
-### **Memory Optimization**
-- Lazy evaluation with Polars
-- Efficient categorical encoding (max 50 columns)
-- Streaming data processing for large datasets
-
-
-
-## <img src="readme_images/hippo.jpeg" alt="🧪" width="25" height="25" style="background: transparent;"> **Testing**
-
-The pipeline includes comprehensive testing:
-- Unit tests for core functions
-- Integration tests for data flow
-- Model validation tests
-- API endpoint testing
-
-Run tests with:
-```bash
-python main.py  # Select option 7
-```
-
-## <img src="readme_images/hippo.jpeg" alt="🔄" width="25" height="25" style="background: transparent;"> **Development Workflow**
-
-1. **Local Development**:
-   ```bash
-   python main.py  # Interactive development
-   ```
-
-2. **Containerized Development**:
-   ```bash
-   # Complete pipeline with optional API server
-   docker-compose --profile pipeline up
-   
-   # Or run separately:
-   # Terminal 1: Training
-   docker-compose --profile training up
-   
-   # Terminal 2: API Server
-   docker-compose --profile serve up
-   ```
-
-3. **Production Deployment**:
-   ```bash
-   docker-compose --profile pipeline up --build
-   ```
-
-## <img src="readme_images/hippo.jpeg" alt="🛠️" width="25" height="25" style="background: transparent;"> **Troubleshooting**
-
-### **Docker Compose Issues**
-```bash
-# Port already in use
-# Edit docker-compose.yml to change port: "8001:8000"
-
-# Permission issues (Linux/Mac)
-sudo chown -R $USER:$USER ./data ./models ./artifacts ./plots
-
-# View logs
-docker-compose --profile pipeline logs
-docker-compose --profile serve logs -f
-```
-
-### **Common Issues**
-- **No models found**: Ensure training completed successfully
-- **FastAPI dependencies missing**: Use the serve container instead of training container
-- **Port conflicts**: Change port mapping in docker-compose.yml
-
-## <img src="readme_images/hippo.jpeg" alt="📊" width="25" height="25" style="background: transparent;"> **Model Performance**
-
-The pipeline automatically evaluates models using:
-- **AUROC**: Area Under ROC Curve
-- **AUPRC**: Area Under Precision-Recall Curve
-- **F1 Score**: Balanced precision and recall
-- **Confusion Matrix**: Detailed classification results
-
-Results are logged to Weights & Biases and saved locally for analysis.
+- **Age**: Strongest predictor (expected)
+- **Glucose levels**: Metabolic health indicator
+- **Healthcare utilization**: Proxy for overall health status
+- **Demographics**: Regional and socioeconomic factors

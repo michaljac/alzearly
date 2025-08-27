@@ -40,7 +40,7 @@ RUN pip install \
 # Copy source code
 COPY src/ ./src/
 COPY utils.py .
-COPY main.py .
+COPY run_training.py .
 COPY config/ ./config/
 
 # Create necessary directories
@@ -60,4 +60,4 @@ USER root
 EXPOSE 5678
 
 # Set default command
-CMD ["python", "main.py"]
+CMD ["python", "run_training.py"]
