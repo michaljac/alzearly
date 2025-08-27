@@ -4,6 +4,20 @@
 
 A comprehensive machine learning pipeline that predicts Alzheimer's disease risk from patient health data. This project demonstrates how to build, train, and evaluate predictive models for early disease detection using synthetic patient data.
 
+## 📋 **Submission Status**
+
+**Python 3.10, API :8000, artifacts in ./artifacts/latest, MLflow in ./mlruns.**
+
+### **MUST Items Checklist:**
+
+- [ ] **Single-command run & Quick Start**
+- [ ] **Tracker choice works w/o secrets**
+- [ ] **Determinism & data cache**
+- [ ] **FastAPI /health & /version + predict example**
+- [ ] **Minimal tests (pipeline, API, serialize)**
+- [ ] **Pinned deps & Docker notes**
+- [ ] **Minimal CI**
+
 ## <img src="readme_images/hippo.jpeg" alt="🎯" width="20" height="20" style="background: transparent;"> **What This Project Does**
 
 Alzheimer's disease is a progressive brain disorder that affects memory, thinking, and behavior. Early detection is crucial for better treatment outcomes. This project:
