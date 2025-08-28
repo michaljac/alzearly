@@ -144,12 +144,33 @@ def setup_experiment_tracker():
     Bootstrap function to set up experiment tracking.
     Returns (tracker, tracker_type) tuple.
     """
+    # Suppress Pydantic warnings
+    import warnings
+    warnings.filterwarnings("ignore", category=UserWarning, module="pydantic")
+    warnings.filterwarnings("ignore", message="Field.*has conflict with protected namespace")
+    warnings.filterwarnings("ignore", message="Valid config keys have changed in V2")
+    
     # Check if we're in non-interactive mode (Docker container)
     import os
     if os.environ.get('NON_INTERACTIVE', 'false').lower() == 'true':
         print("\n🔬 Experiment Tracking Setup (Non-interactive mode)")
         print("=" * 50)
         print("✅ Using no experiment tracking for Docker container")
+        return None, "none"
+    
+    # Check if we're in a non-interactive environment
+    try:
+        import sys
+        if not sys.stdin.isatty():
+            print("\n🔬 Experiment Tracking Setup (Non-interactive environment)")
+            print("=" * 50)
+            print("✅ Using no experiment tracking for non-interactive environment")
+            return None, "none"
+    except:
+        # If we can't check, assume non-interactive
+        print("\n🔬 Experiment Tracking Setup (Non-interactive environment)")
+        print("=" * 50)
+        print("✅ Using no experiment tracking for non-interactive environment")
         return None, "none"
     
     print("\n🔬 Experiment Tracking Setup")
@@ -171,8 +192,9 @@ def setup_experiment_tracker():
                 break
             else:
                 print("❌ Invalid choice. Please enter 1, 2, or 3.")
-        except KeyboardInterrupt:
-            print("\n\n⚠️  Setup interrupted. Using no tracking.")
+        except (KeyboardInterrupt, EOFError, OSError) as e:
+            print(f"\n\n⚠️  Input error ({type(e).__name__}). Using no tracking.")
+            print("💡 This might happen in non-interactive environments.")
             return None, "none"
     
     # Handle wandb selection
@@ -260,6 +282,12 @@ def setup_wandb():
 def setup_mlflow():
     """Set up MLflow tracking."""
     print("\n🔧 Setting up MLflow...")
+    
+    # Suppress Pydantic warnings
+    import warnings
+    warnings.filterwarnings("ignore", category=UserWarning, module="pydantic")
+    warnings.filterwarnings("ignore", message="Field.*has conflict with protected namespace")
+    warnings.filterwarnings("ignore", message="Valid config keys have changed in V2")
     
     # Try to import mlflow
     try:

@@ -10,19 +10,37 @@ import argparse
 import sys
 import json
 import pickle
+import socket
 from pathlib import Path
 from typing import List, Union, Dict, Any
 import uvicorn
 from fastapi import FastAPI, HTTPException
+from contextlib import asynccontextmanager
 from pydantic import BaseModel, Field
 import numpy as np
 import pandas as pd
+
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    """Lifespan event handler for FastAPI app."""
+    # Startup
+    try:
+        load_model_and_metadata()
+        print("🚀 Service started successfully!")
+    except Exception as e:
+        print(f"❌ Failed to start service: {e}")
+        raise
+    yield
+    # Shutdown
+    print("🛑 Service shutting down...")
+
 
 # Initialize FastAPI app
 app = FastAPI(
     title="Alzheimer's Prediction API",
     description="API for predicting Alzheimer's disease risk from patient clinical data",
-    version="1.0.0"
+    version="1.0.0",
+    lifespan=lifespan
 )
 
 # Global variables for model and metadata
@@ -221,6 +239,18 @@ def load_model_and_metadata():
     print("🎉 All artifacts loaded successfully!")
 
 
+def find_available_port(start_port: int = 8000, max_attempts: int = 100) -> int:
+    """Find an available port starting from start_port."""
+    for port in range(start_port, start_port + max_attempts):
+        try:
+            with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
+                s.bind(('localhost', port))
+                return port
+        except OSError:
+            continue
+    raise RuntimeError(f"Could not find an available port in range {start_port}-{start_port + max_attempts - 1}")
+
+
 def prepare_features(item: PredictionItem) -> np.ndarray:
     """Prepare features for prediction from a single item."""
     # Convert item to dictionary
@@ -273,15 +303,7 @@ def prepare_features(item: PredictionItem) -> np.ndarray:
     return np.array([[risk_score] * 150])  # Match expected 150 features
 
 
-@app.on_event("startup")
-async def startup_event():
-    """Load model and metadata on startup."""
-    try:
-        load_model_and_metadata()
-        print("🚀 Service started successfully!")
-    except Exception as e:
-        print(f"❌ Failed to start service: {e}")
-        raise
+
 
 
 @app.get("/health", tags=["Health"])
@@ -306,6 +328,46 @@ async def get_version():
     
     run_id = model_metadata.get('run_id', 'unknown')
     return {"model_version": run_id}
+
+
+@app.get("/predict", tags=["Prediction"])
+async def predict_info():
+    """
+    Get information about the prediction endpoint.
+    
+    Returns:
+        Information about how to use the prediction API
+    """
+    return {
+        "message": "Prediction endpoint information",
+        "method": "POST",
+        "description": "Use POST /predict with JSON data to get predictions",
+        "example_request": {
+            "items": [
+                {
+                    "age": 65.0,
+                    "bmi": 26.5,
+                    "systolic_bp": 140.0,
+                    "diastolic_bp": 85.0,
+                    "heart_rate": 72.0,
+                    "temperature": 37.0,
+                    "glucose": 95.0,
+                    "cholesterol_total": 200.0,
+                    "hdl": 45.0,
+                    "ldl": 130.0,
+                    "triglycerides": 150.0,
+                    "creatinine": 1.2,
+                    "hemoglobin": 14.5,
+                    "white_blood_cells": 7.5,
+                    "platelets": 250.0,
+                    "num_encounters": 3,
+                    "num_medications": 2,
+                    "num_lab_tests": 5
+                }
+            ]
+        },
+        "note": "Use the interactive docs at /docs for testing the API"
+    }
 
 
 @app.post("/predict", response_model=PredictionResponse, tags=["Prediction"])
@@ -374,16 +436,37 @@ async def root():
 def main():
     """Run the FastAPI server."""
     parser = argparse.ArgumentParser(description="Run Alzheimer's prediction API server")
-    parser.add_argument("--port", type=int, default=8000, help="Port to run server on")
+    parser.add_argument("--port", type=int, default=None, help="Port to run server on (auto-find if not specified)")
     parser.add_argument("--host", default="0.0.0.0", help="Host to bind server to")
     parser.add_argument("--reload", action="store_true", help="Enable auto-reload")
     
-    args = parser.parse_args()
+    # Parse only known arguments to avoid errors with extra arguments
+    args, unknown = parser.parse_known_args()
+    
+    if unknown:
+        print(f"⚠️  Ignoring unknown arguments: {unknown}")
+    
+    # Auto-find available port if not specified
+    if args.port is None:
+        try:
+            args.port = find_available_port(start_port=8000)
+            print(f"🔍 Auto-selected available port: {args.port}")
+        except RuntimeError as e:
+            print(f"❌ {e}")
+            return 1
+    else:
+        # Check if specified port is available
+        try:
+            with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
+                s.bind(('localhost', args.port))
+        except OSError:
+            print(f"❌ Port {args.port} is already in use. Try a different port or let the server auto-find one.")
+            return 1
     
     print("🧠 Alzearly - API Server")
     print("=" * 40)
     print(f"🌐 Server will be available at: http://{args.host}:{args.port}")
-    print("📖 Interactive docs at: http://localhost:8000/docs")
+    print(f"📖 Interactive docs at: http://localhost:{args.port}/docs")
     print("🛑 Press Ctrl+C to stop the server")
     print()
     

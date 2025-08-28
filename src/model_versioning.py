@@ -13,7 +13,16 @@ from datetime import datetime
 from pathlib import Path
 from typing import Dict, Any, Optional, List
 from dataclasses import dataclass, asdict
-import yaml
+try:
+    import yaml
+except ImportError:
+    try:
+        import pyyaml as yaml
+    except ImportError:
+        raise ImportError(
+            "Neither 'yaml' nor 'pyyaml' is installed. Please install PyYAML:\n"
+            "pip install pyyaml==6.0.1"
+        )
 
 logger = logging.getLogger(__name__)
 

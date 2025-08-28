@@ -19,6 +19,8 @@ import platform
 from pathlib import Path
 from typing import Optional, Tuple
 
+# Debugging disabled
+
 
 def run_data_generation() -> bool:
     """Run data generation subprocess."""
@@ -39,6 +41,7 @@ def run_data_generation() -> bool:
 def detect_environment() -> Tuple[bool, str]:
     """Detect if Docker is available and determine the best execution method."""
     print("🔍 Detecting environment...")
+    print()
     
     # Check if Docker is available
     try:
@@ -68,6 +71,7 @@ def detect_environment() -> Tuple[bool, str]:
 def check_dependencies() -> bool:
     """Check if required Python dependencies are installed."""
     print("🔍 Checking dependencies...")
+    print()
     
     required_packages = ['pandas', 'numpy', 'sklearn', 'xgboost']
     missing_packages = []
@@ -98,6 +102,7 @@ def check_dependencies() -> bool:
 def setup_paths() -> bool:
     """Setup Python paths and validate project structure."""
     print("🔍 Setting up paths...")
+    print()
     
     # Add src to path - FIXED: More robust path handling
     current_dir = Path(__file__).parent.absolute()
@@ -116,12 +121,13 @@ def setup_paths() -> bool:
 def import_modules() -> Tuple[bool, object, object]:
     """Import required modules with comprehensive error handling."""
     print("🔍 Importing modules...")
+    print()
     
     try:
-        from src.train import train as train_model
+        from src.train import ModelTrainer, TrainingConfig
         from utils import setup_experiment_tracker
         print("✅ Training modules imported successfully")
-        return True, train_model, setup_experiment_tracker
+        return True, (ModelTrainer, TrainingConfig), setup_experiment_tracker
     except ImportError as e:
         print(f"❌ Import error: {e}")
         print("💡 Make sure all dependencies are installed:")
@@ -177,208 +183,54 @@ def run_with_docker(args) -> int:
 def run_with_python(args, modules) -> int:
     """Run the pipeline using local Python."""
     print("🐍 Running pipeline with local Python...")
+    print()
     
-    train_model, setup_experiment_tracker = modules
+    training_classes, setup_experiment_tracker = modules
     
     # Now call the main pipeline function
-    return main_pipeline(args, train_model, setup_experiment_tracker)
+    return main_pipeline(args, training_classes, setup_experiment_tracker)
 
 
-def main_pipeline(args, train_model, setup_experiment_tracker) -> int:
-    """The main pipeline logic - TRAINING ONLY (data generation removed)."""
+def main_pipeline(args, training_classes, setup_experiment_tracker) -> int:
+    """The main pipeline logic - TRAINING ONLY (data generation handled by shell scripts)."""
+    
     print("🤖 Alzheimer's Training Pipeline")
     print("=" * 60)
     
-    # Check for data in multiple locations
+    print()
+    
+    # Check for data in multiple locations (including subdirectories)
     local_featurized_dir = Path("data/featurized")
-    docker_data_dir = Path("/Data")  # Docker mount point
-    docker_featurized_dir = docker_data_dir / "featurized" if docker_data_dir.exists() else None
+    docker_featurized_dir = Path("/Data/featurized")
     
-    local_data_files = []
-    docker_data_files = []
+    data_files = []
     
-    # Check local data
+    # Check local data first (including subdirectories)
     if local_featurized_dir.exists():
-        local_data_files = list(local_featurized_dir.glob("*.parquet")) + list(local_featurized_dir.glob("*.csv"))
+        data_files = list(local_featurized_dir.rglob("*.parquet")) + list(local_featurized_dir.rglob("*.csv"))
     
-    # Check Docker data
-    if docker_featurized_dir and docker_featurized_dir.exists():
-        docker_data_files = list(docker_featurized_dir.glob("*.parquet")) + list(docker_featurized_dir.glob("*.csv"))
+    # Check Docker data if local data not found (including subdirectories)
+    if not data_files and docker_featurized_dir.exists():
+        data_files = list(docker_featurized_dir.rglob("*.parquet")) + list(docker_featurized_dir.rglob("*.csv"))
     
-    # Handle non-interactive modes first
-    if args.use_existing and (local_data_files or docker_data_files):
-        if local_data_files:
-            print(f"✅ Using existing local data ({len(local_data_files)} files) - non-interactive mode")
-        else:
-            print(f"✅ Using existing Docker data ({len(docker_data_files)} files) - non-interactive mode")
-    elif args.auto_generate:
-        print("🔄 Auto-generating data - non-interactive mode")
-        success = run_data_generation()
-        if not success:
-            print("❌ Data generation failed")
-            return 1
-        local_data_files = list(local_featurized_dir.glob("*.parquet")) + list(local_featurized_dir.glob("*.csv"))
-    elif local_data_files or docker_data_files:
-        # Data exists - ask user what to do
-        if local_data_files and docker_data_files:
-            print(f"✅ Found data in multiple locations:")
-            print(f"   Local: {len(local_data_files)} files")
-            print(f"   Docker: {len(docker_data_files)} files")
-            print("\nWhat would you like to do?")
-            print("1. Use local data (data/featurized)")
-            print("2. Use Docker data (/Data/featurized)")
-            print("3. Generate new data (will overwrite local data)")
-            print("4. Exit and run data generation manually")
-            
-            while True:
-                try:
-                    choice = input("\nEnter your choice (1/2/3/4): ").strip()
-                    
-                    if choice == "1":
-                        print("✅ Using local data - proceeding with training")
-                        data_files = local_data_files
-                        break
-                    elif choice == "2":
-                        print("✅ Using Docker data - proceeding with training")
-                        data_files = docker_data_files
-                        break
-                    elif choice == "3":
-                        print("🔄 Generating new data...")
-                        success = run_data_generation()
-                        if success:
-                            print("✅ New data generated successfully")
-                            data_files = list(local_featurized_dir.glob("*.parquet")) + list(local_featurized_dir.glob("*.csv"))
-                            break
-                        else:
-                            print("❌ Data generation failed")
-                            return 1
-                    elif choice == "4":
-                        print("✋ Exiting. Run 'python run_datagen.py' when ready")
-                        return 0
-                    else:
-                        print("❌ Invalid choice. Please enter 1, 2, 3, or 4")
-                except KeyboardInterrupt:
-                    print("\n✋ Process interrupted by user")
-                    return 0
-                except EOFError:
-                    print("\n❌ Invalid input")
-                    return 1
-        elif local_data_files:
-            print(f"✅ Found existing local featurized data ({len(local_data_files)} files)")
-            print("\nWhat would you like to do?")
-            print("1. Use existing local data (recommended for quick training)")
-            print("2. Generate new data (will overwrite existing data)")
-            print("3. Exit and run data generation manually")
-            
-            while True:
-                try:
-                    choice = input("\nEnter your choice (1/2/3): ").strip()
-                    
-                    if choice == "1":
-                        print("✅ Using existing local data - proceeding with training")
-                        data_files = local_data_files
-                        break
-                    elif choice == "2":
-                        print("🔄 Generating new data...")
-                        success = run_data_generation()
-                        if success:
-                            print("✅ New data generated successfully")
-                            data_files = list(local_featurized_dir.glob("*.parquet")) + list(local_featurized_dir.glob("*.csv"))
-                            break
-                        else:
-                            print("❌ Data generation failed")
-                            return 1
-                    elif choice == "3":
-                        print("✋ Exiting. Run 'python run_datagen.py' when ready")
-                        return 0
-                    else:
-                        print("❌ Invalid choice. Please enter 1, 2, or 3")
-                except KeyboardInterrupt:
-                    print("\n✋ Process interrupted by user")
-                    return 0
-                except EOFError:
-                    print("\n❌ Invalid input")
-                    return 1
-        else:  # docker_data_files only
-            print(f"✅ Found existing Docker featurized data ({len(docker_data_files)} files)")
-            print("\nWhat would you like to do?")
-            print("1. Use existing Docker data (recommended for quick training)")
-            print("2. Generate new local data")
-            print("3. Exit and run data generation manually")
-            
-            while True:
-                try:
-                    choice = input("\nEnter your choice (1/2/3): ").strip()
-                    
-                    if choice == "1":
-                        print("✅ Using existing Docker data - proceeding with training")
-                        data_files = docker_data_files
-                        break
-                    elif choice == "2":
-                        print("🔄 Generating new local data...")
-                        success = run_data_generation()
-                        if success:
-                            print("✅ New local data generated successfully")
-                            data_files = list(local_featurized_dir.glob("*.parquet")) + list(local_featurized_dir.glob("*.csv"))
-                            break
-                        else:
-                            print("❌ Data generation failed")
-                            return 1
-                    elif choice == "3":
-                        print("✋ Exiting. Run 'python run_datagen.py' when ready")
-                        return 0
-                    else:
-                        print("❌ Invalid choice. Please enter 1, 2, or 3")
-                except KeyboardInterrupt:
-                    print("\n✋ Process interrupted by user")
-                    return 0
-                except EOFError:
-                    print("\n❌ Invalid input")
-                    return 1
-    else:
-        # No data exists - must generate
-        print("❌ No featurized data found in any location!")
-        print("\nWhat would you like to do?")
-        print("1. Generate data now")
-        print("2. Exit and run data generation manually")
-        
-        while True:
-            try:
-                choice = input("\nEnter your choice (1/2): ").strip()
-                
-                if choice == "1":
-                    print("🔄 Generating data...")
-                    success = run_data_generation()
-                    if success:
-                        print("✅ Data generated successfully")
-                        data_files = list(local_featurized_dir.glob("*.parquet")) + list(local_featurized_dir.glob("*.csv"))
-                        break
-                    else:
-                        print("❌ Data generation failed")
-                        return 1
-                elif choice == "2":
-                    print("✋ Exiting. Run 'python run_datagen.py' when ready")
-                    return 0
-                else:
-                    print("❌ Invalid choice. Please enter 1 or 2")
-            except KeyboardInterrupt:
-                print("\n✋ Process interrupted by user")
-                return 0
-            except EOFError:
-                print("\n❌ Invalid input")
-                return 1
-    
-    # Final check that we have data
     if not data_files:
-        print("❌ No data available for training")
+        print("❌ No featurized data found")
+        print("💡 Please run the training script: ./train.sh (Linux/Mac) or train.bat (Windows)")
         return 1
+    
+    print(f"✅ Found {len(data_files)} data files - proceeding with training")
+    
+    print()
+    print()
     
     # Setup experiment tracking
     if args.tracker is None:
         print("\n🔬 Setting up experiment tracking...")
+        print()
         tracker, tracker_type = setup_experiment_tracker()
     else:
         print(f"\n🔬 Using experiment tracker: {args.tracker}")
+        print()
         tracker_type = args.tracker
         tracker = None  # Will be set up in the training module
     
@@ -386,25 +238,54 @@ def main_pipeline(args, train_model, setup_experiment_tracker) -> int:
     print("\n⚠️  Data generation and preprocessing handled separately")
     print("💡 Use: python run_datagen.py to generate/update data")
     
+    print()
+    print()
+    
     # Step 1: Model Training (main focus now)
     print("\n🤖 Step 1: Model Training")
     print("-" * 30)
+    print()
     
     # Validate config file exists
-    config_path = Path(args.config)
+    # Handle different types of config arguments
+    if hasattr(args.config, 'default'):
+        config_file = args.config.default
+    elif hasattr(args.config, 'value'):
+        config_file = args.config.value
+    else:
+        config_file = str(args.config)
+    
+    config_path = Path(config_file)
     if not config_path.exists():
-        print(f"❌ Configuration file not found: {args.config}")
+        print(f"❌ Configuration file not found: {config_file}")
         print("💡 Check if the config file exists or use --config to specify a different file")
         return 1
     
     try:
-        # Run training with the specified tracker
-        train_model(
-            config_file=args.config,
-            tracker=tracker_type
-        )
+        # Create training configuration
+        ModelTrainer, TrainingConfig = training_classes
+        config = TrainingConfig()
         
-        print("✅ Model training completed")
+        # Create trainer and run training
+        print("🚀 Starting model training...")
+        print()
+        print("⏳ This may take several minutes. Progress will be shown below:")
+        print()
+        print()
+        
+        trainer = ModelTrainer(config)
+        
+        print("📊 Loading and preparing data...")
+        print()
+        results = trainer.train(run_type="initial", tracker_type=tracker_type)
+        
+        print()
+        print()
+        print("✅ Model training completed successfully!")
+        print("📊 Training results saved to artifacts")
+        
+        print()
+        print()
         
     except FileNotFoundError as e:
         print(f"❌ Model training failed - missing file: {e}")
@@ -418,6 +299,7 @@ def main_pipeline(args, train_model, setup_experiment_tracker) -> int:
     # Step 2: Verify artifacts were created
     print("\n📦 Step 2: Verifying artifacts")
     print("-" * 30)
+    print()
     
     artifacts_dir = Path("artifacts/latest")
     required_files = ["model.pkl", "feature_names.json", "threshold.json", "metrics.json"]
@@ -433,14 +315,19 @@ def main_pipeline(args, train_model, setup_experiment_tracker) -> int:
     
     if missing_files:
         print(f"\n⚠️  Warning: {len(missing_files)} artifact files are missing:")
+        print()
         for file_name in missing_files:
             print(f"   - {file_name}")
+        print()
         print("💡 Check the training logs for errors")
     else:
         print("\n✅ All artifacts successfully created!")
     
-    print("\n🎉 Training pipeline completed successfully!")
+    print()
+    print()
+    print("🎉 Training pipeline completed successfully!")
     print("📤 Ready for model serving with: python run_serve.py")
+    print()
     
     return 0
 
@@ -449,6 +336,9 @@ def main():
     """Training Pipeline Runner - Training focused (data generation separate)."""
     print("🤖 Alzearly Training Runner")
     print("===========================")
+    print()
+    
+    # Debugging disabled
     
     # Parse command line arguments (UPDATED - removed data gen options)
     parser = argparse.ArgumentParser(
@@ -501,14 +391,20 @@ Note: Data generation is now separate - use run_datagen.py first
     if env_type == "none":
         return 1
     
+    print()
+    
     # Step 2: Setup paths
     if not setup_paths():
         return 1
+    
+    print()
     
     # Step 3: Check dependencies (only for local Python)
     if not use_docker or args.force_python:
         if not check_dependencies():
             return 1
+    
+    print()
     
     # Step 4: Import modules (only for local Python)
     if not use_docker or args.force_python:
@@ -519,12 +415,16 @@ Note: Data generation is now separate - use run_datagen.py first
     else:
         modules = None
     
+    print()
+    
     # Step 5: Run the pipeline
     if use_docker and not args.force_python:
         print("\n🚀 Using Docker for execution...")
+        print()
         return run_with_docker(args)
     else:
         print("\n🚀 Using local Python for execution...")
+        print()
         return run_with_python(args, modules)
 
 

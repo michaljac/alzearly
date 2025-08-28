@@ -6,8 +6,21 @@ Loads and validates configuration from YAML files.
 import logging
 from pathlib import Path
 from typing import Any, Dict, Optional, List
-import yaml
 from dataclasses import dataclass, field
+
+# YAML import with fallback
+try:
+    import yaml
+    YAML_AVAILABLE = True
+except ImportError:
+    try:
+        import pyyaml as yaml
+        YAML_AVAILABLE = True
+    except ImportError:
+        YAML_AVAILABLE = False
+        print("⚠️  Warning: Neither 'yaml' nor 'pyyaml' is installed.")
+        print("   Using default configuration values.")
+        print("   To install: pip install pyyaml==6.0.1")
 
 logger = logging.getLogger(__name__)
 
@@ -116,11 +129,65 @@ class ConfigLoader:
         if not filepath.exists():
             raise FileNotFoundError(f"Configuration file {filepath} does not exist")
         
+        if not YAML_AVAILABLE:
+            # Return default configuration when YAML is not available
+            print(f"⚠️  YAML not available, using default configuration for {filename}")
+            return self._get_default_config(filename)
+        
         with open(filepath, 'r') as f:
             config = yaml.safe_load(f)
         
         # Loaded configuration from file
         return config
+    
+    def _get_default_config(self, filename: str) -> Dict[str, Any]:
+        """Get default configuration when YAML is not available."""
+        if "data_gen" in filename:
+            return {
+                "dataset": {
+                    "n_patients": 3000,
+                    "years": [2021, 2022, 2023, 2024],
+                    "target_rows": 12000
+                },
+                "target": {
+                    "positive_rate": 0.08,
+                    "column_name": "alzheimers_diagnosis"
+                },
+                "processing": {
+                    "rows_per_chunk": 100000,
+                    "seed": 42
+                },
+                "output": {
+                    "directory": "/Data/raw"
+                },
+                "clinical_ranges": {},
+                "risk_factors": {}
+            }
+        elif "model" in filename:
+            return {
+                "input_dir": "data/featurized",
+                "target_column": "alzheimers_diagnosis",
+                "exclude_columns": ["patient_id", "year"],
+                "test_size": 0.2,
+                "val_size": 0.2,
+                "random_state": 42,
+                "stratify": True,
+                "max_features": 150,
+                "variance_threshold": 0.01,
+                "handle_imbalance": "class_weight",
+                "models": ["logistic_regression", "xgboost"],
+                "enable_hyperparameter_tuning": False,
+                "n_trials": 50,
+                "xgb_params": {},
+                "lr_params": {"random_state": 42, "max_iter": 1000},
+                "output_dir": "models",
+                "save_metadata": True,
+                "wandb_project": "alzheimers-prediction",
+                "wandb_entity": None,
+                "log_artifacts": True
+            }
+        else:
+            return {}
     
     def load_data_gen_config(self, filename: str = "data_gen.yaml") -> DataGenConfig:
         """Load data generation configuration."""

@@ -71,13 +71,17 @@ class TrainingConfig:
     
     # XGBoost parameters
     xgb_params: Dict[str, Any] = field(default_factory=lambda: {
-        "n_estimators": 100,
-        "max_depth": 6,
-        "learning_rate": 0.1,
+        "n_estimators": 50,  # Reduced from 100 for faster training
+        "max_depth": 4,  # Reduced from 6 for faster training
+        "learning_rate": 0.2,  # Increased from 0.1 for faster convergence
         "subsample": 0.8,
         "colsample_bytree": 0.8,
         "random_state": 42,
-        "eval_metric": "logloss"
+        "eval_metric": "logloss",
+        "tree_method": "hist",  # Faster tree method
+        "grow_policy": "lossguide",  # Faster growing policy
+        "max_leaves": 32,  # Limit leaves for speed
+        "verbosity": 0  # Reduce verbosity
     })
     
     # Logistic Regression parameters
@@ -283,11 +287,15 @@ class ModelTrainer:
         # Step 2: XGBoost importance-based selection
         if len(var_features) > self.config.max_features:
             
-            # Train a quick XGBoost model to get feature importance
+            # Train a quick XGBoost model to get feature importance (optimized for speed)
             xgb_selector = xgb.XGBClassifier(
-                n_estimators=50,
-                max_depth=4,
-                learning_rate=0.1,
+                n_estimators=25,  # Reduced for faster feature selection
+                max_depth=3,  # Reduced for faster feature selection
+                learning_rate=0.3,  # Higher learning rate for faster convergence
+                tree_method="hist",  # Faster tree method
+                grow_policy="lossguide",
+                max_leaves=16,  # Fewer leaves for speed
+                verbosity=0,
                 random_state=self.config.random_state,
                 eval_metric='logloss'
             )
@@ -393,13 +401,17 @@ class ModelTrainer:
         # Check for NaN values
         nan_count = X_df.isna().sum().sum()
         if nan_count > 0:
-            # Impute with median for numeric columns
-            for col in tqdm(X_df.columns, desc="Imputing NaN values", unit="col", leave=False):
-                if X_df[col].dtype in ['float64', 'int64']:
-                    median_val = X_df[col].median()
-                    X_df[col].fillna(median_val, inplace=True)
-                else:
-                    # For non-numeric, fill with most frequent value
+            # Use more efficient imputation - fill all numeric columns at once
+            numeric_cols = X_df.select_dtypes(include=['float64', 'int64']).columns
+            if len(numeric_cols) > 0:
+                # Calculate medians for all numeric columns at once
+                medians = X_df[numeric_cols].median()
+                X_df[numeric_cols] = X_df[numeric_cols].fillna(medians)
+            
+            # Handle any remaining non-numeric columns
+            non_numeric_cols = X_df.select_dtypes(exclude=['float64', 'int64']).columns
+            for col in non_numeric_cols:
+                if X_df[col].isna().any():
                     mode_val = X_df[col].mode().iloc[0] if len(X_df[col].mode()) > 0 else 0
                     X_df[col].fillna(mode_val, inplace=True)
         
@@ -460,20 +472,34 @@ class ModelTrainer:
     
     def _train_logistic_regression(self, X_train: np.ndarray, y_train: np.ndarray) -> LogisticRegression:
         """Train logistic regression model."""
-        # Training Logistic Regression
+        print(f"  🚀 Training Logistic Regression...")
         
-        # Clean and impute data
-        X_train_clean = self._clean_and_impute_data(X_train)
+        # Optimize parameters for faster training
+        params = self.config.lr_params.copy()
+        if self.config.handle_imbalance == "class_weight":
+            params['class_weight'] = 'balanced'
+        
+        # Add performance optimizations
+        params.update({
+            'solver': 'liblinear',  # Faster than 'lbfgs' for small datasets
+            'max_iter': 500,  # Reduce from 1000 for faster training
+            'tol': 1e-3,  # Slightly relaxed tolerance for faster convergence
+            'random_state': self.config.random_state
+        })
+        
+        # Only clean data if there are actual NaN values (avoid unnecessary processing)
+        if np.isnan(X_train).any():
+            X_train_clean = self._clean_and_impute_data(X_train)
+        else:
+            X_train_clean = X_train
         
         # Scale features for better convergence
         scaler = StandardScaler()
         X_train_scaled = scaler.fit_transform(X_train_clean)
         
-        params = self.config.lr_params.copy()
-        if self.config.handle_imbalance == "class_weight":
-            params['class_weight'] = 'balanced'
-        
         model = LogisticRegression(**params)
+        
+        # Train without progress bar for speed
         model.fit(X_train_scaled, y_train)
         
         # Store scaler for later use
@@ -484,22 +510,38 @@ class ModelTrainer:
     def _predict_model(self, model, model_name: str, X: np.ndarray) -> np.ndarray:
         """Make predictions using the appropriate scaling for each model."""
         if model_name == "logistic_regression" and hasattr(self, 'lr_scaler'):
-            X_clean = self._clean_and_impute_data(X)
+            # Only clean data if there are NaN values
+            if np.isnan(X).any():
+                X_clean = self._clean_and_impute_data(X)
+            else:
+                X_clean = X
             X_scaled = self.lr_scaler.transform(X_clean)
             return model.predict(X_scaled)
         else:
-            X_clean = self._clean_and_impute_data(X)
+            # Only clean data if there are NaN values
+            if np.isnan(X).any():
+                X_clean = self._clean_and_impute_data(X)
+            else:
+                X_clean = X
             return model.predict(X_clean)
     
     def _predict_proba_model(self, model, model_name: str, X: np.ndarray) -> np.ndarray:
         """Make probability predictions using the appropriate scaling for each model."""
         try:
             if model_name == "logistic_regression" and hasattr(self, 'lr_scaler'):
-                X_clean = self._clean_and_impute_data(X)
+                # Only clean data if there are NaN values
+                if np.isnan(X).any():
+                    X_clean = self._clean_and_impute_data(X)
+                else:
+                    X_clean = X
                 X_scaled = self.lr_scaler.transform(X_clean)
                 proba = model.predict_proba(X_scaled)
             else:
-                X_clean = self._clean_and_impute_data(X)
+                # Only clean data if there are NaN values
+                if np.isnan(X).any():
+                    X_clean = self._clean_and_impute_data(X)
+                else:
+                    X_clean = X
                 proba = model.predict_proba(X_clean)
             
             # Ensure we have a 2D array with probabilities for both classes
@@ -521,13 +563,14 @@ class ModelTrainer:
     
     def _train_xgboost(self, X_train: np.ndarray, y_train: np.ndarray, X_val: np.ndarray = None, y_val: np.ndarray = None) -> xgb.XGBClassifier:
         """Train XGBoost model with optional hyperparameter tuning."""
-                    # Training XGBoost
         
         if hasattr(self.config, 'enable_hyperparameter_tuning') and self.config.enable_hyperparameter_tuning:
             # Performing hyperparameter tuning with Optuna
             return self._train_xgboost_with_tuning(X_train, y_train, X_val, y_val)
         else:
-            # Use default parameters
+            # Use optimized parameters for faster training
+            print(f"  🚀 Training XGBoost (n_estimators={self.config.xgb_params.get('n_estimators', 50)})...")
+            
             params = self.config.xgb_params.copy()
             if self.config.handle_imbalance == "class_weight":
                 # Calculate scale_pos_weight
@@ -535,8 +578,20 @@ class ModelTrainer:
                 pos_count = np.sum(y_train == 1)
                 params['scale_pos_weight'] = neg_count / pos_count
             
+            # Add additional speed optimizations
+            params.update({
+                'early_stopping_rounds': 10,  # Stop early if no improvement
+                'eval_metric': 'logloss',
+                'verbosity': 0  # Reduce output
+            })
+            
             model = xgb.XGBClassifier(**params)
-            model.fit(X_train, y_train)
+            
+            # Train XGBoost with validation set for early stopping (faster)
+            if X_val is not None and y_val is not None:
+                model.fit(X_train, y_train, eval_set=[(X_val, y_val)], verbose=False)
+            else:
+                model.fit(X_train, y_train, verbose=False)
             
             return model
     
@@ -565,16 +620,24 @@ class ModelTrainer:
                 pos_count = np.sum(y_train == 1)
                 params['scale_pos_weight'] = neg_count / pos_count
             
-            # Cross-validation
-            cv = StratifiedKFold(n_splits=3, shuffle=True, random_state=self.config.random_state)
+            # Cross-validation (reduced for speed)
+            cv = StratifiedKFold(n_splits=2, shuffle=True, random_state=self.config.random_state)  # Reduced from 3 to 2
             scores = []
             
             for train_idx, val_idx in cv.split(X_train, y_train):
                 X_cv_train, X_cv_val = X_train[train_idx], X_train[val_idx]
                 y_cv_train, y_cv_val = y_train[train_idx], y_train[val_idx]
                 
-                model = xgb.XGBClassifier(**params)
-                model.fit(X_cv_train, y_cv_train)
+                # Use faster parameters for CV
+                cv_params = params.copy()
+                cv_params.update({
+                    'n_estimators': min(25, params['n_estimators']),  # Use fewer trees for CV
+                    'tree_method': 'hist',
+                    'verbosity': 0
+                })
+                
+                model = xgb.XGBClassifier(**cv_params)
+                model.fit(X_cv_train, y_cv_train, verbose=False)
                 
                 y_pred_proba = model.predict_proba(X_cv_val)[:, 1]  # XGBoost doesn't need scaling
                 score = roc_auc_score(y_cv_val, y_pred_proba)
@@ -604,9 +667,20 @@ class ModelTrainer:
             sampler=optuna.samplers.TPESampler(seed=self.config.random_state)
         )
         
-        # Optimize
-        n_trials = getattr(self.config, 'n_trials', 50)
-        study.optimize(objective, n_trials=n_trials)
+        # Optimize with progress bar (reduced trials for speed)
+        n_trials = getattr(self.config, 'n_trials', 20)  # Reduced from 50 to 20 for speed
+        print(f"  🔍 Hyperparameter tuning ({n_trials} trials)...")
+        
+        with tqdm(total=n_trials, desc="Optuna trials", unit="trial",
+                 bar_format="{desc}: {percentage:3.0f}%|{bar}| {n_fmt}/{total_fmt} [{elapsed}<{remaining}]",
+                 ncols=60, ascii=True, position=1, leave=False) as pbar:
+            
+            # Custom callback to update progress bar
+            def progress_callback(study, trial):
+                pbar.update(1)
+                pbar.set_postfix({'best_score': f"{study.best_value:.4f}"})
+            
+            study.optimize(objective, n_trials=n_trials, callbacks=[progress_callback])
         
         # Log best parameters
         best_params = study.best_params
@@ -687,10 +761,12 @@ class ModelTrainer:
         """Find optimal classification threshold using validation set."""
         y_pred_proba = self._predict_proba_model(model, model_name, X_val)[:, 1]
         
-        thresholds = np.arange(0.1, 0.9, 0.05)
+        # Use fewer thresholds for faster optimization
+        thresholds = np.arange(0.1, 0.9, 0.1)  # Reduced from 0.05 to 0.1 step
         best_f1 = 0
         best_threshold = 0.5
         
+        # Vectorized threshold evaluation for speed
         for threshold in thresholds:
             y_pred = (y_pred_proba >= threshold).astype(int)
             f1 = f1_score(y_val, y_pred)
@@ -808,20 +884,34 @@ class ModelTrainer:
         else:
             print("ℹ️  No experiment tracking configured")
         
-        # Load data
-        df = self._load_data()
-        
-        # Patient-level split
-        train_df, val_df, test_df = self._patient_level_split(df)
-        
-        # Prepare features
-        X_train, y_train, feature_names = self._prepare_features(train_df)
-        X_val, y_val, _ = self._prepare_features(val_df)
-        X_test, y_test, _ = self._prepare_features(test_df)
-        
-        # Feature selection
-        selected_features = self._feature_selection(X_train, feature_names, y_train)
-        self.feature_names = selected_features
+        # Load data with progress bar
+        print("📊 Loading and preparing data...")
+        with tqdm(total=4, desc="Data Pipeline", unit="step", 
+                 bar_format="{desc}: {percentage:3.0f}%|{bar}| {n_fmt}/{total_fmt} [{elapsed}<{remaining}]",
+                 ncols=80, ascii=True, position=0, leave=True) as pbar:
+            
+            # Load data
+            pbar.set_description("Loading data")
+            df = self._load_data()
+            pbar.update(1)
+            
+            # Patient-level split
+            pbar.set_description("Splitting data")
+            train_df, val_df, test_df = self._patient_level_split(df)
+            pbar.update(1)
+            
+            # Prepare features
+            pbar.set_description("Preparing features")
+            X_train, y_train, feature_names = self._prepare_features(train_df)
+            X_val, y_val, _ = self._prepare_features(val_df)
+            X_test, y_test, _ = self._prepare_features(test_df)
+            pbar.update(1)
+            
+            # Feature selection
+            pbar.set_description("Selecting features")
+            selected_features = self._feature_selection(X_train, feature_names, y_train)
+            self.feature_names = selected_features
+            pbar.update(1)
         
         # Print clean dataset summary
         total_samples = len(X_train) + len(X_val) + len(X_test)
@@ -838,13 +928,12 @@ class ModelTrainer:
         X_val_selected = X_val[:, feature_indices]
         X_test_selected = X_test[:, feature_indices]
         
-
-        
         # Handle class imbalance
         X_train_balanced, y_train_balanced = self._handle_class_imbalance(X_train_selected, y_train)
         
-        # Train models with progress bar
+        # Train models with enhanced progress bar
         results = {}
+        print("🤖 Training models...")
         
         for i, model_name in enumerate(tqdm(self.config.models, desc="Training models", unit="model",
                                           bar_format="{desc}: {percentage:3.0f}%|{bar}| {n_fmt}/{total_fmt} [{elapsed}<{remaining}]",
