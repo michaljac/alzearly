@@ -44,6 +44,9 @@ from utils import (
     start_run, end_run, get_run_id, tracker, tracker_type
 )
 
+# Import new tracking module
+from .tracking import tracker_run
+
 
 @dataclass
 class TrainingConfig:
@@ -644,8 +647,8 @@ class ModelTrainer:
                 scores.append(score)
             
             # Log trial results
-            if self.tracker_enabled:
-                log_metrics({
+            if hasattr(self, 'tracker') and self.tracker:
+                self.tracker["log"]({
                     'trial_number': trial.number,
                     'cv_roc_auc_mean': np.mean(scores),
                     'cv_roc_auc_std': np.std(scores),
@@ -657,7 +660,7 @@ class ModelTrainer:
                     'reg_alpha': params['reg_alpha'],
                     'reg_lambda': params['reg_lambda'],
                     'training_time': time.time() - trial_start_time
-                }, step=trial.number)
+                })
             
             return np.mean(scores)
         
@@ -684,8 +687,8 @@ class ModelTrainer:
         
         # Log best parameters
         best_params = study.best_params
-        if self.tracker_enabled:
-            log_metrics({
+        if hasattr(self, 'tracker') and self.tracker:
+            self.tracker["log"]({
                 'best_n_estimators': best_params['n_estimators'],
                 'best_max_depth': best_params['max_depth'],
                 'best_learning_rate': best_params['learning_rate'],
@@ -702,12 +705,10 @@ class ModelTrainer:
             importance = optuna.importance.get_param_importances(study)
             if importance:
                 importance_df = pd.DataFrame(list(importance.items()), columns=['parameter', 'importance'])
-                if self.tracker_enabled:
-                    log_table(importance_df, "parameter_importance")
-                    
+                if hasattr(self, 'tracker') and self.tracker:
                     # Log individual parameter importance values
                     for param, imp in importance.items():
-                        log_metrics({f"param_importance_{param}": imp})
+                        self.tracker["log"]({f"param_importance_{param}": imp})
                 
                 # Save parameter importance plot
                 timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
@@ -868,22 +869,23 @@ class ModelTrainer:
         """Main training pipeline."""
         print("🚀 Starting model training pipeline...")
         
-        # Initialize wandb with descriptive run name
+        # Initialize run name
         run_name = self._generate_model_name(run_type, include_timestamp=True)
         
-        # Initialize experiment tracking
+        # Initialize experiment tracking with new module
         self.tracker_enabled = tracker_type != "none"
         if self.tracker_enabled:
-            try:
-                start_run(run_name=run_name, config=vars(self.config))
-                print(f"✅ {tracker_type.upper()} initialized successfully")
-            except Exception as e:
-                print(f"⚠️  {tracker_type.upper()} initialization failed: {e}")
-                print("🔄 Continuing without experiment tracking...")
-                self.tracker_enabled = False
+            print(f"✅ {tracker_type.upper()} tracking enabled")
         else:
-            print("ℹ️  No experiment tracking configured")
+            print("ℹ️  Using local JSON logging fallback")
         
+        # Use new tracking context manager
+        with tracker_run(run_name, params=vars(self.config)) as tr:
+            self.tracker = tr
+            return self._train_with_tracking(run_type)
+    
+    def _train_with_tracking(self, run_type: str) -> Dict[str, Any]:
+        """Internal training method with tracking integration."""
         # Load data with progress bar
         print("📊 Loading and preparing data...")
         with tqdm(total=4, desc="Data Pipeline", unit="step", 
@@ -960,11 +962,11 @@ class ModelTrainer:
             model_metrics[f"{model_name}_optimal_threshold"] = optimal_threshold
             
                     # Log final metrics (use different keys to avoid overwriting hyperparameter tuning data)
-            if self.tracker_enabled:
+            if hasattr(self, 'tracker') and self.tracker:
                 final_metrics = {}
                 for k, v in model_metrics.items():
                     final_metrics[f"final_{model_name}_{k}"] = v
-                log_metrics(final_metrics)
+                self.tracker["log"](final_metrics)
             
             # Log confusion matrix
             y_pred = self._predict_model(model, model_name, X_test_selected)
@@ -1021,8 +1023,10 @@ class ModelTrainer:
         for model_name, model in self.models.items():
             self._save_plots(model_name, model, X_test_selected, y_test, descriptive_name)
         
-        # Save artifacts using our helper function
-        from src.train_utils.save_artifacts import save_all_artifacts
+        # Save artifacts in standardized format
+        from src.utils_version import get_git_sha
+        from datetime import datetime
+        import json
         
         # Get the best model (XGBoost if available, otherwise Logistic Regression)
         best_model = self.models.get("xgboost", self.models.get("logistic_regression"))
@@ -1032,25 +1036,46 @@ class ModelTrainer:
         best_results = results[best_model_name]
         optimal_threshold = best_results['optimal_threshold']
         
-        # Prepare metrics for saving
-        metrics_to_save = {
-            'run_id': descriptive_name,
-            'tracker_run_id': get_run_id(),
-            'tracker_type': tracker_type,
-            'feature_names': self.feature_names,
-            'preprocessing_metadata': self.preprocessing_metadata,
-            'results': results,
-            'config': vars(self.config)
+        # Ensure artifacts directory exists
+        artifacts_dir = Path("artifacts/latest")
+        artifacts_dir.mkdir(parents=True, exist_ok=True)
+        
+        # Save model
+        model_path = artifacts_dir / "model.pkl"
+        with open(model_path, 'wb') as f:
+            pickle.dump(best_model, f)
+        
+        # Save feature list
+        feature_list_path = artifacts_dir / "feature_list.json"
+        with open(feature_list_path, 'w') as f:
+            json.dump(self.feature_names, f, indent=2)
+        
+        # Save model metadata
+        model_meta = {
+            "model_name": best_model_name,
+            "created_at": datetime.now().isoformat(),
+            "git_sha": get_git_sha(),
+            "params": vars(self.config),
+            "metrics": {
+                "optimal_threshold": optimal_threshold,
+                "feature_count": len(self.feature_names),
+                "model_type": best_model_name
+            }
         }
         
-        # Save all required artifacts
-        saved_paths = save_all_artifacts(
-            model=best_model,
-            feature_names=self.feature_names,
-            threshold=optimal_threshold,
-            metrics=metrics_to_save,
-            model_name="model.pkl"
-        )
+        # Add model-specific metrics
+        for model_name, model_results in results.items():
+            for split in ['train', 'val', 'test']:
+                for metric in ['accuracy', 'precision', 'recall', 'f1', 'roc_auc']:
+                    key = f"{split}_{metric}"
+                    if key in model_results['metrics']:
+                        model_meta["metrics"][f"{model_name}_{key}"] = model_results['metrics'][key]
+        
+        model_meta_path = artifacts_dir / "model_meta.json"
+        with open(model_meta_path, 'w') as f:
+            json.dump(model_meta, f, indent=2)
+        
+        saved_paths = [str(model_path), str(feature_list_path), str(model_meta_path)]
         
         # Also save all models to the original location for backward compatibility
         output_path = Path(self.config.output_dir)
@@ -1087,16 +1112,16 @@ class ModelTrainer:
                 log_table(feature_importance, "feature_importance")
                 
                 # Log model complexity metrics
-                log_metrics({
-                    "model_n_trees": xgb_model.n_estimators,
-                    "model_max_depth": xgb_model.max_depth,
-                    "model_n_features": len(self.feature_names),
-                    "model_feature_importance_mean": np.mean(xgb_model.feature_importances_),
-                    "model_feature_importance_std": np.std(xgb_model.feature_importances_)
-                })
+                if hasattr(self, 'tracker') and self.tracker:
+                    self.tracker["log"]({
+                        "model_n_trees": xgb_model.n_estimators,
+                        "model_max_depth": xgb_model.max_depth,
+                        "model_n_features": len(self.feature_names),
+                        "model_feature_importance_mean": np.mean(xgb_model.feature_importances_),
+                        "model_feature_importance_std": np.std(xgb_model.feature_importances_)
+                    })
         
-        if self.tracker_enabled:
-            end_run()
+        # Tracking cleanup is handled by context manager
         
         print(f"🎉 Training complete! Model: {descriptive_name}")
         print(f"💾 Models saved to: {artifact_path}")

@@ -35,6 +35,19 @@ train.bat --force-regen             # Force regenerate data
 .\train.ps1                         # Simple alternative
 ```
 
+## <img src="readme_images/hippo.jpeg" width="20" height="20" style="vertical-align: middle; margin-right: 8px;"> Cloud Deployment
+
+<div>
+
+### **Cloud Provider: Google Cloud Platform (GCP)**
+- **Rationale**: Strong ML ecosystem, enterprise-grade scalability, and 
+- **Data Layer Architecture**: Cloud Storage, BigQuery, Cloud Dataflow
+- **Model Training**: Vertex AI, GPU-enabled instances for accelerated training
+- **tracking**: mlflow
+- **experiment management**: Vertex AI experiments
+
+
+
 ### **Key Implementation Snippets:**
 
 **train.bat (Windows) - Smart Data Detection:**
@@ -421,8 +434,7 @@ xgboost:
 
 1. **Model Requirements**: The server requires trained model artifacts in `artifacts/latest/` directory
 2. **Medical Disclaimer**: This is a research tool and should not be used for clinical diagnosis
-3. **Data Privacy**: Ensure patient data is handled according to privacy regulations
-4. **Port Conflicts**: The server automatically finds available ports to avoid conflicts
+3. **Port Conflicts**: The server automatically finds available ports to avoid conflicts
 
 </div>
 </div>
