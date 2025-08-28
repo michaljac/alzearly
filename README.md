@@ -2,23 +2,18 @@
 
 A FastAPI-based service for predicting Alzheimer's disease risk from patient clinical data using a **3-container Docker pipeline**.
 
-## 📊 Model Performance Comparison
-
 ![Model Comparison](readme_images/model_comparison.jpeg)
 
 *Performance comparison between XGBoost and Logistic Regression models across different metrics including accuracy, precision, recall, and F1-score.*
 
-## 🏗️ Architecture & Design
-
-<div style="display: flex; align-items: flex-start; gap: 20px;">
-<img src="readme_images/hippo.jpeg" width="100" style="flex-shrink: 0;">
+## <img src="readme_images/hippo.jpeg" width="20" height="20" style="vertical-align: middle; margin-right: 8px;"> Architecture & Design
 
 <div>
 
 ### **Container Pipeline:**
 - **📊 Data Generation** → Synthetic clinical data + feature engineering
 - **🤖 Training** → ML models (XGBoost, Logistic Regression) + experiment tracking
-- **🚀 Serving** → FastAPI server for real-time predictions
+- **<img src="readme_images/hippo.jpeg" width="16" height="16" style="vertical-align: middle;"> Serving** → FastAPI server for real-time predictions
 
 ### **Pipeline Orchestration:**
 
@@ -80,10 +75,7 @@ docker run -it --rm -v "$(pwd):/workspace" -v "$(pwd)/../Data/alzearly:/Data" al
 docker run -it --rm -v "$(pwd):/workspace" -p 8000:8000 alzearly-serve:latest python run_serve.py
 ```
 
-## 🚀 Quick Start
-
-<div style="display: flex; align-items: flex-start; gap: 20px;">
-<img src="readme_images/hippo.jpeg" width="100" style="flex-shrink: 0;">
+## <img src="readme_images/hippo.jpeg" width="20" height="20" style="vertical-align: middle; margin-right: 8px;"> Quick Start
 
 <div>
 
@@ -100,13 +92,7 @@ This automatically:
 
 **Server will be available at:** `http://localhost:8001/docs`
 
-</div>
-</div>
-
-## 🐳 Manual Docker Commands
-
-<div style="display: flex; align-items: flex-start; gap: 20px;">
-<img src="readme_images/hippo.jpeg" width="100" style="flex-shrink: 0;">
+## <img src="readme_images/hippo.jpeg" width="20" height="20" style="vertical-align: middle; margin-right: 8px;"> Manual Docker Commands
 
 <div>
 
@@ -163,10 +149,7 @@ docker run --rm -v "${PWD}:/workspace" -p 8000:8000 alzearly-serve:latest
 docker run --rm -v "%cd%:/workspace" -p 8000:8000 alzearly-serve:latest
 ```
 
-## 📋 API Endpoints
-
-<div style="display: flex; align-items: flex-start; gap: 20px;">
-<img src="readme_images/hippo.jpeg" width="100" style="flex-shrink: 0;">
+## <img src="readme_images/hippo.jpeg" width="20" height="20" style="vertical-align: middle; margin-right: 8px;"> API Endpoints
 
 <div>
 
@@ -209,10 +192,7 @@ docker run --rm -v "%cd%:/workspace" -p 8000:8000 alzearly-serve:latest
 </div>
 </div>
 
-## 🤖 ML Pipeline & Technical Decisions
-
-<div style="display: flex; align-items: flex-start; gap: 20px;">
-<img src="readme_images/hippo.jpeg" width="100" style="flex-shrink: 0;">
+## <img src="readme_images/hippo.jpeg" width="20" height="20" style="vertical-align: middle; margin-right: 8px;"> ML Pipeline & Technical Decisions
 
 <div>
 
@@ -252,10 +232,7 @@ train_patients, val_patients = train_test_split(
 </div>
 </div>
 
-## 🧪 Testing the API
-
-<div style="display: flex; align-items: flex-start; gap: 20px;">
-<img src="readme_images/hippo.jpeg" width="100" style="flex-shrink: 0;">
+## <img src="readme_images/hippo.jpeg" width="20" height="20" style="vertical-align: middle; margin-right: 8px;"> Testing the API
 
 <div>
 
@@ -268,10 +245,7 @@ curl -X POST "http://localhost:8001/predict" \
      -d '{"items":[{"age":65.0,"bmi":26.5,"systolic_bp":140.0,"diastolic_bp":85.0,"heart_rate":72.0,"temperature":37.0,"glucose":95.0,"cholesterol_total":200.0,"hdl":45.0,"ldl":130.0,"triglycerides":150.0,"creatinine":1.2,"hemoglobin":14.5,"white_blood_cells":7.5,"platelets":250.0,"num_encounters":3,"num_medications":2,"num_lab_tests":5}]}'
 ```
 
-## 📊 Required Patient Data Fields
-
-<div style="display: flex; align-items: flex-start; gap: 20px;">
-<img src="readme_images/hippo.jpeg" width="100" style="flex-shrink: 0;">
+## <img src="readme_images/hippo.jpeg" width="20" height="20" style="vertical-align: middle; margin-right: 8px;"> Required Patient Data Fields
 
 <div>
 
@@ -299,10 +273,7 @@ curl -X POST "http://localhost:8001/predict" \
 </div>
 </div>
 
-## 🐳 Docker Setup & Requirements
-
-<div style="display: flex; align-items: flex-start; gap: 20px;">
-<img src="readme_images/hippo.jpeg" width="100" style="flex-shrink: 0;">
+## <img src="readme_images/hippo.jpeg" width="20" height="20" style="vertical-align: middle; margin-right: 8px;"> Docker Setup & Requirements
 
 <div>
 
@@ -382,10 +353,7 @@ docker build -f Dockerfile.serve -t alzearly-serve .
 </div>
 </div>
 
-## ⚙️ Key Configuration Parameters
-
-<div style="display: flex; align-items: flex-start; gap: 20px;">
-<img src="readme_images/hippo.jpeg" width="100" style="flex-shrink: 0;">
+## <img src="readme_images/hippo.jpeg" width="20" height="20" style="vertical-align: middle; margin-right: 8px;"> Key Configuration Parameters
 
 <div>
 
@@ -412,10 +380,7 @@ class_imbalance:
 </div>
 </div>
 
-## 🔬 Technical Deep Dive
-
-<div style="display: flex; align-items: flex-start; gap: 20px;">
-<img src="readme_images/hippo.jpeg" width="100" style="flex-shrink: 0;">
+## <img src="readme_images/hippo.jpeg" width="20" height="20" style="vertical-align: middle; margin-right: 8px;"> Technical Deep Dive
 
 <div>
 
@@ -450,10 +415,7 @@ xgboost:
 </div>
 </div>
 
-## ⚠️ Important Notes
-
-<div style="display: flex; align-items: flex-start; gap: 20px;">
-<img src="readme_images/hippo.jpeg" width="100" style="flex-shrink: 0;">
+## <img src="readme_images/hippo.jpeg" width="20" height="20" style="vertical-align: middle; margin-right: 8px;"> Important Notes
 
 <div>
 
@@ -465,10 +427,7 @@ xgboost:
 </div>
 </div>
 
-## 🆘 Troubleshooting
-
-<div style="display: flex; align-items: flex-start; gap: 20px;">
-<img src="readme_images/hippo.jpeg" width="100" style="flex-shrink: 0;">
+## <img src="readme_images/hippo.jpeg" width="20" height="20" style="vertical-align: middle; margin-right: 8px;"> Troubleshooting
 
 <div>
 
@@ -522,10 +481,7 @@ docker logs <container_name>
 </div>
 </div>
 
-## 🔗 Related Files
-
-<div style="display: flex; align-items: flex-start; gap: 20px;">
-<img src="readme_images/hippo.jpeg" width="100" style="flex-shrink: 0;">
+## <img src="readme_images/hippo.jpeg" width="20" height="20" style="vertical-align: middle; margin-right: 8px;"> Related Files
 
 <div>
 
