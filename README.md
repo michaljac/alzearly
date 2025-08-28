@@ -46,12 +46,10 @@ train.bat --force-regen             # Force regenerate data
 - **tracking**: mlflow
 - **experiment management**: Vertex AI experiments
 
-## <img src="readme_images/hippo.jpeg" width="20" height="20" style="vertical-align: middle; margin-right: 8px;"> Cloud Deployment
+## <img src="readme_images/hippo.jpeg" width="20" height="20" style="vertical-align: middle; margin-right: 8px;"> Key area codes
 
 <div>
 
-
-### **Key Implementation Snippets:**
 
 **train.bat (Windows) - Smart Data Detection:**
 ```batch
