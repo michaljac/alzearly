@@ -8,50 +8,80 @@ A FastAPI-based service for predicting Alzheimer's disease risk from patient cli
 
 ## <img src="readme_images/hippo.jpeg" width="20" height="20" style="vertical-align: middle; margin-right: 8px;"> Architecture & Design
 
-### Local (Docker)
-- **Containers:** `alzearly-datagen`, `alzearly-train`, `alzearly-serve`
-- **Flow:** data → `Data/featurized/` → train → `artifacts/latest/` → FastAPI serve
-- **Run:** `docker compose up --build serve` → API at `localhost:8000`
-  **Alternatives:**
-  - **Windows (CMD):** `train.bat --serve` │ `--tracker mlflow` │ `--force-regen`
-  - **Linux/Mac:** `./train.sh --serve` │ `./train.sh`
-  - **PowerShell:** `.\train.ps1`
+### **Container Pipeline:**
+- **📊 Data Generation** → Synthetic clinical data + feature engineering
+- **🤖 Training** → ML models (XGBoost, Logistic Regression) + experiment tracking
+- **<img src="readme_images/hippo.jpeg" width="16" height="16" style="vertical-align: middle;"> Serving** → FastAPI server for real-time predictions
 
+### **Pipeline Orchestration:**
 
-### Cloud (GCP)
-- **Region:** `europe-west4` (Netherlands) for EU locality
-- **Data:** GCS for Parquet + model artifacts; BigQuery external table over Parquet
-- **Compute:**  
-  - Cloud Run Jobs → run **datagen** + **train**, save outputs to GCS  
-  - Cloud Run Service → runs FastAPI, loads latest model from GCS, auto-scales to zero
-- **Tracking:** metrics + params saved with artifacts in GCS (optional: MLflow)
+**Windows (CMD):**
+```cmd
+train.bat --serve                    # Complete pipeline
+train.bat --tracker mlflow          # Training only
+train.bat --force-regen             # Force regenerate data
+```
 
-**Flows:**  
-- **Local:** Docker volumes hold data + artifacts, FastAPI on port 8000  
-- **Cloud:** Cloud Run Jobs produce data/models in GCS → BigQuery queries data → Cloud Run serves predictions
+**Linux/Mac:**
+```bash
+./train.sh --serve                   # Complete pipeline
+./train.sh                          # Training only
+```
+
+**PowerShell (Windows):**
+```powershell
+.\train.ps1                         # Simple alternative
+```
+
+### **Tracking Configuration:**
+- **TRACKER**: `{none|mlflow|wandb}` - Experiment tracking system
+- **MLFLOW_TRACKING_URI**: MLflow tracking server URI (default: `file:./mlruns`)
+- **WANDB_MODE**: Weights & Biases mode (default: `online`, use `disabled` for offline)
+- **WANDB_PROJECT**: Weights & Biases project name (default: `alz_detect`)
+
+*Note: If no tracker is set, training gracefully logs basic JSON metrics to `artifacts/latest/run_log.json`*
+
+### **Example Files:**
+- `examples/predict_request.json` - Sample prediction request
+- `examples/predict_response.json` - Sample prediction response
 
 
 ## <img src="readme_images/hippo.jpeg" width="20" height="20" style="vertical-align: middle; margin-right: 8px;"> Quick Start
 
 <div>
 
+**⚠️ Important Setup Note:**
+The training scripts expect a `Data/alzearly` directory in the **parent directory** of your project. This directory will be created automatically if it doesn't exist.
+
+**Project Structure:**
+```
+parent_directory/
+├── Data/
+│   └── alzearly/          # Data directory (created automatically)
+│       ├── raw/           # Raw generated data
+│       └── featurized/    # Processed features
+└── your_project/          # Current project directory
+    ├── train.bat
+    ├── train.sh
+    └── ...
+```
+
 **One command to run the complete pipeline:**
 
-**Windows:** `train.bat --serve`  
-**Linux/Mac:** `./train.sh --serve`  
+**Windows:** `.\train.bat --serve`  
 **PowerShell:** `.\train.ps1`
+**Linux/Mac:** `./train.sh --serve`  
 
 This automatically:
-1. ✅ Generates data (if not exists)
-2. ✅ Trains ML models with experiment tracking
-3. ✅ Starts the API server
+1. ✅ Creates Data directory (if not exists)
+2. ✅ Generates data (if not exists)
+3. ✅ Trains ML models with experiment tracking
+4. ✅ Starts the API server
 
-**Server will be available at:** `http://localhost:8000/docs`
+**Server will be available at:** `http://localhost:8001/docs`
 
 
-
-
-## <img src="readme_images/hippo.jpeg" width="20" height="20" style="vertical-align: middle; margin-right: 8px;"> Key area codes
+## <img src="readme_images/hippo.jpeg" width="20" height="20" style="vertical-align: middle; margin-right: 8px;"> Key Implementation Snippets
 
 <div>
 
@@ -73,8 +103,10 @@ if "%DATA_FOUND%"=="false" (
 
 **train.sh (Linux/Mac) - Smart Data Detection:**
 ```bash
-# Check if featurized data exists
-if [ ! -f "$DATA_DIR/featurized"/*.parquet ] && [ ! -f "$DATA_DIR/featurized"/*.csv ]; then
+# Robust check for parquet/csv in featurized dir
+shopt -s nullglob
+files=("$DATA_DIR/featurized"/*.parquet "$DATA_DIR/featurized"/*.csv)
+if [ ${#files[@]} -eq 0 ]; then
     echo "🔄 Generating data using datagen container..."
     docker run --rm -v "$CURRENT_DIR:/workspace" -v "$DATA_DIR:/Data" alzearly-datagen:latest
 else
@@ -91,7 +123,7 @@ docker run --rm -v "$(pwd):/workspace" -v "$(pwd)/../Data/alzearly:/Data" alzear
 docker run -it --rm -v "$(pwd):/workspace" -v "$(pwd)/../Data/alzearly:/Data" alzearly-train:latest python run_training.py
 
 # Serving (works on all platforms)
-docker run -it --rm -v "$(pwd):/workspace" -p 8000:8000 alzearly-serve:latest python run_serve.py
+docker run -it --rm -v "$(pwd):/workspace" -v "$(pwd)/artifacts:/workspace/artifacts" -p 8000:8000 alzearly-serve:latest python run_serve.py
 ```
 
 
@@ -140,17 +172,17 @@ docker run --rm -v "%cd%:/workspace" -v "%cd%/../Data/alzearly:/Data" alzearly-t
 
 **Linux/Mac:**
 ```bash
-docker run --rm -v "$(pwd):/workspace" -p 8000:8000 alzearly-serve:latest
+docker run --rm -v "$(pwd):/workspace" -v "$(pwd)/artifacts:/workspace/artifacts" -p 8000:8000 alzearly-serve:latest
 ```
 
 **Windows (PowerShell):**
 ```powershell
-docker run --rm -v "${PWD}:/workspace" -p 8000:8000 alzearly-serve:latest
+docker run --rm -v "${PWD}:/workspace" -v "${PWD}/artifacts:/workspace/artifacts" -p 8000:8000 alzearly-serve:latest
 ```
 
 **Windows (CMD):**
 ```cmd
-docker run --rm -v "%cd%:/workspace" -p 8000:8000 alzearly-serve:latest
+docker run -it --name alz_serve --entrypoint /bin/bash -v "${PWD}:/workspace" alzearly-serve:latest
 ```
 
 ## <img src="readme_images/hippo.jpeg" width="20" height="20" style="vertical-align: middle; margin-right: 8px;"> API Endpoints
@@ -244,9 +276,9 @@ train_patients, val_patients = train_test_split(
 
 **Quick test with curl:**
 ```bash
-curl -X POST "http://localhost:8000/predict" \
-     -H "Content-Type: application/json" \
-     -d '{"items":[{"age":65.0,"bmi":26.5,"systolic_bp":140.0,"diastolic_bp":85.0,"heart_rate":72.0,"temperature":37.0,"glucose":95.0,"cholesterol_total":200.0,"hdl":45.0,"ldl":130.0,"triglycerides":150.0,"creatinine":1.2,"hemoglobin":14.5,"white_blood_cells":7.5,"platelets":250.0,"num_encounters":3,"num_medications":2,"num_lab_tests":5}]}'
+curl -s -X POST http://localhost:8000/predict \
+  -H "Content-Type: application/json" \
+  -d @examples/predict_request.json | jq .
 ```
 
 ## <img src="readme_images/hippo.jpeg" width="20" height="20" style="vertical-align: middle; margin-right: 8px;"> Required Patient Data Fields
@@ -326,6 +358,7 @@ docker build -f Dockerfile.serve -t alzearly-serve .
 # Data persistence
 -v "$(pwd):/workspace"           # Project code
 -v "$(pwd)/../Data/alzearly:/Data"  # Data storage
+-v "$(pwd)/artifacts:/workspace/artifacts"  # Model artifacts
 
 # Port mapping (for serving)
 -p 8000:8000                     # API server
@@ -336,6 +369,7 @@ docker build -f Dockerfile.serve -t alzearly-serve .
 # Data persistence
 -v "${PWD}:/workspace"           # Project code
 -v "${PWD}/../Data/alzearly:/Data"  # Data storage
+-v "${PWD}/artifacts:/workspace/artifacts"  # Model artifacts
 
 # Port mapping (for serving)
 -p 8000:8000                     # API server
@@ -346,10 +380,10 @@ docker build -f Dockerfile.serve -t alzearly-serve .
 # Data persistence
 -v "%cd%:/workspace"             # Project code
 -v "%cd%/../Data/alzearly:/Data" # Data storage
+-v "%cd%/artifacts:/workspace/artifacts" # Model artifacts
 
 # Port mapping (for serving)
 -p 8000:8000                     # API server
--p 8000:8000                     # Alternative port
 ```
 
 </div>

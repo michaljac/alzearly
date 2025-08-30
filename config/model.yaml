@@ -4,7 +4,7 @@
 # Data configuration
 data:
   # Input directory for featurized data
-  input_dir: "data/featurized"
+  input_dir: "/Data/featurized"
   # Target variable column name
   target_column: "alzheimers_diagnosis"
   # Columns to exclude from features

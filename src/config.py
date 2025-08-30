@@ -33,7 +33,7 @@ class DataGenConfig:
     positive_rate: float = 0.08
     rows_per_chunk: int = 100_000
     seed: int = 42
-    output_dir: str = "data/raw"
+    output_dir: str = "/Data/raw"
     target_column: str = "alzheimers_diagnosis"
     clinical_ranges: Dict[str, Dict[str, float]] = field(default_factory=dict)
     risk_factors: Dict[str, float] = field(default_factory=dict)
@@ -42,8 +42,8 @@ class DataGenConfig:
 @dataclass
 class PreprocessConfig:
     """Configuration for data preprocessing."""
-    input_dir: str = "data/raw"
-    output_dir: str = "data/featurized"
+    input_dir: str = "/Data/raw"
+    output_dir: str = "/Data/featurized"
     rolling_window_years: int = 3
     numeric_columns: Optional[list[str]] = None
     categorical_columns: Optional[list[str]] = None
@@ -59,7 +59,7 @@ class PreprocessConfig:
 class ModelConfig:
     """Configuration for model training."""
     # Data configuration
-    input_dir: str = "data/featurized"
+    input_dir: str = "/Data/featurized"
     target_column: str = "alzheimers_diagnosis"
     exclude_columns: List[str] = field(default_factory=lambda: ["patient_id", "year"])
     
@@ -165,7 +165,7 @@ class ConfigLoader:
             }
         elif "model" in filename:
             return {
-                "input_dir": "data/featurized",
+                "input_dir": "/Data/featurized",
                 "target_column": "alzheimers_diagnosis",
                 "exclude_columns": ["patient_id", "year"],
                 "test_size": 0.2,
@@ -216,7 +216,7 @@ class ConfigLoader:
         
         # Extract output configuration
         output = config.get("output", {})
-        output_dir = output.get("directory", "data/raw")
+        output_dir = output.get("directory", "/Data/raw")
         
         # Extract clinical ranges and risk factors
         clinical_ranges = config.get("clinical_ranges", {})
@@ -240,8 +240,8 @@ class ConfigLoader:
         
         # Extract IO configuration
         io = config.get("io", {})
-        input_dir = io.get("input_dir", "data/raw")
-        output_dir = io.get("output_dir", "data/featurized")
+        input_dir = io.get("input_dir", "/Data/raw")
+        output_dir = io.get("output_dir", "/Data/featurized")
         
         # Extract feature configuration
         features = config.get("features", {})
@@ -284,7 +284,7 @@ class ConfigLoader:
         config = self.load_yaml(filename)
         
         # Load flat structure (new format)
-        input_dir = config.get("input_dir", "data/featurized")
+        input_dir = config.get("input_dir", "/Data/featurized")
         target_column = config.get("target_column", "alzheimers_diagnosis")
         exclude_columns = config.get("exclude_columns", ["patient_id", "year"])
         

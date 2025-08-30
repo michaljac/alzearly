@@ -74,8 +74,7 @@ tests/
 test_*
 
 # Data files (if they exist)
-data/
-Data/
+/Data/
 
 # Artifacts (will be mounted at runtime)
 artifacts/

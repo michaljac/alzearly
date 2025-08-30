@@ -81,6 +81,12 @@ if [ ! -f "$DATA_DIR/featurized"/*.parquet ] && [ ! -f "$DATA_DIR/featurized"/*.
     docker run --rm \
         -v "$CURRENT_DIR:/workspace" \
         -v "$DATA_DIR:/Data" \
+        -e PYTHONUNBUFFERED=1 \
+        -e TQDM_DISABLE=1 \
+        -e POLARS_NUM_THREADS=1 \
+        -e POLARS_STREAMING_COLLECT=0 \
+        -e POLARS_FORCE_OPTIMIZED=1 \
+        -e POLARS_USE_STREAMING=0 \
         alzearly-datagen:latest \
         python run_datagen.py
     
@@ -98,6 +104,10 @@ docker run -it --rm \
     -v "$DATA_DIR:/Data" \
     -e PYTHONUNBUFFERED=1 \
     -e PYTHONDONTWRITEBYTECODE=1 \
+    -e TQDM_DISABLE=1 \
+    -e POLARS_NUM_THREADS=1 \
+    -e POLARS_STREAMING_COLLECT=0 \
+    -e POLARS_FORCE_OPTIMIZED=1 \
     alzearly-train:latest \
     python run_training.py
 
@@ -114,19 +124,31 @@ if [ "$START_SERVER" = true ]; then
     SERVER_CMD="python run_serve.py --host 0.0.0.0"
     if [ ! -z "$PORT" ]; then
         SERVER_CMD="$SERVER_CMD --port $PORT"
+        PORT_MAPPING="-p $PORT:$PORT"
+    else
+        PORT_MAPPING="-p 8001:8001"
     fi
     
     echo -e "${BLUE}🌐${NC} Server command: ${CYAN}$SERVER_CMD${NC}"
-    echo -e "${BLUE}📖${NC} Interactive docs will be available at: ${CYAN}http://localhost:[PORT]/docs${NC}"
+    if [ ! -z "$PORT" ]; then
+        echo -e "${BLUE}📖${NC} Interactive docs will be available at: ${CYAN}http://localhost:$PORT/docs${NC}"
+    else
+        echo -e "${BLUE}📖${NC} Interactive docs will be available at: ${CYAN}http://localhost:8001/docs${NC}"
+    fi
     echo -e "${YELLOW}🛑${NC} Press Ctrl+C to stop the server"
     echo ""
     
     # Run server in Docker container
     docker run -it --rm \
         -v "$CURRENT_DIR:/workspace" \
-        -p "${PORT:-8000}:${PORT:-8000}" \
+        $PORT_MAPPING \
+        -w /workspace \
         -e PYTHONUNBUFFERED=1 \
         -e PYTHONDONTWRITEBYTECODE=1 \
+        -e TQDM_DISABLE=1 \
+        -e POLARS_NUM_THREADS=1 \
+        -e POLARS_STREAMING_COLLECT=0 \
+        -e POLARS_FORCE_OPTIMIZED=1 \
         alzearly-serve:latest \
         $SERVER_CMD
 else
@@ -134,6 +156,6 @@ else
     echo -e "${YELLOW}   To start the API server, run:${NC}"
     echo -e "${GREEN}   • python run_serve.py${NC}"
     echo -e "${GREEN}   • $0 --serve${NC}"
-    echo -e "${GREEN}   • docker run -it --rm -v \$(pwd):/workspace -p 8000:8000 alzearly-serve:latest python run_serve.py${NC}"
+    echo -e "${GREEN}   • docker run -it --rm -v \$(pwd):/workspace -p 8001:8001 -w /workspace alzearly-serve:latest python run_serve.py --port 8001${NC}"
     echo ""
 fi

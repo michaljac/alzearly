@@ -138,7 +138,7 @@ def run_with_python(args, modules) -> int:
         print("=" * 50)
         
         # Check for cached data
-        featurized_path = Path("data/featurized")
+        featurized_path = Path("/Data/featurized")
         if featurized_path.exists() and any(featurized_path.glob("*")):
             print("✅ Cache hit: Found existing featurized data")
             skip_data_gen = True

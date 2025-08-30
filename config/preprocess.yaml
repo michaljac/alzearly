@@ -4,9 +4,9 @@
 # Input/Output configuration
 io:
   # Input directory for raw data
-  input_dir: "data/raw"
+  input_dir: "/Data/raw"
   # Output directory for featurized data
-  output_dir: "data/featurized"
+  output_dir: "/Data/featurized"
   # File format for output
   format: "parquet"
   # Partitioning strategy

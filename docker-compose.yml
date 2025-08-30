@@ -1,22 +1,42 @@
 services:
-  # Training service - handles data generation, preprocessing, training, evaluation
-  training:
-    image: alz_detect-pipeline:latest
-    container_name: alzearly_t
+  # Data generation service
+  datagen:
+    build:
+      context: .
+      dockerfile: Dockerfile.datagen
+    container_name: alzearly-datagen
     volumes:
-      - ./data:/workspace/data
-      - ./models:/workspace/models
-      - ./artifacts:/workspace/artifacts
-      - ./plots:/workspace/plots
-      - ./config:/workspace/config
-      - ./src:/workspace/src
-      - ./main.py:/workspace/main.py
-      - ./cli.py:/workspace/cli.py
+      - .:/workspace
+      - ../Data/alzearly:/Data
     environment:
+      - PYTHONUNBUFFERED=1
+      - TQDM_DISABLE=1
+      - POLARS_NUM_THREADS=1
+      - POLARS_STREAMING_COLLECT=0
+      - POLARS_FORCE_OPTIMIZED=1
+      - POLARS_USE_STREAMING=0
+    command: ["python", "run_datagen.py"]
+    profiles:
+      - datagen
+
+  # Training service - handles training and experiment tracking
+  training:
+    build:
+      context: .
+      dockerfile: Dockerfile.train
+    container_name: alzearly-train
+    volumes:
+      - .:/workspace
+      - ../Data/alzearly:/Data
+    environment:
+      - PYTHONUNBUFFERED=1
+      - TQDM_DISABLE=1
+      - POLARS_NUM_THREADS=1
+      - POLARS_STREAMING_COLLECT=0
+      - POLARS_FORCE_OPTIMIZED=1
       - WANDB_API_KEY=${WANDB_API_KEY:-}
       - PYTHONPATH=/workspace
-      - NON_INTERACTIVE=true
-    command: ["python", "main.py"]
+    command: ["python", "run_training.py", "--config", "config/model.yaml"]
     profiles:
       - training
 
@@ -25,36 +45,41 @@ services:
     build:
       context: .
       dockerfile: Dockerfile.serve
-    container_name: alzearly_s
+    container_name: alzearly-serve
     ports:
-      - "8000:8000"
+      - "8001:8001"
     volumes:
-      - ./models:/app/models
-      - ./artifacts:/app/artifacts
+      - .:/workspace
     environment:
-      - PYTHONPATH=/app
-    command: ["python", "run_serve.py", "--reload"]
+      - PYTHONUNBUFFERED=1
+      - TQDM_DISABLE=1
+      - POLARS_NUM_THREADS=1
+      - POLARS_STREAMING_COLLECT=0
+      - POLARS_FORCE_OPTIMIZED=1
+      - PYTHONPATH=/workspace
+    working_dir: /workspace
+    command: ["python", "run_serve.py", "--port", "8001", "--host", "0.0.0.0"]
     profiles:
       - serve
 
-  # Complete pipeline (training + optional serving)
+  # Complete pipeline (training + serving)
   pipeline:
-    image: alz_detect-pipeline:latest
+    build:
+      context: .
+      dockerfile: Dockerfile.train
     container_name: alzearly-pipeline
     volumes:
-      - ./data:/workspace/data
-      - ./models:/workspace/models
-      - ./artifacts:/workspace/artifacts
-      - ./plots:/workspace/plots
-      - ./config:/workspace/config
-      - ./src:/workspace/src
-      - ./main.py:/workspace/main.py
-      - ./cli.py:/workspace/cli.py
+      - .:/workspace
+      - ../Data/alzearly:/Data
     environment:
+      - PYTHONUNBUFFERED=1
+      - TQDM_DISABLE=1
+      - POLARS_NUM_THREADS=1
+      - POLARS_STREAMING_COLLECT=0
+      - POLARS_FORCE_OPTIMIZED=1
       - WANDB_API_KEY=${WANDB_API_KEY:-}
       - PYTHONPATH=/workspace
-      - NON_INTERACTIVE=true
-    command: ["python", "pipeline_with_server.py"]
+    command: ["python", "run_training.py", "--config", "config/model.yaml"]
     profiles:
       - pipeline
 

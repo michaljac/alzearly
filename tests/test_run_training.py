@@ -40,7 +40,7 @@ class TestRunTraining:
         # Create a minimal config file
         config_content = """
 model:
-  input_dir: "data/featurized"
+  input_dir: "/Data/featurized"
   output_dir: "artifacts/latest"
   max_features: 50
   test_size: 0.2
@@ -107,7 +107,7 @@ model:
     def test_main_existing_featurized_data(self, mock_train, mock_preprocess, mock_generate, mock_setup_tracker):
         """Test pipeline when featurized data already exists."""
         # Create featurized data directory with files
-        featurized_dir = Path("data/featurized")
+        featurized_dir = Path("/Data/featurized")
         featurized_dir.mkdir(parents=True, exist_ok=True)
         (featurized_dir / "test.parquet").touch()
         
@@ -292,7 +292,7 @@ model:
                             mock_preprocess.assert_called_once()
         
         # Test with existing featurized data
-        featurized_dir = Path("data/featurized")
+        featurized_dir = Path("/Data/featurized")
         featurized_dir.mkdir(parents=True, exist_ok=True)
         (featurized_dir / "data.parquet").touch()
         
@@ -383,7 +383,7 @@ def setup_experiment_tracker():
         """Create minimal configuration file."""
         config_content = """
 model:
-  input_dir: "data/featurized"
+  input_dir: "/Data/featurized"
   output_dir: "artifacts/latest"
   max_features: 50
   test_size: 0.2

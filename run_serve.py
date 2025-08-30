@@ -194,11 +194,14 @@ def load_model_and_metadata():
         raise Exception(f"Failed to load model: {e}")
     
     # Load feature names
-    feature_names_path = artifacts_dir / "feature_names.json"
+    feature_names_path = artifacts_dir / "feature_list.json"
     if not feature_names_path.exists():
-        raise FileNotFoundError(
-            "feature_names.json not found in artifacts/latest/. Please run training first."
-        )
+        # Try alternative name
+        feature_names_path = artifacts_dir / "feature_names.json"
+        if not feature_names_path.exists():
+            raise FileNotFoundError(
+                "feature_list.json or feature_names.json not found in artifacts/latest/. Please run training first."
+            )
     
     try:
         with open(feature_names_path, 'r') as f:
@@ -239,7 +242,7 @@ def load_model_and_metadata():
     print("🎉 All artifacts loaded successfully!")
 
 
-def find_available_port(start_port: int = 8000, max_attempts: int = 100) -> int:
+def find_available_port(start_port: int = 8001, max_attempts: int = 100) -> int:
     """Find an available port starting from start_port."""
     for port in range(start_port, start_port + max_attempts):
         try:
@@ -449,7 +452,7 @@ def main():
     # Auto-find available port if not specified
     if args.port is None:
         try:
-            args.port = find_available_port(start_port=8000)
+            args.port = find_available_port(start_port=8001)
             print(f"🔍 Auto-selected available port: {args.port}")
         except RuntimeError as e:
             print(f"❌ {e}")

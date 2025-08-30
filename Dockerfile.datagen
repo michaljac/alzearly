@@ -55,7 +55,7 @@ COPY config/ ./config/
 COPY utils.py* ./
 
 # Create necessary directories
-RUN mkdir -p data/raw data/featurized models artifacts plots mlruns wandb
+RUN mkdir -p /Data/raw data/featurized models artifacts plots mlruns wandb
 
 # Set Python path
 ENV PYTHONPATH=/workspace

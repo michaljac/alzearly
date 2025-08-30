@@ -83,7 +83,7 @@ def check_existing_data() -> bool:
     """Check if featurized data already exists."""
     # Check multiple possible locations for featurized data
     possible_dirs = [
-        Path("data/featurized"),
+        Path("/Data/featurized"),
         Path("/Data/featurized"),  # Docker mount location
         Path("../Data/alzearly/featurized")  # Host location
     ]

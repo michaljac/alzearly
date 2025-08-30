@@ -200,7 +200,7 @@ def main_pipeline(args, training_classes, setup_experiment_tracker) -> int:
     print()
     
     # Check for data in multiple locations (including subdirectories)
-    local_featurized_dir = Path("data/featurized")
+    local_featurized_dir = Path("/Data/featurized")
     docker_featurized_dir = Path("/Data/featurized")
     
     data_files = []

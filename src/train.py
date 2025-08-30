@@ -45,14 +45,13 @@ from utils import (
 )
 
 # Import new tracking module
-from .tracking import tracker_run
-
+from tracking import tracker_run
 
 @dataclass
 class TrainingConfig:
     """Configuration for model training."""
     # Data configuration
-    input_dir: str = "data/featurized"
+    input_dir: str = "/Data/featurized"  # Will be overridden by _load_data to check multiple locations
     target_column: str = "alzheimers_diagnosis"
     exclude_columns: List[str] = field(default_factory=lambda: ["patient_id", "year"])
     
@@ -140,10 +139,21 @@ class ModelTrainer:
         
     def _load_data(self) -> pd.DataFrame:
         """Load featurized data from partitioned Parquet files."""
-        # Use Polars to read partitioned data efficiently
-        input_path = Path(self.config.input_dir)
-        if not input_path.exists():
-            raise FileNotFoundError(f"Input directory {input_path} does not exist")
+        # Check multiple possible data locations
+        possible_paths = [
+            Path(self.config.input_dir),
+            Path("/Data/featurized"),
+        ]
+        
+        input_path = None
+        for path in possible_paths:
+            if path.exists():
+                input_path = path
+                print(f"📁 Using data from: {input_path}")
+                break
+        
+        if input_path is None:
+            raise FileNotFoundError(f"Input directory not found in any of: {[str(p) for p in possible_paths]}")
         
         # Use the same data loading logic as the preprocessor to ensure year column exists
         lazy_frames = []
@@ -1057,7 +1067,7 @@ class ModelTrainer:
             "git_sha": get_git_sha(),
             "params": vars(self.config),
             "metrics": {
-                "optimal_threshold": optimal_threshold,
+                "optimal_threshold": float(optimal_threshold) if hasattr(optimal_threshold, 'item') else optimal_threshold,
                 "feature_count": len(self.feature_names),
                 "model_type": best_model_name
             }
@@ -1069,7 +1079,11 @@ class ModelTrainer:
                 for metric in ['accuracy', 'precision', 'recall', 'f1', 'roc_auc']:
                     key = f"{split}_{metric}"
                     if key in model_results['metrics']:
-                        model_meta["metrics"][f"{model_name}_{key}"] = model_results['metrics'][key]
+                        # Convert numpy values to native Python types for JSON serialization
+                        value = model_results['metrics'][key]
+                        if hasattr(value, 'item'):  # Check if it's a numpy scalar
+                            value = value.item()
+                        model_meta["metrics"][f"{model_name}_{key}"] = value
         
         model_meta_path = artifacts_dir / "model_meta.json"
         with open(model_meta_path, 'w') as f:

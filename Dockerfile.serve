@@ -27,7 +27,7 @@ RUN pip install -r requirements-serve.txt \
 # Copy project files
 COPY . .
 
-EXPOSE 8000
+EXPOSE 8001
 
 # Use exec form for better signal handling
 ENTRYPOINT ["python", "run_serve.py"]

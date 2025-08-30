@@ -192,36 +192,22 @@ echo.
 echo %GREEN%🎉%NC% Training pipeline completed!
 echo.
 
-REM Start API server if requested
+REM Automatically start the API server after successful training
+echo %CYAN%🚀 Starting API Server automatically after training%NC%
+echo %CYAN%==================================================%NC%
+echo.
+echo %BLUE%🌐%NC% Starting API server...
+echo %BLUE%📖%NC% Interactive docs will be available at: %CYAN%http://localhost:8001/docs%NC%
+echo %YELLOW%🛑%NC% Press Ctrl+C to stop the server
+echo.
+
+REM Run the API server with auto port detection using Docker container
+docker run --rm -v "%CURRENT_DIR%:/workspace" -p 8001:8001 -w /workspace alzearly-serve:latest python run_serve.py --port 8001
+
+REM Legacy --serve option (now redundant since server starts automatically)
 if "%START_SERVER%"=="true" (
     echo.
-    echo %CYAN%🚀 Starting API Server in Docker%NC%
-    echo %CYAN%===================================%NC%
-    echo.
-    
-    echo %BLUE%🌐%NC% Starting API server...
-    if not "%SERVER_PORT%"=="" (
-        echo %BLUE%📖%NC% Interactive docs will be available at: %CYAN%http://localhost:%SERVER_PORT%/docs%NC%
-    ) else (
-        echo %BLUE%📖%NC% Interactive docs will be available at: %CYAN%http://localhost:8001/docs%NC%
-    )
-    echo %YELLOW%🛑%NC% Press Ctrl+C to stop the server
-    echo.
-    
-    REM Run server in Docker container with auto port detection
-    if not "%SERVER_PORT%"=="" (
-        docker run -it --rm -v "%CURRENT_DIR%:/workspace" -p "%SERVER_PORT%:%SERVER_PORT%" alzearly-serve:latest python run_serve.py --host %SERVER_HOST% --port %SERVER_PORT%
-    ) else (
-        REM Try different ports if 8000 is busy
-        docker run -it --rm -v "%CURRENT_DIR%:/workspace" -p 8001:8001 alzearly-serve:latest python run_serve.py --host %SERVER_HOST% --port 8001
-    )
-) else (
-    echo.
-    echo %YELLOW%💡 Next Steps:%NC%
-    echo %YELLOW%   To start the API server, run:%NC%
-    echo %GREEN%   • python run_serve.py%NC%
-    echo %GREEN%   • train.bat --serve%NC%
-    echo %GREEN%   • docker run -it --rm -v "%cd%:/workspace" -p 8000:8000 alzearly-serve:latest python run_serve.py%NC%
+    echo %YELLOW%⚠️%NC% Server is already running automatically. The --serve option is no longer needed.
     echo.
 )
 
