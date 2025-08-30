@@ -2,60 +2,52 @@
 
 A FastAPI-based service for predicting Alzheimer's disease risk from patient clinical data using a **3-container Docker pipeline**.
 
-## <img src="readme_images/hippo.jpeg" width="20" height="20" style="vertical-align: middle; margin-right: 8px;"> Architecture & Design
-
-<div>
-
-### **Containers Pipeline:**
-- **📊 Data Generation** → Synthetic clinical data + feature engineering
-- **🤖 Training** → ML models (XGBoost, Logistic Regression) + experiment tracking
-- **<img src="readme_images/hippo.jpeg" width="16" height="16" style="vertical-align: middle;"> Serving** → FastAPI server for real-time predictions
-
 ![Model Comparison](readme_images/model_comparison.jpeg)
 
 *Performance comparison between XGBoost and Logistic Regression models across different metrics including accuracy, precision, recall, and F1-score.*
 
-### **Pipeline Orchestration:**
+## <img src="readme_images/hippo.jpeg" width="20" height="20" style="vertical-align: middle; margin-right: 8px;"> Architecture & Design
 
-**Windows (CMD):**
-```cmd
-train.bat --serve                    # Complete pipeline
-train.bat --tracker mlflow          # Training only
-train.bat --force-regen             # Force regenerate data
-```
+### Local (Docker)
+- **Containers:** `alzearly-datagen`, `alzearly-train`, `alzearly-serve`
+- **Flow:** data → `Data/featurized/` → train → `artifacts/latest/` → FastAPI serve
+- **Run:** `docker compose up --build serve` → API at `localhost:8000`
+  **Alternatives:**
+  - **Windows (CMD):** `train.bat --serve` │ `--tracker mlflow` │ `--force-regen`
+  - **Linux/Mac:** `./train.sh --serve` │ `./train.sh`
+  - **PowerShell:** `.\train.ps1`
 
-**Linux/Mac:**
-```bash
-./train.sh --serve                   # Complete pipeline
-./train.sh                          # Training only
-```
 
-**PowerShell (Windows):**
-```powershell
-.\train.ps1                         # Simple alternative
-```
+### Cloud (GCP)
+- **Region:** `europe-west4` (Netherlands) for EU locality
+- **Data:** GCS for Parquet + model artifacts; BigQuery external table over Parquet
+- **Compute:**  
+  - Cloud Run Jobs → run **datagen** + **train**, save outputs to GCS  
+  - Cloud Run Service → runs FastAPI, loads latest model from GCS, auto-scales to zero
+- **Tracking:** metrics + params saved with artifacts in GCS (optional: MLflow)
 
-## <img src="readme_images/hippo.jpeg" width="20" height="20" style="vertical-align: middle; margin-right: 8px;"> Cloud Deployment
+**Flows:**  
+- **Local:** Docker volumes hold data + artifacts, FastAPI on port 8000  
+- **Cloud:** Cloud Run Jobs produce data/models in GCS → BigQuery queries data → Cloud Run serves predictions
+
+
+## <img src="readme_images/hippo.jpeg" width="20" height="20" style="vertical-align: middle; margin-right: 8px;"> Quick Start
 
 <div>
 
-### **Cloud Provider: Google Cloud Platform (GCP)**
-- **Rationale**: Cost-efficient, low-ops deployment with generous free tier; strong ML/data ecosystem; EU-locality for compliance and low-latency.
-- **Data Layer**: 
-  - **Cloud Storage (GCS)** for storing generated Parquet data and trained model artifacts (bucket in `europe-west4`).
-  - **BigQuery (external tables)** over Parquet in GCS for analytics and validation queries (Sandbox/free tier).
-- **Model Training**: 
-  - **Cloud Run Jobs (CPU)** run the training container on demand, writing model + metrics back to GCS.
-- **Tracking**: 
-  - Default: metrics/params saved as JSON alongside artifacts in GCS.
-  - *(Optional)*: MLflow integration can be enabled by pointing the training job to an MLflow server.
-- **Experiment Management**: 
-  - Lightweight: Cloud Run Job history + GCS artifact versions.
-- **Serving / API**: 
-  - **Cloud Run (service)** runs the FastAPI inference container, auto-scales to zero, and loads the latest model from GCS on startup.
+**One command to run the complete pipeline:**
 
+**Windows:** `train.bat --serve`  
+**Linux/Mac:** `./train.sh --serve`  
+**PowerShell:** `.\train.ps1`
 
-Cloud (GCP): Deploy on Cloud Run (auto-scales to zero) with images in Artifact Registry Region: europe-west4 (Netherlands) for EU data locality and low egress
+This automatically:
+1. ✅ Generates data (if not exists)
+2. ✅ Trains ML models with experiment tracking
+3. ✅ Starts the API server
+
+**Server will be available at:** `http://localhost:8000/docs`
+
 
 
 
@@ -102,22 +94,7 @@ docker run -it --rm -v "$(pwd):/workspace" -v "$(pwd)/../Data/alzearly:/Data" al
 docker run -it --rm -v "$(pwd):/workspace" -p 8000:8000 alzearly-serve:latest python run_serve.py
 ```
 
-## <img src="readme_images/hippo.jpeg" width="20" height="20" style="vertical-align: middle; margin-right: 8px;"> Quick Start
 
-<div>
-
-**One command to run the complete pipeline:**
-
-**Windows:** `train.bat --serve`  
-**Linux/Mac:** `./train.sh --serve`  
-**PowerShell:** `.\train.ps1`
-
-This automatically:
-1. ✅ Generates data (if not exists)
-2. ✅ Trains ML models with experiment tracking
-3. ✅ Starts the API server
-
-**Server will be available at:** `http://localhost:8000/docs`
 
 ## <img src="readme_images/hippo.jpeg" width="20" height="20" style="vertical-align: middle; margin-right: 8px;"> Manual Docker Commands
 
