@@ -8,43 +8,22 @@ A FastAPI-based service for predicting Alzheimer's disease risk from patient cli
 
 ## <img src="readme_images/hippo.jpeg" width="20" height="20" style="vertical-align: middle; margin-right: 8px;"> Architecture & Design
 
-### **Container Pipeline:**
-- **📊 Data Generation** → Synthetic clinical data + feature engineering
-- **🤖 Training** → ML models (XGBoost, Logistic Regression) + experiment tracking
-- **<img src="readme_images/hippo.jpeg" width="16" height="16" style="vertical-align: middle;"> Serving** → FastAPI server for real-time predictions
+### Local (Docker)
+- **Containers:** `alzearly-datagen`, `alzearly-train`, `alzearly-serve`
+- **Flow:** data → `/Data/featurized/` → train → `artifacts/latest/` → FastAPI serve
+- **Run:** `docker compose up --build serve` → API at `localhost:8000`
 
-### **Pipeline Orchestration:**
+### Cloud (GCP)
+- **Region:** `europe-west4` (Netherlands) for EU locality
+- **Data:** GCS for Parquet + model artifacts; BigQuery external table over Parquet
+- **Compute:**  
+  - Cloud Run Jobs → run **datagen** + **train**, save outputs to GCS  
+  - Cloud Run Service → runs FastAPI, loads latest model from GCS, auto-scales to zero
+- **Tracking:** metrics + params saved with artifacts in GCS (optional: MLflow)
 
-**Windows (CMD):**
-```cmd
-train.bat --serve                    # Complete pipeline
-train.bat --tracker mlflow          # Training only
-train.bat --force-regen             # Force regenerate data
-```
-
-**Linux/Mac:**
-```bash
-./train.sh --serve                   # Complete pipeline
-./train.sh                          # Training only
-```
-
-**PowerShell (Windows):**
-```powershell
-.\train.ps1                         # Simple alternative
-```
-
-### **Tracking Configuration:**
-- **TRACKER**: `{none|mlflow|wandb}` - Experiment tracking system
-- **MLFLOW_TRACKING_URI**: MLflow tracking server URI (default: `file:./mlruns`)
-- **WANDB_MODE**: Weights & Biases mode (default: `online`, use `disabled` for offline)
-- **WANDB_PROJECT**: Weights & Biases project name (default: `alz_detect`)
-
-*Note: If no tracker is set, training gracefully logs basic JSON metrics to `artifacts/latest/run_log.json`*
-
-### **Example Files:**
-- `examples/predict_request.json` - Sample prediction request
-- `examples/predict_response.json` - Sample prediction response
-
+**Flows:**  
+- **Local:** Docker volumes hold data + artifacts, FastAPI on port 8000  
+- **Cloud:** Cloud Run Jobs produce data/models in GCS → BigQuery queries data → Cloud Run serves predictions
 
 ## <img src="readme_images/hippo.jpeg" width="20" height="20" style="vertical-align: middle; margin-right: 8px;"> Quick Start
 
@@ -84,7 +63,6 @@ This automatically:
 ## <img src="readme_images/hippo.jpeg" width="20" height="20" style="vertical-align: middle; margin-right: 8px;"> Key Implementation Snippets
 
 <div>
-
 
 **train.bat (Windows) - Smart Data Detection:**
 ```batch
