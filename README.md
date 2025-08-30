@@ -2,18 +2,18 @@
 
 A FastAPI-based service for predicting Alzheimer's disease risk from patient clinical data using a **3-container Docker pipeline**.
 
-![Model Comparison](readme_images/model_comparison.jpeg)
-
-*Performance comparison between XGBoost and Logistic Regression models across different metrics including accuracy, precision, recall, and F1-score.*
-
 ## <img src="readme_images/hippo.jpeg" width="20" height="20" style="vertical-align: middle; margin-right: 8px;"> Architecture & Design
 
 <div>
 
-### **Container Pipeline:**
+### **Containers Pipeline:**
 - **📊 Data Generation** → Synthetic clinical data + feature engineering
 - **🤖 Training** → ML models (XGBoost, Logistic Regression) + experiment tracking
 - **<img src="readme_images/hippo.jpeg" width="16" height="16" style="vertical-align: middle;"> Serving** → FastAPI server for real-time predictions
+
+![Model Comparison](readme_images/model_comparison.jpeg)
+
+*Performance comparison between XGBoost and Logistic Regression models across different metrics including accuracy, precision, recall, and F1-score.*
 
 ### **Pipeline Orchestration:**
 
@@ -40,11 +40,24 @@ train.bat --force-regen             # Force regenerate data
 <div>
 
 ### **Cloud Provider: Google Cloud Platform (GCP)**
-- **Rationale**: Strong ML ecosystem, enterprise-grade scalability, and 
-- **Data Layer Architecture**: Cloud Storage, BigQuery, Cloud Dataflow
-- **Model Training**: Vertex AI, GPU-enabled instances for accelerated training
-- **tracking**: mlflow
-- **experiment management**: Vertex AI experiments
+- **Rationale**: Cost-efficient, low-ops deployment with generous free tier; strong ML/data ecosystem; EU-locality for compliance and low-latency.
+- **Data Layer**: 
+  - **Cloud Storage (GCS)** for storing generated Parquet data and trained model artifacts (bucket in `europe-west4`).
+  - **BigQuery (external tables)** over Parquet in GCS for analytics and validation queries (Sandbox/free tier).
+- **Model Training**: 
+  - **Cloud Run Jobs (CPU)** run the training container on demand, writing model + metrics back to GCS.
+- **Tracking**: 
+  - Default: metrics/params saved as JSON alongside artifacts in GCS.
+  - *(Optional)*: MLflow integration can be enabled by pointing the training job to an MLflow server.
+- **Experiment Management**: 
+  - Lightweight: Cloud Run Job history + GCS artifact versions.
+- **Serving / API**: 
+  - **Cloud Run (service)** runs the FastAPI inference container, auto-scales to zero, and loads the latest model from GCS on startup.
+
+
+Cloud (GCP): Deploy on Cloud Run (auto-scales to zero) with images in Artifact Registry Region: europe-west4 (Netherlands) for EU data locality and low egress
+
+
 
 ## <img src="readme_images/hippo.jpeg" width="20" height="20" style="vertical-align: middle; margin-right: 8px;"> Key area codes
 
@@ -104,7 +117,7 @@ This automatically:
 2. ✅ Trains ML models with experiment tracking
 3. ✅ Starts the API server
 
-**Server will be available at:** `http://localhost:8001/docs`
+**Server will be available at:** `http://localhost:8000/docs`
 
 ## <img src="readme_images/hippo.jpeg" width="20" height="20" style="vertical-align: middle; margin-right: 8px;"> Manual Docker Commands
 
@@ -250,11 +263,11 @@ train_patients, val_patients = train_test_split(
 
 <div>
 
-**Easiest way:** Visit `http://localhost:8001/docs` for interactive testing
+**Easiest way:** Visit `http://localhost:8000/docs` for interactive testing
 
 **Quick test with curl:**
 ```bash
-curl -X POST "http://localhost:8001/predict" \
+curl -X POST "http://localhost:8000/predict" \
      -H "Content-Type: application/json" \
      -d '{"items":[{"age":65.0,"bmi":26.5,"systolic_bp":140.0,"diastolic_bp":85.0,"heart_rate":72.0,"temperature":37.0,"glucose":95.0,"cholesterol_total":200.0,"hdl":45.0,"ldl":130.0,"triglycerides":150.0,"creatinine":1.2,"hemoglobin":14.5,"white_blood_cells":7.5,"platelets":250.0,"num_encounters":3,"num_medications":2,"num_lab_tests":5}]}'
 ```
@@ -339,7 +352,6 @@ docker build -f Dockerfile.serve -t alzearly-serve .
 
 # Port mapping (for serving)
 -p 8000:8000                     # API server
--p 8001:8001                     # Alternative port
 ```
 
 **Windows (PowerShell):**
@@ -350,7 +362,6 @@ docker build -f Dockerfile.serve -t alzearly-serve .
 
 # Port mapping (for serving)
 -p 8000:8000                     # API server
--p 8001:8001                     # Alternative port
 ```
 
 **Windows (CMD):**
@@ -361,7 +372,7 @@ docker build -f Dockerfile.serve -t alzearly-serve .
 
 # Port mapping (for serving)
 -p 8000:8000                     # API server
--p 8001:8001                     # Alternative port
+-p 8000:8000                     # Alternative port
 ```
 
 </div>
