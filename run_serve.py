@@ -436,57 +436,53 @@ async def root():
     }
 
 
+def can_bind(host: str, port: int) -> bool:
+    with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
+        s.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
+        try:
+            s.bind((host, port))
+            return True
+        except OSError:
+            return False
+
+def find_available_port(start_port: int = 8001, max_attempts: int = 100, host: str = "0.0.0.0") -> int:
+    for port in range(start_port, start_port + max_attempts):
+        if can_bind(host, port):
+            return port
+    raise RuntimeError(f"Could not find an available port in range {start_port}-{start_port + max_attempts - 1}")
+
+
 def main():
-    """Run the FastAPI server."""
     parser = argparse.ArgumentParser(description="Run Alzheimer's prediction API server")
-    parser.add_argument("--port", type=int, default=None, help="Port to run server on (auto-find if not specified)")
+    parser.add_argument("--port", type=int, default=None, help="Port to run server on (0/None = auto)")
     parser.add_argument("--host", default="0.0.0.0", help="Host to bind server to")
     parser.add_argument("--reload", action="store_true", help="Enable auto-reload")
-    
-    # Parse only known arguments to avoid errors with extra arguments
     args, unknown = parser.parse_known_args()
-    
     if unknown:
         print(f"⚠️  Ignoring unknown arguments: {unknown}")
-    
-    # Auto-find available port if not specified
-    if args.port is None:
-        try:
-            args.port = find_available_port(start_port=8001)
-            print(f"🔍 Auto-selected available port: {args.port}")
-        except RuntimeError as e:
-            print(f"❌ {e}")
-            return 1
+
+    if args.port in (None, 0):
+        selected_port = find_available_port(start_port=8001, host=args.host)
+        print(f"🔍 Auto-selected available port: {selected_port}")
     else:
-        # Check if specified port is available
-        try:
-            with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
-                s.bind(('localhost', args.port))
-        except OSError:
-            print(f"❌ Port {args.port} is already in use. Try a different port or let the server auto-find one.")
+        if not can_bind(args.host, args.port):
+            print(f"❌ Port {args.port} is already in use on {args.host}.")
             return 1
-    
+        selected_port = args.port
+
     print("🧠 Alzearly - API Server")
     print("=" * 40)
-    print(f"🌐 Server will be available at: http://{args.host}:{args.port}")
-    print(f"📖 Interactive docs at: http://localhost:{args.port}/docs")
-    print("🛑 Press Ctrl+C to stop the server")
-    print()
-    
+    print(f"🌐 Server will be available at: http://{args.host}:{selected_port}")
+    print(f"📖 Interactive docs at: http://localhost:{selected_port}/docs")
+    print("🛑 Press Ctrl+C to stop the server\n")
+
     try:
-        uvicorn.run(
-            "run_serve:app",
-            host=args.host,
-            port=args.port,
-            reload=args.reload,
-            log_level="info"
-        )
+        uvicorn.run("run_serve:app", host=args.host, port=selected_port, reload=args.reload, log_level="info")
     except KeyboardInterrupt:
         print("\n🛑 Server stopped by user")
     except Exception as e:
         print(f"❌ Failed to start server: {e}")
         return 1
-    
     return 0
 
 
