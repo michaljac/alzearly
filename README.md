@@ -39,10 +39,28 @@ parent_directory/
 │   └── alzearly/          # Data directory (created automatically)
 │       ├── raw/           # Raw generated data
 │       └── featurized/    # Processed features
-└── your_project/          # Current project directory
+└── alzearly/          # Current project directory
     ├── train.bat
     ├── train.sh
     └── ...
+```
+
+### **Building Docker Images**
+
+**Windows (PowerShell or CMD):**
+```powershell
+# Build all containers
+docker build -f Dockerfile.datagen -t alzearly-datagen .
+docker build -f Dockerfile.train -t alzearly-train .
+docker build -f Dockerfile.serve -t alzearly-serve .
+```
+
+**Linux/Mac:**
+```bash
+# Build all containers
+docker build --network=host -f Dockerfile.datagen -t alzearly-datagen .
+docker build --network=host -f Dockerfile.train -t alzearly-train .
+docker build --network=host -f Dockerfile.serve -t alzearly-serve .
 ```
 
 **One command to run the complete pipeline:**
@@ -296,31 +314,6 @@ curl -s -X POST http://localhost:8000/predict \
 - **Disk Space**: ~2GB for containers and data
 - **Memory**: 4GB+ recommended for training
 
-### **Building Docker Images**
-
-**Linux/Mac:**
-```bash
-# Build all containers
-docker build --network=host -f Dockerfile.datagen -t alzearly-datagen .
-docker build --network=host -f Dockerfile.train -t alzearly-train .
-docker build --network=host -f Dockerfile.serve -t alzearly-serve .
-```
-
-**Windows (PowerShell):**
-```powershell
-# Build all containers
-docker build -f Dockerfile.datagen -t alzearly-datagen .
-docker build -f Dockerfile.train -t alzearly-train .
-docker build -f Dockerfile.serve -t alzearly-serve .
-```
-
-**Windows (CMD):**
-```cmd
-# Build all containers
-docker build -f Dockerfile.datagen -t alzearly-datagen .
-docker build -f Dockerfile.train -t alzearly-train .
-docker build -f Dockerfile.serve -t alzearly-serve .
-```
 
 ### **Container Specifications**
 | Container | Base Image | Purpose | Key Dependencies |
