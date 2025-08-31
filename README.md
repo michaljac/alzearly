@@ -67,7 +67,8 @@ docker build --network=host -f Dockerfile.serve -t alzearly-serve .
 
 **Windows:** `.\train.bat --serve`  
 **PowerShell:** `.\train.ps1`
-**Linux/Mac:** `./train.sh --serve`  
+**Linux/Mac:** ` chmod +x train.sh
+./train.sh --serve`  
 
 This automatically:
 1. ✅ Creates Data directory (if not exists)

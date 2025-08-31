@@ -9,6 +9,7 @@ ipdb==0.13.13
 
 # Data processing
 Pint==0.24.4
+polars==0.20.3
 # dask[complete]==2023.8.0 
 
 # Experiment tracking
