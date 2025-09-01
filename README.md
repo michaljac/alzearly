@@ -25,29 +25,33 @@ A FastAPI-based service for predicting Alzheimer's disease risk from patient cli
 - **Local:** Docker volumes hold data + artifacts, FastAPI on port 8001  
 - **Cloud:** Cloud Run Jobs produce data/models in GCS → BigQuery queries data → Cloud Run serves predictions
 
-## <img src="readme_images/hippo.jpeg" width="20" height="20" style="vertical-align: middle; margin-right: 8px;"> Quick Start
+## <img src="readme_images/hippo.jpeg" width="20" height="20" style="vertical-align: middle; margin-right: 8px;"> Quick Start Summary
 
 <div>
 
-**🚀 Cross-Platform Docker Compose Setup (Recommended)**
+**🚀 Get Started in 3 Steps:**
 
-The easiest way to run the complete pipeline on any platform (Windows, Linux, Mac):
+1. **Clone the repository:**
+   ```bash
+   git clone <repository-url>
+   cd alzearly
+   ```
 
-### **1. Run Complete Pipeline**
-```bash
-# Build and run the complete pipeline (training + serving)
-docker-compose --profile pipeline-serve up --build
-```
+2. **Run the complete pipeline:**
+   ```bash
+   docker-compose --profile pipeline-serve up --build
+   ```
 
-This automatically:
-1. ✅ Creates Data directory (if not exists)
-2. ✅ Generates synthetic patient data
-3. ✅ Trains ML models with experiment tracking
-4. ✅ Starts the API server
+3. **Access the API:**
+   - **API Documentation:** `http://localhost:8001/docs`
+   - **Health Check:** `http://localhost:8001/health`
+   - **Predictions:** `http://localhost:8001/predict`
 
-**Server will be available at:** `http://localhost:8001/docs`
+**That's it!** The pipeline will automatically generate data, train models, and start the API server.
 
-### **3. Alternative: Run Individual Services**
+</div>
+
+### **Alternative: Run Individual Services**
 
 **Data Generation Only:**
 ```bash
@@ -76,7 +80,6 @@ parent_directory/
     ├── artifacts/         # Trained models
     └── ...
 ```
-
 
 ## <img src="readme_images/hippo.jpeg" width="20" height="20" style="vertical-align: middle; margin-right: 8px;"> Key Implementation Snippets
 
@@ -383,32 +386,6 @@ xgboost:
 All Python dependencies (including PyYAML) are pre-installed in Docker containers. No manual installation required.
 
 
-
-## <img src="readme_images/hippo.jpeg" width="20" height="20" style="vertical-align: middle; margin-right: 8px;"> Quick Start Summary
-
-<div>
-
-**🚀 Get Started in 3 Steps:**
-
-1. **Clone the repository:**
-   ```bash
-   git clone <repository-url>
-   cd alzearly
-   ```
-
-2. **Run the complete pipeline:**
-   ```bash
-   docker-compose --profile pipeline-serve up --build
-   ```
-
-3. **Access the API:**
-   - **API Documentation:** `http://localhost:8001/docs`
-   - **Health Check:** `http://localhost:8001/health`
-   - **Predictions:** `http://localhost:8001/predict`
-
-**That's it!** The pipeline will automatically generate data, train models, and start the API server.
-
-</div>
 </div>
 
 ## <img src="readme_images/hippo.jpeg" width="20" height="20" style="vertical-align: middle; margin-right: 8px;"> Related Files
