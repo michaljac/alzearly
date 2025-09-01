@@ -11,7 +11,7 @@ A FastAPI-based service for predicting Alzheimer's disease risk from patient cli
 ### Local (Docker Compose)
 - **Containers:** `alzearly-datagen`, `alzearly-train`, `alzearly-serve`
 - **Flow:** data → `/Data/featurized/` → train → `artifacts/latest/` → FastAPI serve
-- **Run:** `docker-compose --profile pipeline-serve up --build` → API at `localhost:8001`
+- **Run:** `docker-compose --profile pipeline-serve up` → API at `localhost:8001`
 
 ### Cloud (GCP)
 - **Region:** `europe-west4` (Netherlands) for EU locality
