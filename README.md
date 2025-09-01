@@ -29,7 +29,7 @@ A FastAPI-based service for predicting Alzheimer's disease risk from patient cli
 
 <div>
 
-**🚀 Get Started in 4 Steps:**
+**🚀 Get Started in 5 Steps:**
 
 1. **Clone the repository:**
    ```bash
