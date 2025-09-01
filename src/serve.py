@@ -330,8 +330,8 @@ async def root():
 if __name__ == "__main__":
     uvicorn.run(
         "src.serve:app",
-        host="0.0.0.0",
+        host="localhost",
         port=8000,
         reload=False,
-        log_level="info"
+        log_level="warning"
     )

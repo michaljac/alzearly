@@ -445,7 +445,7 @@ def can_bind(host: str, port: int) -> bool:
         except OSError:
             return False
 
-def find_available_port(start_port: int = 8001, max_attempts: int = 100, host: str = "0.0.0.0") -> int:
+def find_available_port(start_port: int = 8001, max_attempts: int = 100, host: str = "localhost") -> int:
     for port in range(start_port, start_port + max_attempts):
         if can_bind(host, port):
             return port
@@ -455,7 +455,7 @@ def find_available_port(start_port: int = 8001, max_attempts: int = 100, host: s
 def main():
     parser = argparse.ArgumentParser(description="Run Alzheimer's prediction API server")
     parser.add_argument("--port", type=int, default=None, help="Port to run server on (0/None = auto)")
-    parser.add_argument("--host", default="0.0.0.0", help="Host to bind server to")
+    parser.add_argument("--host", default="localhost", help="Host to bind server to")
     parser.add_argument("--reload", action="store_true", help="Enable auto-reload")
     args, unknown = parser.parse_known_args()
     if unknown:
@@ -472,12 +472,12 @@ def main():
 
     print("🧠 Alzearly - API Server")
     print("=" * 40)
-    print(f"🌐 Server will be available at: http://{args.host}:{selected_port}")
+    print(f"🌐 Server will be available at: http://localhost:{selected_port}")
     print(f"📖 Interactive docs at: http://localhost:{selected_port}/docs")
     print("🛑 Press Ctrl+C to stop the server\n")
 
     try:
-        uvicorn.run("run_serve:app", host=args.host, port=selected_port, reload=args.reload, log_level="info")
+        uvicorn.run("run_serve:app", host=args.host, port=selected_port, reload=args.reload, log_level="warning")
     except KeyboardInterrupt:
         print("\n🛑 Server stopped by user")
     except Exception as e:

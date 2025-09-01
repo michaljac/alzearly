@@ -1,6 +1,6 @@
 # Alzheimer's Prediction API
 
-A FastAPI-based service for predicting Alzheimer's disease risk from patient clinical data using a **3-container Docker pipeline**.
+A FastAPI-based service for predicting Alzheimer's disease risk from patient clinical data using docker compose.
 
 ![Model Comparison](readme_images/model_comparison.jpeg)
 
@@ -8,10 +8,10 @@ A FastAPI-based service for predicting Alzheimer's disease risk from patient cli
 
 ## <img src="readme_images/hippo.jpeg" width="20" height="20" style="vertical-align: middle; margin-right: 8px;"> Architecture & Design
 
-### Local (Docker)
+### Local (Docker Compose)
 - **Containers:** `alzearly-datagen`, `alzearly-train`, `alzearly-serve`
 - **Flow:** data → `/Data/featurized/` → train → `artifacts/latest/` → FastAPI serve
-- **Run:** `docker compose up --build serve` → API at `localhost:8000`
+- **Run:** `docker-compose --profile pipeline-serve up --build` → API at `localhost:8001`
 
 ### Cloud (GCP)
 - **Region:** `europe-west4` (Netherlands) for EU locality
@@ -22,165 +22,135 @@ A FastAPI-based service for predicting Alzheimer's disease risk from patient cli
 - **Tracking:** metrics + params saved with artifacts in GCS (optional: MLflow)
 
 **Flows:**  
-- **Local:** Docker volumes hold data + artifacts, FastAPI on port 8000  
+- **Local:** Docker volumes hold data + artifacts, FastAPI on port 8001  
 - **Cloud:** Cloud Run Jobs produce data/models in GCS → BigQuery queries data → Cloud Run serves predictions
 
 ## <img src="readme_images/hippo.jpeg" width="20" height="20" style="vertical-align: middle; margin-right: 8px;"> Quick Start
 
 <div>
 
-**⚠️ Important Setup Note:**
-The training scripts expect a `Data/alzearly` directory in the **parent directory** of your project. This directory will be created automatically if it doesn't exist.
+**🚀 Cross-Platform Docker Compose Setup (Recommended)**
 
-**Project Structure:**
+The easiest way to run the complete pipeline on any platform (Windows, Linux, Mac):
+
+### **1. Run Complete Pipeline**
+```bash
+# Build and run the complete pipeline (training + serving)
+docker-compose --profile pipeline-serve up --build
+```
+
+This automatically:
+1. ✅ Creates Data directory (if not exists)
+2. ✅ Generates synthetic patient data
+3. ✅ Trains ML models with experiment tracking
+4. ✅ Starts the API server
+
+**Server will be available at:** `http://localhost:8001/docs`
+
+### **3. Alternative: Run Individual Services**
+
+**Data Generation Only:**
+```bash
+docker-compose --profile datagen up --build
+```
+
+**Training Only:**
+```bash
+docker-compose --profile training up --build
+```
+
+**Serving Only (requires trained models):**
+```bash
+docker-compose --profile serve up --build
+```
+
+### **4. Project Structure**
 ```
 parent_directory/
 ├── Data/
 │   └── alzearly/          # Data directory (created automatically)
 │       ├── raw/           # Raw generated data
 │       └── featurized/    # Processed features
-└── alzearly/          # Current project directory
-    ├── train.bat
-    ├── train.sh
+└── alzearly/           # Current project directory
+    ├── docker-compose.yml # Cross-platform orchestration
+    ├── artifacts/         # Trained models
     └── ...
 ```
-
-### **Building Docker Images**
-
-**Windows (PowerShell or CMD):**
-```powershell
-# Build all containers
-docker build -f Dockerfile.datagen -t alzearly-datagen .
-docker build -f Dockerfile.train -t alzearly-train .
-docker build -f Dockerfile.serve -t alzearly-serve .
-```
-
-**Linux/Mac:**
-```bash
-# Build all containers
-docker build --network=host -f Dockerfile.datagen -t alzearly-datagen .
-docker build --network=host -f Dockerfile.train -t alzearly-train .
-docker build --network=host -f Dockerfile.serve -t alzearly-serve .
-```
-
-**One command to run the complete pipeline:**
-
-**Windows:** `.\train.bat --serve`  
-**PowerShell:** `.\train.ps1`
-**Linux/Mac:** ` chmod +x train.sh
-./train.sh --serve`  
-
-This automatically:
-1. ✅ Creates Data directory (if not exists)
-2. ✅ Generates data (if not exists)
-3. ✅ Trains ML models with experiment tracking
-4. ✅ Starts the API server
-
-**Server will be available at:** `http://localhost:8001/docs`
 
 
 ## <img src="readme_images/hippo.jpeg" width="20" height="20" style="vertical-align: middle; margin-right: 8px;"> Key Implementation Snippets
 
 <div>
 
-**train.bat (Windows) - Smart Data Detection:**
-```batch
-REM Check if featurized data exists
-set DATA_FOUND=false
-if exist "%DATA_DIR%\featurized\*.parquet" set DATA_FOUND=true
-if exist "%DATA_DIR%\featurized\*.csv" set DATA_FOUND=true
-
-if "%DATA_FOUND%"=="false" (
-    echo 🔄 Generating data using datagen container...
-    docker run --rm -v "%CURRENT_DIR%:/workspace" -v "%DATA_DIR%:/Data" alzearly-datagen:latest
-) else (
-    echo ✅ Found existing featurized data
-)
+**Docker Compose - Cross-Platform Pipeline:**
+```yaml
+# Complete pipeline with auto-serve (training + serving)
+pipeline-serve:
+  build:
+    context: .
+    dockerfile: Dockerfile.train
+  container_name: alzearly-pipeline-serve
+  ports:
+    - "8001:8001"
+  volumes:
+    - .:/workspace
+    - ../Data/alzearly:/Data
+  environment:
+    - NON_INTERACTIVE=true
+  command: ["python", "pipeline_with_server.py"]
+  profiles:
+    - pipeline-serve
 ```
 
-**train.sh (Linux/Mac) - Smart Data Detection:**
-```bash
-# Robust check for parquet/csv in featurized dir
-shopt -s nullglob
-files=("$DATA_DIR/featurized"/*.parquet "$DATA_DIR/featurized"/*.csv)
-if [ ${#files[@]} -eq 0 ]; then
-    echo "🔄 Generating data using datagen container..."
-    docker run --rm -v "$CURRENT_DIR:/workspace" -v "$DATA_DIR:/Data" alzearly-datagen:latest
-else
-    echo "✅ Found existing featurized data"
-fi
-```
-
-**Cross-Platform Docker Commands:**
-```bash
-# Data generation (works on all platforms)
-docker run --rm -v "$(pwd):/workspace" -v "$(pwd)/../Data/alzearly:/Data" alzearly-datagen:latest
-
-# Training (works on all platforms)
-docker run -it --rm -v "$(pwd):/workspace" -v "$(pwd)/../Data/alzearly:/Data" alzearly-train:latest python run_training.py
-
-# Serving (works on all platforms)
-docker run -it --rm -v "$(pwd):/workspace" -v "$(pwd)/artifacts:/workspace/artifacts" -p 8000:8000 alzearly-serve:latest python run_serve.py
+**Smart Data Detection in Pipeline:**
+```python
+# Automatically detects if data exists and generates if needed
+def run_training_pipeline():
+    """Run the complete training pipeline automatically."""
+    try:
+        from run_training import main
+        return main() == 0
+    except Exception as e:
+        print(f"❌ Training pipeline failed: {e}")
+        return False
 ```
 
 
 
-## <img src="readme_images/hippo.jpeg" width="20" height="20" style="vertical-align: middle; margin-right: 8px;"> Manual Docker Commands
+
+
+## <img src="readme_images/hippo.jpeg" width="20" height="20" style="vertical-align: middle; margin-right: 8px;"> Manual Docker Commands (Advanced)
 
 <div>
 
-If you prefer to run containers individually:
+If you prefer to run containers individually or need custom configurations:
 
-### **Data Generation**
+### **Build Images**
+```bash
+# Build all containers
+docker build -f Dockerfile.datagen -t alzearly-datagen .
+docker build -f Dockerfile.train -t alzearly-train .
+docker build -f Dockerfile.serve -t alzearly-serve .
+```
 
-**Linux/Mac:**
+### **Run Individual Services**
+
+**Data Generation:**
 ```bash
 docker run --rm -v "$(pwd):/workspace" -v "$(pwd)/../Data/alzearly:/Data" alzearly-datagen:latest
 ```
 
-**Windows (PowerShell):**
-```powershell
-docker run --rm -v "${PWD}:/workspace" -v "${PWD}/../Data/alzearly:/Data" alzearly-datagen:latest
-```
-
-**Windows (CMD):**
-```cmd
-docker run --rm -v "%cd%:/workspace" -v "%cd%/../Data/alzearly:/Data" alzearly-datagen:latest
-```
-
-### **Training**
-
-**Linux/Mac:**
+**Training:**
 ```bash
 docker run --rm -v "$(pwd):/workspace" -v "$(pwd)/../Data/alzearly:/Data" alzearly-train:latest
 ```
 
-**Windows (PowerShell):**
-```powershell
-docker run --rm -v "${PWD}:/workspace" -v "${PWD}/../Data/alzearly:/Data" alzearly-train:latest
-```
-
-**Windows (CMD):**
-```cmd
-docker run --rm -v "%cd%:/workspace" -v "%cd%/../Data/alzearly:/Data" alzearly-train:latest
-```
-
-### **Serving**
-
-**Linux/Mac:**
+**Serving (with port mapping):**
 ```bash
-docker run --rm -v "$(pwd):/workspace" -v "$(pwd)/artifacts:/workspace/artifacts" -p 8000:8000 alzearly-serve:latest
+docker run --rm -v "$(pwd)/artifacts:/workspace/artifacts" -v "$(pwd)/config:/workspace/config" -v "$(pwd)/src:/workspace/src" -v "$(pwd)/run_serve.py:/workspace/run_serve.py" -v "$(pwd)/utils.py:/workspace/utils.py" -p 8001:8001 alzearly-serve:latest
 ```
 
-**Windows (PowerShell):**
-```powershell
-docker run --rm -v "${PWD}:/workspace" -v "${PWD}/artifacts:/workspace/artifacts" -p 8000:8000 alzearly-serve:latest
-```
-
-**Windows (CMD):**
-```cmd
-docker run -it --name alz_serve --entrypoint /bin/bash -v "${PWD}:/workspace" alzearly-serve:latest
-```
+**Note:** These commands work on Windows, Linux, and Mac. Docker Compose is recommended for easier management.
 
 ## <img src="readme_images/hippo.jpeg" width="20" height="20" style="vertical-align: middle; margin-right: 8px;"> API Endpoints
 
@@ -323,42 +293,8 @@ curl -s -X POST http://localhost:8000/predict \
 | `alzearly-train` | Python 3.10-slim | ML training & experiment tracking | xgboost, sklearn, mlflow |
 | `alzearly-serve` | Python 3.10-slim-bullseye | API serving | fastapi, uvicorn, pydantic |
 
-### **Volume Mounts**
 
-**Linux/Mac:**
-```bash
-# Data persistence
--v "$(pwd):/workspace"           # Project code
--v "$(pwd)/../Data/alzearly:/Data"  # Data storage
--v "$(pwd)/artifacts:/workspace/artifacts"  # Model artifacts
 
-# Port mapping (for serving)
--p 8000:8000                     # API server
-```
-
-**Windows (PowerShell):**
-```powershell
-# Data persistence
--v "${PWD}:/workspace"           # Project code
--v "${PWD}/../Data/alzearly:/Data"  # Data storage
--v "${PWD}/artifacts:/workspace/artifacts"  # Model artifacts
-
-# Port mapping (for serving)
--p 8000:8000                     # API server
-```
-
-**Windows (CMD):**
-```cmd
-# Data persistence
--v "%cd%:/workspace"             # Project code
--v "%cd%/../Data/alzearly:/Data" # Data storage
--v "%cd%/artifacts:/workspace/artifacts" # Model artifacts
-
-# Port mapping (for serving)
--p 8000:8000                     # API server
-```
-
-</div>
 </div>
 
 ## <img src="readme_images/hippo.jpeg" width="20" height="20" style="vertical-align: middle; margin-right: 8px;"> Key Configuration Parameters
@@ -446,44 +382,31 @@ xgboost:
 ### **Docker Dependencies:**
 All Python dependencies (including PyYAML) are pre-installed in Docker containers. No manual installation required.
 
-### **Platform Compatibility:**
-- **Windows**: Use `train.bat` script (Windows batch file)
-- **Linux/Mac**: Use `train.sh` script (Bash script)
-- **Cross-platform**: Use manual Docker commands (works on all platforms)
-- **Docker commands**: Use `$(pwd)` for Linux/Mac, `${PWD}` for PowerShell, `%cd%` for CMD
 
-### **Platform-Specific Commands:**
 
-**Check Docker Status:**
-```bash
-# Linux/Mac
-docker --version
-docker ps
+## <img src="readme_images/hippo.jpeg" width="20" height="20" style="vertical-align: middle; margin-right: 8px;"> Quick Start Summary
 
-# Windows (PowerShell/CMD)
-docker --version
-docker ps
-```
+<div>
 
-**Clean Docker Resources:**
-```bash
-# Linux/Mac
-docker system prune -f
-docker volume prune -f
+**🚀 Get Started in 3 Steps:**
 
-# Windows (PowerShell/CMD)
-docker system prune -f
-docker volume prune -f
-```
+1. **Clone the repository:**
+   ```bash
+   git clone <repository-url>
+   cd alzearly
+   ```
 
-**Check Container Logs:**
-```bash
-# Linux/Mac
-docker logs <container_name>
+2. **Run the complete pipeline:**
+   ```bash
+   docker-compose --profile pipeline-serve up --build
+   ```
 
-# Windows (PowerShell/CMD)
-docker logs <container_name>
-```
+3. **Access the API:**
+   - **API Documentation:** `http://localhost:8001/docs`
+   - **Health Check:** `http://localhost:8001/health`
+   - **Predictions:** `http://localhost:8001/predict`
+
+**That's it!** The pipeline will automatically generate data, train models, and start the API server.
 
 </div>
 </div>
@@ -492,6 +415,7 @@ docker logs <container_name>
 
 <div>
 
+- `docker-compose.yml` - Cross-platform orchestration
 - `run_serve.py` - Main server script
 - `artifacts/latest/` - Trained model and metadata
 - `requirements.txt` - Python dependencies
