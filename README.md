@@ -51,6 +51,7 @@ A FastAPI-based service for predicting Alzheimer's disease risk from patient cli
 
 </div>
 
+
 ### **Alternative: Run Individual Services**
 
 **Data Generation Only:**
@@ -68,7 +69,8 @@ docker-compose --profile training up --build
 docker-compose --profile serve up --build
 ```
 
-### **4. Project Structure**
+## <img src="readme_images/hippo.jpeg" width="20" height="20" style="vertical-align: middle; margin-right: 8px;"> Project Structure
+
 ```
 parent_directory/
 ├── Data/
