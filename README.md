@@ -29,7 +29,7 @@ A FastAPI-based service for predicting Alzheimer's disease risk from patient cli
 
 <div>
 
-**🚀 Get Started in 3 Steps:**
+**🚀 Get Started in 4 Steps:**
 
 1. **Clone the repository:**
    ```bash
@@ -44,8 +44,7 @@ mkdir -p artifacts && chmod -R 777 artifacts
 ```
 - windows
 
-
-2. Build the images
+3. **Build the images**
 - linux
 #base image
 ```bash
@@ -70,12 +69,12 @@ docker build -t alzearly-train:v1  -f Dockerfile.train   .
 docker build -t alzearly-serve:v1   -f Dockerfile.serve   .
 ```
 
-3. **Run the complete pipeline:**
+4. **Run the complete pipeline:**
    ```bash
-   docker-compose --profile pipeline-serve up --build
+   docker compose --profile pipeline-serve up -d pipeline-serve
    ```
 
-3. **Access the API:**
+5. **Access the API:**
    - **API Documentation:** `http://localhost:8001/docs`
    - **Health Check:** `http://localhost:8001/health`
    - **Predictions:** `http://localhost:8001/predict`
@@ -89,17 +88,17 @@ docker build -t alzearly-serve:v1   -f Dockerfile.serve   .
 
 **Data Generation Only:**
 ```bash
-docker-compose --profile datagen up --build
+docker-compose --profile datagen
 ```
 
 **Training Only:**
 ```bash
-docker-compose --profile training up --build
+docker-compose --profile training
 ```
 
 **Serving Only (requires trained models):**
 ```bash
-docker-compose --profile serve up --build
+docker-compose --profile serve
 ```
 
 ## <img src="readme_images/hippo.jpeg" width="20" height="20" style="vertical-align: middle; margin-right: 8px;"> Project Structure
