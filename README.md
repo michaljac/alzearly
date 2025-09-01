@@ -123,20 +123,19 @@ parent_directory/
 ```yaml
 # Complete pipeline with auto-serve (training + serving)
 pipeline-serve:
-  build:
-    context: .
-    dockerfile: Dockerfile.train
+  image: alzearly-train:v1
   container_name: alzearly-pipeline-serve
-  ports:
-    - "8001:8001"
+  network_mode: "host"
   volumes:
     - .:/workspace
     - ../Data/alzearly:/Data
   environment:
+    - PYTHONUNBUFFERED=1
+    - PYTHONPATH=/workspace
     - NON_INTERACTIVE=true
+  working_dir: /workspace
   command: ["python", "pipeline_with_server.py"]
-  profiles:
-    - pipeline-serve
+  profiles: [pipeline-serve]
 ```
 
 **Smart Data Detection in Pipeline:**
@@ -174,17 +173,17 @@ docker build -f Dockerfile.serve -t alzearly-serve .
 
 **Data Generation:**
 ```bash
-docker run --rm -v "$(pwd):/workspace" -v "$(pwd)/../Data/alzearly:/Data" alzearly-datagen:latest
+docker run --rm -v "$(pwd):/workspace" -v "$(pwd)/../Data/alzearly:/Data" alzearly-datagen:v1
 ```
 
 **Training:**
 ```bash
-docker run --rm -v "$(pwd):/workspace" -v "$(pwd)/../Data/alzearly:/Data" alzearly-train:latest
+docker run --rm -v "$(pwd):/workspace" -v "$(pwd)/../Data/alzearly:/Data" alzearly-train:v1
 ```
 
 **Serving (with port mapping):**
 ```bash
-docker run --rm -v "$(pwd)/artifacts:/workspace/artifacts" -v "$(pwd)/config:/workspace/config" -v "$(pwd)/src:/workspace/src" -v "$(pwd)/run_serve.py:/workspace/run_serve.py" -v "$(pwd)/utils.py:/workspace/utils.py" -p 8001:8001 alzearly-serve:latest
+docker run --rm -v "$(pwd)/artifacts:/workspace/artifacts" -v "$(pwd)/config:/workspace/config" -v "$(pwd)/src:/workspace/src" -v "$(pwd)/run_serve.py:/workspace/run_serve.py" -v "$(pwd)/utils.py:/workspace/utils.py" -p 8001:8001 alzearly-serve:v1
 ```
 
 **Note:** These commands work on Windows, Linux, and Mac. Docker Compose is recommended for easier management.
@@ -321,8 +320,6 @@ curl -s -X POST http://localhost:8000/predict \
 
 * **Docker**: Engine ≥ **20.10** and **Docker Compose v2**
 * **Disk space**:
-
-  * Your image sizes:
 
     * `alzearly-base:py310` ≈ **1.09 GB**
     * `alzearly-serve:v1` ≈ **1.09 GB** (mostly same layers as base)
