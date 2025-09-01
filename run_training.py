@@ -15,7 +15,6 @@ import argparse
 import os
 import sys
 import subprocess
-import platform
 from pathlib import Path
 from typing import Optional, Tuple
 
@@ -215,7 +214,7 @@ def main_pipeline(args, training_classes, setup_experiment_tracker) -> int:
     
     if not data_files:
         print("❌ No featurized data found")
-        print("💡 Please run the training script: ./train.sh (Linux/Mac) or train.bat (Windows)")
+        print("💡 Please run the training service")
         return 1
     
     print(f"✅ Found {len(data_files)} data files - proceeding with training")
@@ -302,6 +301,7 @@ def main_pipeline(args, training_classes, setup_experiment_tracker) -> int:
     print()
     
     artifacts_dir = Path("artifacts/latest")
+    os.chmod(artifacts_dir, 0o777)
     required_files = ["model.pkl", "feature_names.json", "threshold.json", "metrics.json"]
     missing_files = []
     

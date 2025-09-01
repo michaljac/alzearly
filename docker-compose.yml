@@ -1,9 +1,7 @@
 services:
   # Data generation service
   datagen:
-    build:
-      context: .
-      dockerfile: Dockerfile.datagen
+    image: alzearly-datagen:v1
     container_name: alzearly-datagen
     volumes:
       - .:/workspace
@@ -16,14 +14,11 @@ services:
       - POLARS_FORCE_OPTIMIZED=1
       - POLARS_USE_STREAMING=0
     command: ["python", "run_datagen.py"]
-    profiles:
-      - datagen
+    profiles: [datagen]
 
-  # Training service - handles training and experiment tracking
+  # Training service
   training:
-    build:
-      context: .
-      dockerfile: Dockerfile.train
+    image: alzearly-train:v1
     container_name: alzearly-train
     volumes:
       - .:/workspace
@@ -37,17 +32,17 @@ services:
       - WANDB_API_KEY=${WANDB_API_KEY:-}
       - PYTHONPATH=/workspace
     command: ["python", "run_training.py", "--config", "config/model.yaml"]
-    profiles:
-      - training
+    profiles: [training]
 
-  # Serving service - FastAPI development server
+  # Serving service - FastAPI
   serve:
-    build:
-      context: .
-      dockerfile: Dockerfile.serve
+    image: alzearly-serve:v1
     container_name: alzearly-serve
-    ports:
-      - "8001:8001"
+    network_mode: "host" 
+    # ports:
+    #   - target: 8001
+    #     published: ${SERVE_PORT:-0}   # 0 = auto-pick a free host port; set SERVE_PORT to force a port
+    #     protocol: tcp
     volumes:
       - ./artifacts:/workspace/artifacts
       - ./config:/workspace/config
@@ -56,21 +51,19 @@ services:
       - ./utils.py:/workspace/utils.py
     environment:
       - PYTHONUNBUFFERED=1
-      - TQDM_DISABLE=1
-      - POLARS_NUM_THREADS=1
-      - POLARS_STREAMING_COLLECT=0
-      - POLARS_FORCE_OPTIMIZED=1
       - PYTHONPATH=/workspace
     working_dir: /workspace
-    command: ["python", "run_serve.py", "--port", "8001", "--host", "0.0.0.0"]
-    profiles:
-      - serve
+    command: ["--host", "0.0.0.0", "--port", "8001"]
+    profiles: [serve]
 
-  # Complete pipeline (training + serving)
+
+
+
+
+
+  # Complete pipeline (training only)
   pipeline:
-    build:
-      context: .
-      dockerfile: Dockerfile.train
+    image: alzearly-train:v1
     container_name: alzearly-pipeline
     volumes:
       - .:/workspace
@@ -84,33 +77,24 @@ services:
       - WANDB_API_KEY=${WANDB_API_KEY:-}
       - PYTHONPATH=/workspace
     command: ["python", "run_training.py", "--config", "config/model.yaml"]
-    profiles:
-      - pipeline
+    profiles: [pipeline]
 
-  # Complete pipeline with auto-serve (training + serving)
+  # Pipeline that starts a server from your script
   pipeline-serve:
-    build:
-      context: .
-      dockerfile: Dockerfile.train
+    image: alzearly-train:v1
     container_name: alzearly-pipeline-serve
-    ports:
-      - "8001:8001"
+    network_mode: "host"
     volumes:
       - .:/workspace
       - ../Data/alzearly:/Data
     environment:
       - PYTHONUNBUFFERED=1
-      - TQDM_DISABLE=1
-      - POLARS_NUM_THREADS=1
-      - POLARS_STREAMING_COLLECT=0
-      - POLARS_FORCE_OPTIMIZED=1
-      - WANDB_API_KEY=${WANDB_API_KEY:-}
       - PYTHONPATH=/workspace
       - NON_INTERACTIVE=true
     working_dir: /workspace
     command: ["python", "pipeline_with_server.py"]
-    profiles:
-      - pipeline-serve
+    profiles: [pipeline-serve]
+
 
 networks:
   default:

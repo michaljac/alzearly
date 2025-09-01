@@ -36,8 +36,41 @@ A FastAPI-based service for predicting Alzheimer's disease risk from patient cli
    git clone https://github.com/michaljac/alzearly.git
    cd alzearly
    ```
+2. **Prerequisites**
+- linux
+```bash
+mkdir -p ../Data/alzearly/{raw,featurized} && chmod -R 777 ../Data/alzearly
+mkdir -p artifacts && chmod -R 777 artifacts
+```
+- windows
 
-2. **Run the complete pipeline:**
+
+2. Build the images
+- linux
+#base image
+```bash
+docker build --network=host -t alzearly-base:py310 -f Dockerfile.base .
+```
+#other images
+```bash
+docker build --network=host -t alzearly-datagen:v1 -f Dockerfile.datagen .
+docker build --network=host -t alzearly-train:v1   -f Dockerfile.train   .
+docker build --network=host -t alzearly-serve:v1   -f Dockerfile.serve   .
+```
+
+- windows
+#base image
+```bash
+docker build -t alzearly-base:py310 -f Dockerfile.base .
+```
+#other images
+```bash
+docker build -t alzearly-datagen:v1 -f Dockerfile.datagen .
+docker build -t alzearly-train:v1  -f Dockerfile.train   .
+docker build -t alzearly-serve:v1   -f Dockerfile.serve   .
+```
+
+3. **Run the complete pipeline:**
    ```bash
    docker-compose --profile pipeline-serve up --build
    ```
@@ -285,10 +318,27 @@ curl -s -X POST http://localhost:8000/predict \
 
 <div>
 
-### **Prerequisites**
-- **Docker**: Version 20.10+ with Docker Compose
-- **Disk Space**: ~2GB for containers and data
-- **Memory**: 4GB+ recommended for training
+### Prerequisites
+
+* **Docker**: Engine ≥ **20.10** and **Docker Compose v2**
+* **Disk space**:
+
+  * Your image sizes:
+
+    * `alzearly-base:py310` ≈ **1.09 GB**
+    * `alzearly-serve:v1` ≈ **1.09 GB** (mostly same layers as base)
+    * `alzearly-datagen:v1` ≈ **1.24 GB**
+    * `alzearly-train:v1` ≈ **1.81 GB**
+  * **Effective on-disk (with layer sharing)**: \~**2–2.5 GB** for images
+  * **Data/artifacts (defaults)**: \~**1–3 GB**
+  * **Recommendation**: keep **≥ 8 GB** free to be safe
+* **Memory**:
+
+  * Serving: **≥1 GB**
+  * Training (XGBoost): **≥4 GB** minimum, **8 GB+** recommended
+* **CPU**: **2+ cores** minimum (4+ recommended)
+* **GPU (optional)**: NVIDIA GPU + NVIDIA Container Toolkit if you plan to use CUDA
+
 
 
 ### **Container Specifications**

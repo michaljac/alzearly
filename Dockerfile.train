@@ -1,63 +1,8 @@
-# Use Python 3.10 slim image as base
-FROM python:3.10-slim
+ARG BASE_TAG=alzearly-base:py310
+FROM ${BASE_TAG} As train
 
-# Set environment variables
-ENV PYTHONUNBUFFERED=1
-ENV PYTHONDONTWRITEBYTECODE=1
-ENV DEBIAN_FRONTEND=noninteractive
-
-# Install system dependencies
-RUN apt-get update && apt-get install -y \
-    build-essential \
-    curl \
-    git \
-    wget \
-    vim \
-    nano \
-    htop \
-    procps \
-    && rm -rf /var/lib/apt/lists/*
-
-# Upgrade pip to latest version
-RUN python -m pip install --upgrade pip
-
-# Set working directory
-WORKDIR /workspace
-
-# Copy requirements file
 COPY requirements-train.txt .
+RUN pip install --no-cache-dir --prefer-binary -r requirements-train.txt
 
-# Install Python dependencies
-RUN pip install -r requirements-train.txt
-
-# Install debugging tools
-RUN pip install \
-    ipdb==0.13.13 \
-    pdbpp==0.10.3 \
-    pudb==2022.1.3 \
-    ipython==8.14.0
-
-# Copy source code
-COPY src/ ./src/
-COPY utils.py .
-COPY run_training.py .
-COPY config/ ./config/
-
-# Create necessary directories
-RUN mkdir -p /Data/raw /Data/featurized models artifacts plots mlruns wandb
-
-# Set Python path
-ENV PYTHONPATH=/workspace
-
-# Create a non-root user for better security
-RUN useradd -m -u 1000 trainer && \
-    chown -R trainer:trainer /workspace
-
-# Switch to non-root user
-USER root
-
-# Expose port for debugging (if needed)
-EXPOSE 5678
-
-# Set default command
-CMD ["python", "run_training.py"]
+COPY . .
+CMD ["python", "run_training.py", "--config", "config/model.yaml"]
