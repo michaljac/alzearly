@@ -33,7 +33,7 @@ A FastAPI-based service for predicting Alzheimer's disease risk from patient cli
 
 1. **Clone the repository:**
    ```bash
-   git clone <repository-url>
+   git clone https://github.com/michaljac/alzearly.git
    cd alzearly
    ```
 
