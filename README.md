@@ -29,7 +29,7 @@ A FastAPI-based service for predicting Alzheimer's disease risk from patient cli
 
 <div>
 
-**🚀 Get Started in 5 Steps:**
+**🚀 Get Started in 4 Steps:**
 
 1. **Clone the repository:**
    ```bash
@@ -66,12 +66,7 @@ docker compose run --rm training && docker compose restart serve
 docker build -t alzearly:v1 -f Dockerfile .
 ```
 
-4. **Run the complete pipeline:**
-   ```bash
-   docker compose --profile pipeline-serve up -d pipeline-serve
-   ```
-
-5. **Access the API:**
+4. **Access the API:**
    - **API Documentation:** `http://localhost:8001/docs`
    - **Health Check:** `http://localhost:8001/health`
    - **Predictions:** `http://localhost:8001/predict`
