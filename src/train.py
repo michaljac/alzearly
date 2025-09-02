@@ -725,20 +725,6 @@ class ModelTrainer:
         for mname, mres in results.items():
             for k, v in mres["metrics"].items():
                 metrics_payload[f"{mname}_{k}"] = float(v) if isinstance(v, (np.floating, np.integer)) else v
-        write_json(artifacts_dir / "metrics.json", metrics_payload)
-
-        # -----------------------------
-        # Legacy files (back-compat)
-        # -----------------------------
-        write_json(artifacts_dir / "feature_list.json", self.feature_names)  # legacy alt
-        model_meta = {
-            "model_name": best_name,
-            "created_at": datetime.now().isoformat(),
-            "params": vars(self.config),
-            "metrics": {"optimal_threshold": optimal_threshold, "feature_count": len(self.feature_names),
-                        "model_type": best_name}
-        }
-        write_json(artifacts_dir / "model_meta.json", model_meta)
 
         # Also save full set under models/<run_id_clean>
         out_root = ensure_dir(Path(self.config.output_dir), 0o777)
@@ -778,27 +764,6 @@ class ModelTrainer:
         print(f"💾 Artifacts saved to: {artifacts_dir}")
         print(f"   - model.pkl\n   - feature_names.json\n   - threshold.json\n   - metrics.json\n")
 
-        # WandB run id (optional)
-        wandb_run_id = None
-        if self.tracker_enabled and tracker_type == "wandb":
-            try:
-                import wandb
-                if hasattr(wandb, 'run') and wandb.run:
-                    wandb_run_id = wandb.run.id
-            except Exception:
-                pass
-
-        return {
-            'run_id': run_id_clean,
-            'wandb_run_id': wandb_run_id,
-            'artifact_path': str(run_dir),
-            'latest_artifacts': [str(artifacts_dir / "model.pkl"),
-                                 str(artifacts_dir / "feature_names.json"),
-                                 str(artifacts_dir / "threshold.json"),
-                                 str(artifacts_dir / "metrics.json")],
-            'results': results
-        }
-
 
 def train(
     config_file: str = typer.Option("config/model.yaml", "--config", help="Configuration file path"),
@@ -806,8 +771,6 @@ def train(
     output_dir: Optional[str] = typer.Option(None, "--output-dir", help="Override output directory from config"),
     max_features: Optional[int] = typer.Option(None, "--max-features", help="Override max features from config"),
     handle_imbalance: Optional[str] = typer.Option(None, "--handle-imbalance", help="Override imbalance handling from config"),
-    wandb_project: Optional[str] = typer.Option(None, "--wandb-project", help="Override wandb project from config"),
-    wandb_entity: Optional[str] = typer.Option(None, "--wandb-entity", help="Override wandb entity from config"),
     run_type: str = typer.Option("initial", "--run-type", help="Run type (initial, balanced, feature_optimized, hyperparameter_tuned, final, production)"),
     tracker: Optional[str] = typer.Option(None, "--tracker"),
 ) -> None:
@@ -825,11 +788,7 @@ def train(
         config.max_features = max_features
     if handle_imbalance is not None:
         config.handle_imbalance = handle_imbalance
-    if wandb_project is not None:
-        config.wandb_project = wandb_project
-    if wandb_entity is not None:
-        config.wandb_entity = wandb_entity
-
+        
     # Tracking setup
     if tracker is None:
         from utils import setup_experiment_tracker
@@ -837,11 +796,8 @@ def train(
     else:
         tracker_lower = tracker.lower()
         print(f"🔬 Setting up experiment tracking: {tracker_lower}")
-        if tracker_lower == "wandb":
-            os.environ['NON_INTERACTIVE'] = 'true'
-            from utils import setup_wandb
-            global_tracker, chosen_tracker_type = setup_wandb()
-        elif tracker_lower == "mlflow":
+
+        if tracker_lower == "mlflow":
             os.environ['NON_INTERACTIVE'] = 'true'
             from utils import setup_mlflow
             global_tracker, chosen_tracker_type = setup_mlflow()
@@ -850,7 +806,7 @@ def train(
             global_tracker, chosen_tracker_type = None, "none"
         else:
             print(f"❌ Invalid tracker option: {tracker}")
-            print("Valid options: none, mlflow, wandb")
+            print("Valid options: none, mlflow")
             return
 
     # Ensure artifacts dir root exists with wide permissions (useful in containers)
@@ -862,13 +818,6 @@ def train(
     print("🎉 Training completed successfully!")
     print(f"🆔 Run ID: {results['run_id']}")
     print(f"📁 Artifact path: {results['artifact_path']}")
-    if results.get('wandb_run_id'):
-        try:
-            import wandb
-            if hasattr(wandb, 'run') and wandb.run:
-                print(f"🔗 View run online: {wandb.run.get_url()}")
-        except ImportError:
-            pass
 
 
 if __name__ == "__main__":

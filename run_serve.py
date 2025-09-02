@@ -170,88 +170,39 @@ class PredictionResponse(BaseModel):
 def load_model_and_metadata():
     """Load the trained model and metadata from artifacts/latest/ directory."""
     global model, feature_names, model_metadata, optimal_threshold
-    
+
     artifacts_dir = Path("artifacts/latest")
-    
-    # Check if artifacts directory exists
     if not artifacts_dir.exists():
-        raise FileNotFoundError(
-            "artifacts/latest/ directory not found. Please run training first to generate the model."
-        )
-    
+        raise FileNotFoundError("artifacts/latest/ directory not found. Run training first.")
+
+    # required files
+    required_files = ["model.pkl", "feature_names.json", "threshold.json", "metrics.json"]
+    for fname in required_files:
+        if not (artifacts_dir / fname).exists():
+            raise FileNotFoundError(f"Missing required file: {fname} in {artifacts_dir}")
+
     # Load model
-    model_path = artifacts_dir / "model.pkl"
-    if not model_path.exists():
-        raise FileNotFoundError(
-            "model.pkl not found in artifacts/latest/. Please run training first to generate the model."
-        )
-    
-    try:
-        with open(model_path, 'rb') as f:
-            model = pickle.load(f)
-        print("✅ Model loaded successfully")
-    except Exception as e:
-        raise Exception(f"Failed to load model: {e}")
-    
+    with open(artifacts_dir / "model.pkl", "rb") as f:
+        model = pickle.load(f)
+    print("✅ Model loaded successfully")
+
     # Load feature names
-    feature_names_path = artifacts_dir / "feature_list.json"
-    if not feature_names_path.exists():
-        # Try alternative name
-        feature_names_path = artifacts_dir / "feature_names.json"
-        if not feature_names_path.exists():
-            raise FileNotFoundError(
-                "feature_list.json or feature_names.json not found in artifacts/latest/. Please run training first."
-            )
-    
-    try:
-        with open(feature_names_path, 'r') as f:
-            feature_names = json.load(f)
-        print(f"✅ Feature names loaded: {len(feature_names)} features")
-    except Exception as e:
-        raise Exception(f"Failed to load feature names: {e}")
-    
+    with open(artifacts_dir / "feature_names.json", "r") as f:
+        feature_names = json.load(f)
+    print(f"✅ Feature names loaded: {len(feature_names)} features")
+
     # Load threshold
-    threshold_path = artifacts_dir / "threshold.json"
-    if not threshold_path.exists():
-        raise FileNotFoundError(
-            "threshold.json not found in artifacts/latest/. Please run training first."
-        )
-    
-    try:
-        with open(threshold_path, 'r') as f:
-            threshold_data = json.load(f)
-            optimal_threshold = threshold_data.get('optimal_threshold', 0.5)
-        print(f"✅ Threshold loaded: {optimal_threshold}")
-    except Exception as e:
-        raise Exception(f"Failed to load threshold: {e}")
-    
+    with open(artifacts_dir / "threshold.json", "r") as f:
+        threshold_data = json.load(f)
+        optimal_threshold = threshold_data.get("optimal_threshold", 0.5)
+    print(f"✅ Threshold loaded: {optimal_threshold}")
+
     # Load metadata
-    metrics_path = artifacts_dir / "metrics.json"
-    if not metrics_path.exists():
-        raise FileNotFoundError(
-            "metrics.json not found in artifacts/latest/. Please run training first."
-        )
-    
-    try:
-        with open(metrics_path, 'r') as f:
-            model_metadata = json.load(f)
-        print(f"✅ Model metadata loaded: run_id={model_metadata.get('run_id', 'unknown')}")
-    except Exception as e:
-        raise Exception(f"Failed to load model metadata: {e}")
-    
+    with open(artifacts_dir / "metrics.json", "r") as f:
+        model_metadata = json.load(f)
+    print(f"✅ Model metadata loaded: run_id={model_metadata.get('run_id', 'unknown')}")
+
     print("🎉 All artifacts loaded successfully!")
-
-
-def find_available_port(start_port: int = 8001, max_attempts: int = 100) -> int:
-    """Find an available port starting from start_port."""
-    for port in range(start_port, start_port + max_attempts):
-        try:
-            with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
-                s.bind(('localhost', port))
-                return port
-        except OSError:
-            continue
-    raise RuntimeError(f"Could not find an available port in range {start_port}-{start_port + max_attempts - 1}")
 
 
 def prepare_features(item: PredictionItem) -> np.ndarray:
@@ -472,8 +423,8 @@ def main():
 
     print("🧠 Alzearly - API Server")
     print("=" * 40)
-    print(f"🌐 Server will be available at: http://localhost:{selected_port}")
-    print(f"📖 Interactive docs at: http://localhost:{selected_port}/docs")
+    print(f"🌐 Server will be available at: http://{args.host}:{selected_port}")
+    print(f"📖 Interactive docs at: http://{args.host}:{selected_port}/docs")
     print("🛑 Press Ctrl+C to stop the server\n")
 
     try:

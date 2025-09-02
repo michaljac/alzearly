@@ -1,0 +1,51 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+# --- Paths & requirements ---
+DATA_DIR="${DATA_DIR:-../Data/alzearly/featurized}"  # where featurized data ends up
+ART_DIR="${ART_DIR:-artifacts/latest}"               # where trained artifacts live
+REQ_ART=(model.pkl feature_names.json threshold.json metrics.json)
+
+# --- Helpers ---
+have_data() {
+  [[ -d "$DATA_DIR" ]] && [[ -n "$(ls -A "$DATA_DIR" 2>/dev/null || true)" ]]
+}
+
+have_artifacts() {
+  for f in "${REQ_ART[@]}"; do
+    [[ -f "$ART_DIR/$f" ]] || return 1
+  done
+  return 0
+}
+
+# --- Flags ---
+RETRAIN="${RETRAIN:-0}"  # set RETRAIN=1 to force training
+
+echo "🔎 Checking data in: $DATA_DIR"
+if ! have_data; then
+  echo "📦 No featurized data found — generating..."
+  docker compose run --rm datagen
+else
+  echo "✅ Featurized data found."
+fi
+
+if [[ "$RETRAIN" == "1" ]]; then
+  echo "♻️ RETRAIN=1 — running training now..."
+  docker compose run --rm training
+else
+  echo "🔎 Checking artifacts in: $ART_DIR"
+  if have_artifacts; then
+    echo "✅ Artifacts already present — skip training."
+  else
+    echo "🏋️ No artifacts — training once..."
+    docker compose run --rm training
+  fi
+fi
+
+echo "🚀 Starting API server..."
+docker compose up -d serve
+
+echo "📋 Current services:"
+docker compose ps
+
+echo "✅ Done. Open the docs at http://localhost:8001/docs (or the mapped port)"

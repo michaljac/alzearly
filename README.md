@@ -49,21 +49,21 @@ mkdir -p artifacts && chmod -R 777 artifacts
 ```bash
 docker build --network=host -t alzearly:v1 -f Dockerfile .
 ```
+
+4. **docker compose**
 ```bash
-export COMPOSE_PROFILES=datagen,training,serve
-docker compose up
+chmod +x scripts/start_compose.sh
+./scripts/start_compose.sh
+```
+  **re-train if wants to**
+```bash
+docker compose run --rm training && docker compose restart serve
 ```
 
+
 - windows
-#base image
 ```bash
-docker build -t alzearly-base:py310 -f Dockerfile.base .
-```
-#other images
-```bash
-docker build -t alzearly-datagen:v1 -f Dockerfile.datagen .
-docker build -t alzearly-train:v1  -f Dockerfile.train   .
-docker build -t alzearly-serve:v1   -f Dockerfile.serve   .
+docker build -t alzearly:v1 -f Dockerfile .
 ```
 
 4. **Run the complete pipeline:**
@@ -315,13 +315,10 @@ curl -s -X POST http://localhost:8000/predict \
 
 ### Prerequisites
 
-* **Docker**: Engine ≥ **20.10** and **Docker Compose v2**
+* **Docker**: Engine ≥ **20.10** and **Docker Compose v1**
 * **Disk space**:
 
-    * `alzearly-base:py310` ≈ **1.09 GB**
-    * `alzearly-serve:v1` ≈ **1.09 GB** (mostly same layers as base)
-    * `alzearly-datagen:v1` ≈ **1.24 GB**
-    * `alzearly-train:v1` ≈ **1.81 GB**
+    * `alzearly:v1` ≈ **1.47 GB**
   * **Effective on-disk (with layer sharing)**: \~**2–2.5 GB** for images
   * **Data/artifacts (defaults)**: \~**1–3 GB**
   * **Recommendation**: keep **≥ 8 GB** free to be safe

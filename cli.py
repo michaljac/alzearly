@@ -5,7 +5,6 @@ Alzearly CLI - Command Line Interface for Alzheimer's Prediction Pipeline
 Usage:
     python cli.py train --tracker none
     python cli.py train --tracker mlflow --rows 1000
-    python cli.py train --tracker wandb --seed 123
 """
 
 import argparse
@@ -106,13 +105,6 @@ def run_with_docker(args) -> int:
         ]
         
         # Add environment variables
-        if args.tracker == 'wandb':
-            wandb_key = os.getenv('WANDB_API_KEY')
-            if wandb_key:
-                cmd.extend(['-e', f'WANDB_API_KEY={wandb_key}'])
-            else:
-                print("⚠️  WANDB_API_KEY not set. WandB tracking may fail.")
-        
         cmd.extend(['alzearly-train', 'python', 'run_training.py'])
         
         # Add arguments
@@ -189,11 +181,7 @@ def run_with_python(args, modules) -> int:
         timestamped_dir.mkdir(parents=True, exist_ok=True)
         
         # Set up experiment tracking based on tracker parameter
-        if args.tracker == "wandb":
-            print(f"🔬 Setting up experiment tracking: {args.tracker}")
-            from utils import setup_wandb
-            global_tracker, tracker_type = setup_wandb()
-        elif args.tracker == "mlflow":
+        if args.tracker == "mlflow":
             print(f"🔬 Setting up experiment tracking: {args.tracker}")
             from utils import setup_mlflow
             global_tracker, tracker_type = setup_mlflow()
@@ -306,7 +294,6 @@ def main():
 Examples:
   python cli.py train --tracker none
   python cli.py train --tracker mlflow --rows 1000
-  python cli.py train --tracker wandb --seed 123
         """
     )
     
@@ -316,7 +303,7 @@ Examples:
     train_parser = subparsers.add_parser('train', help='Run the complete training pipeline')
     train_parser.add_argument(
         '--tracker', 
-        choices=['none', 'mlflow', 'wandb'], 
+        choices=['none', 'mlflow'], 
         default='none',
         help='Experiment tracker to use (default: none)'
     )

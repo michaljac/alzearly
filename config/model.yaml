@@ -77,7 +77,5 @@ output:
 experiment_tracking:
   # Whether to enable experiment tracking
   enabled: true
-  # Tracking backend (wandb, mlflow, none)
-  backend: "wandb"
   # Project name for tracking
   project_name: "alzheimers_prediction"

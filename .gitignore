@@ -7,7 +7,6 @@ mlruns/
 *.parquet
 *.pkl
 models/
-wandb/
 plots/
 
 # Generated images (but keep the logo)
@@ -17,7 +16,6 @@ plots/
 !hippo.jpeg  # Keep the project logo
 
 # Docker build context exclusions
-wandb/
 __pycache__/
 *.log
 

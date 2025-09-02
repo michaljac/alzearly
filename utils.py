@@ -99,7 +99,6 @@ def check_dependencies() -> bool:
         'seaborn': 'seaborn',
         'tqdm': 'tqdm',
         'typer': 'typer',
-        'wandb': 'wandb',
         'mlflow': 'mlflow'
     }
     
@@ -178,31 +177,27 @@ def setup_experiment_tracker():
     
     # Present menu to user
     print("Select experiment tracker:")
-    print("1. Weights & Biases (wandb)")
-    print("2. MLflow (local)")
-    print("3. No tracking")
+    print("1. MLflow (local)")
+    print("2. No tracking")
     
     while True:
         try:
-            choice = input("\nEnter choice (1-3, default=1): ").strip()
+            choice = input("\nEnter choice (1-2, default=1): ").strip()
             if choice == "":
                 choice = "1"
             
-            if choice in ["1", "2", "3"]:
+            if choice in ["1", "2"]:
                 break
             else:
-                print("❌ Invalid choice. Please enter 1, 2, or 3.")
+                print("❌ Invalid choice. Please enter 1, 2")
+                
         except (KeyboardInterrupt, EOFError, OSError) as e:
             print(f"\n\n⚠️  Input error ({type(e).__name__}). Using no tracking.")
             print("💡 This might happen in non-interactive environments.")
             return None, "none"
     
-    # Handle wandb selection
-    if choice == "1":
-        return setup_wandb()
-    
     # Handle MLflow selection
-    elif choice == "2":
+    if choice == "1":
         return setup_mlflow()
     
     # Handle no tracking
@@ -210,73 +205,6 @@ def setup_experiment_tracker():
         print("✅ No experiment tracking will be used.")
         return None, "none"
 
-
-def setup_wandb():
-    """Set up Weights & Biases tracking."""
-    print("\n🔧 Setting up Weights & Biases...")
-    
-    # Try to import wandb
-    try:
-        import wandb
-        print("✅ wandb available")
-    except ImportError:
-        print("❌ wandb not available - please install it in the Dockerfile")
-        print("🔄 Falling back to no tracking")
-        return None, "none"
-    
-    # Check for API key in environment
-    import os
-    api_key = os.environ.get('WANDB_API_KEY')
-    
-    if api_key:
-        try:
-            wandb.login(key=api_key)
-            print("✅ Wandb login successful")
-            return wandb, "wandb"
-        except Exception as e:
-            print(f"❌ Wandb login failed: {e}")
-            print("🔄 Falling back to interactive setup")
-    
-    # No API key in environment - ask user
-    print("\n📝 Weights & Biases Setup:")
-    print("   - Get your API key from: https://wandb.ai/settings")
-    print("   - Or press Enter to run in disabled mode")
-    
-    try:
-        user_key = input("Enter API key (or press Enter for disabled mode): ").strip()
-        
-        if user_key:
-            try:
-                wandb.login(key=user_key)
-                print("✅ Wandb login successful")
-                return wandb, "wandb"
-            except Exception as e:
-                print(f"❌ Wandb login failed: {e}")
-                print("🔄 Falling back to disabled mode")
-        
-        # User chose disabled mode or login failed
-        print("🔄 Running wandb in disabled mode...")
-        os.environ["WANDB_MODE"] = "disabled"
-        try:
-            wandb.init(mode="disabled")
-            print("✅ Wandb disabled mode initialized")
-            return wandb, "wandb"
-        except Exception as e:
-            print(f"❌ Wandb disabled mode failed: {e}")
-            print("🔄 Falling back to no tracking")
-            return None, "none"
-            
-    except (KeyboardInterrupt, EOFError):
-        print("\n🔄 User cancelled - running in disabled mode...")
-        os.environ["WANDB_MODE"] = "disabled"
-        try:
-            wandb.init(mode="disabled")
-            print("✅ Wandb disabled mode initialized")
-            return wandb, "wandb"
-        except Exception as e:
-            print(f"❌ Wandb disabled mode failed: {e}")
-            print("🔄 Falling back to no tracking")
-            return None, "none"
 
 
 def setup_mlflow():
@@ -320,11 +248,7 @@ tracker_type = "none"
 def log_metrics(metrics_dict, step=None):
     """Log metrics to the appropriate tracker."""
     global tracker, tracker_type
-    if tracker_type == "wandb" and tracker:
-        if step is not None:
-            metrics_dict["step"] = step
-        tracker.log(metrics_dict)
-    elif tracker_type == "mlflow" and tracker:
+    if tracker_type == "mlflow" and tracker:
         for key, value in metrics_dict.items():
             if step is not None:
                 tracker.log_metric(key, value, step=step)
@@ -335,20 +259,14 @@ def log_metrics(metrics_dict, step=None):
 def log_artifact(artifact_path, artifact_name, artifact_type="model"):
     """Log artifacts to the appropriate tracker."""
     global tracker, tracker_type
-    if tracker_type == "wandb" and tracker:
-        artifact = tracker.Artifact(name=artifact_name, type=artifact_type)
-        artifact.add_dir(str(artifact_path))
-        tracker.log_artifact(artifact)
-    elif tracker_type == "mlflow" and tracker:
+    if tracker_type == "mlflow" and tracker:
         tracker.log_artifact(str(artifact_path), artifact_name)
 
 
 def log_table(dataframe, table_name):
     """Log tables to the appropriate tracker."""
     global tracker, tracker_type
-    if tracker_type == "wandb" and tracker:
-        tracker.log({table_name: tracker.Table(dataframe=dataframe)})
-    elif tracker_type == "mlflow" and tracker:
+    if tracker_type == "mlflow" and tracker:
         # MLflow doesn't have direct table logging, so we'll log as artifact
         import tempfile
         with tempfile.NamedTemporaryFile(mode='w', suffix='.csv', delete=False) as f:
@@ -359,14 +277,7 @@ def log_table(dataframe, table_name):
 def log_plot(plot_data, plot_name, plot_type="roc_curve"):
     """Log plots to the appropriate tracker."""
     global tracker, tracker_type
-    if tracker_type == "wandb" and tracker:
-        if plot_type == "roc_curve":
-            tracker.log({plot_name: tracker.plot.roc_curve(**plot_data)})
-        elif plot_type == "pr_curve":
-            tracker.log({plot_name: tracker.plot.pr_curve(**plot_data)})
-        elif plot_type == "confusion_matrix":
-            tracker.log({plot_name: tracker.plot.confusion_matrix(**plot_data)})
-    elif tracker_type == "mlflow" and tracker:
+    if tracker_type == "mlflow" and tracker:
         # For MLflow, we'll save plots as artifacts
         import matplotlib.pyplot as plt
         import tempfile
@@ -393,28 +304,20 @@ def log_plot(plot_data, plot_name, plot_type="roc_curve"):
 def start_run(run_name=None, config=None):
     """Start a new run with the appropriate tracker."""
     global tracker, tracker_type
-    if tracker_type == "wandb" and tracker:
-        if config is None:
-            config = {}
-        tracker.init(name=run_name, config=config)
-    elif tracker_type == "mlflow" and tracker:
+    if tracker_type == "mlflow" and tracker:
         tracker.start_run(run_name=run_name)
 
 
 def end_run():
     """End the current run with the appropriate tracker."""
     global tracker, tracker_type
-    if tracker_type == "wandb" and tracker:
-        tracker.finish()
-    elif tracker_type == "mlflow" and tracker:
+    if tracker_type == "mlflow" and tracker:
         tracker.end_run()
 
 
 def get_run_id():
     """Get the current run ID from the appropriate tracker."""
     global tracker, tracker_type
-    if tracker_type == "wandb" and tracker and tracker.run:
-        return tracker.run.id
-    elif tracker_type == "mlflow" and tracker:
+    if tracker_type == "mlflow" and tracker:
         return tracker.active_run().info.run_id if tracker.active_run() else None
     return None
