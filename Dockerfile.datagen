@@ -1,8 +1,0 @@
-ARG BASE_TAG=alzearly-base:py310
-FROM ${BASE_TAG} As datagen
-
-COPY requirements-datagen.txt .
-RUN pip install --no-cache-dir --prefer-binary -r requirements-datagen.txt
-
-COPY . .
-CMD ["python", "run_datagen.py"]

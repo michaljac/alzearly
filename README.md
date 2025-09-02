@@ -44,17 +44,14 @@ mkdir -p artifacts && chmod -R 777 artifacts
 ```
 - windows
 
-3. **Build the images**
+3. **Build the image**
 - linux
-#base image
 ```bash
-docker build --network=host -t alzearly-base:py310 -f Dockerfile.base .
+docker build --network=host -t alzearly:v1 -f Dockerfile .
 ```
-#other images
 ```bash
-docker build --network=host -t alzearly-datagen:v1 -f Dockerfile.datagen .
-docker build --network=host -t alzearly-train:v1   -f Dockerfile.train   .
-docker build --network=host -t alzearly-serve:v1   -f Dockerfile.serve   .
+export COMPOSE_PROFILES=datagen,training,serve
+docker compose up
 ```
 
 - windows

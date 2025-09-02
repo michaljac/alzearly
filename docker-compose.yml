@@ -1,8 +1,9 @@
 services:
-  # Data generation service
+  # 1) Data generation (batch) — exits 0 when done
   datagen:
-    image: alzearly-datagen:v1
-    container_name: alzearly-datagen
+    image: alzearly:v1
+    # container_name removed to avoid name clashes across folders
+    working_dir: /workspace
     volumes:
       - .:/workspace
       - ../Data/alzearly:/Data
@@ -14,12 +15,13 @@ services:
       - POLARS_FORCE_OPTIMIZED=1
       - POLARS_USE_STREAMING=0
     command: ["python", "run_datagen.py"]
-    profiles: [datagen]
+    # Optional: run only this via `--profile datagen`
+    profiles: ["datagen"]
 
-  # Training service
+  # 2) Training (batch) — waits for datagen to complete, then exits 0 when done
   training:
-    image: alzearly-train:v1
-    container_name: alzearly-train
+    image: alzearly:v1
+    working_dir: /workspace
     volumes:
       - .:/workspace
       - ../Data/alzearly:/Data
@@ -32,17 +34,16 @@ services:
       - WANDB_API_KEY=${WANDB_API_KEY:-}
       - PYTHONPATH=/workspace
     command: ["python", "run_training.py", "--config", "config/model.yaml"]
-    profiles: [training]
+    depends_on:
+      datagen:
+        condition: service_completed_successfully
+    profiles: ["training"]
 
-  # Serving service - FastAPI
+  # 3) Serving (FastAPI) — starts only after training completed successfully
   serve:
-    image: alzearly-serve:v1
-    container_name: alzearly-serve
-    network_mode: "host" 
-    # ports:
-    #   - target: 8001
-    #     published: ${SERVE_PORT:-0}   # 0 = auto-pick a free host port; set SERVE_PORT to force a port
-    #     protocol: tcp
+    image: alzearly:v1
+    network_mode: "host"     # Linux only; exposes on localhost of the host
+    working_dir: /workspace
     volumes:
       - ./artifacts:/workspace/artifacts
       - ./config:/workspace/config
@@ -52,19 +53,17 @@ services:
     environment:
       - PYTHONUNBUFFERED=1
       - PYTHONPATH=/workspace
-    working_dir: /workspace
-    command: ["--host", "0.0.0.0", "--port", "8001"]
-    profiles: [serve]
+    command: ["python", "run_serve.py", "--host", "0.0.0.0", "--port", "8001"]
+    restart: unless-stopped
+    depends_on:
+      training:
+        condition: service_completed_successfully
+    profiles: ["serve"]
 
-
-
-
-
-
-  # Complete pipeline (training only)
+  # (Optional) Training-only, as a single "pipeline" service
   pipeline:
-    image: alzearly-train:v1
-    container_name: alzearly-pipeline
+    image: alzearly:v1
+    working_dir: /workspace
     volumes:
       - .:/workspace
       - ../Data/alzearly:/Data
@@ -77,13 +76,13 @@ services:
       - WANDB_API_KEY=${WANDB_API_KEY:-}
       - PYTHONPATH=/workspace
     command: ["python", "run_training.py", "--config", "config/model.yaml"]
-    profiles: [pipeline]
+    profiles: ["pipeline"]
 
-  # Pipeline that starts a server from your script
+  # (Optional) Your script that starts its own server
   pipeline-serve:
-    image: alzearly-train:v1
-    container_name: alzearly-pipeline-serve
+    image: alzearly:v1
     network_mode: "host"
+    working_dir: /workspace
     volumes:
       - .:/workspace
       - ../Data/alzearly:/Data
@@ -91,10 +90,8 @@ services:
       - PYTHONUNBUFFERED=1
       - PYTHONPATH=/workspace
       - NON_INTERACTIVE=true
-    working_dir: /workspace
     command: ["python", "pipeline_with_server.py"]
-    profiles: [pipeline-serve]
-
+    profiles: ["pipeline-serve"]
 
 networks:
   default:

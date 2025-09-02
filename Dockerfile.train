@@ -1,8 +1,0 @@
-ARG BASE_TAG=alzearly-base:py310
-FROM ${BASE_TAG} As train
-
-COPY requirements-train.txt .
-RUN pip install --no-cache-dir --prefer-binary -r requirements-train.txt
-
-COPY . .
-CMD ["python", "run_training.py", "--config", "config/model.yaml"]

@@ -1,6 +1,0 @@
-# Data generation essentials
-polars==0.20.3
-pyarrow==12.0.1
-faker==19.3.1
-tqdm==4.65.0
-typer==0.12.3
