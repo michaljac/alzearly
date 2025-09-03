@@ -11,7 +11,7 @@ A FastAPI-based service for predicting Alzheimer's disease risk from patient cli
 ### Local (Docker Compose)
 - **Containers:** `alzearly-datagen`, `alzearly-train`, `alzearly-serve`
 - **Flow:** data → `/Data/featurized/` → train → `artifacts/latest/` → FastAPI serve
-- **Run:** `docker-compose --profile pipeline-serve up` → API at `localhost:8001`
+- **Run:** `python scripts/start_compose.py`
 
 ### Cloud (GCP)
 - **Region:** `europe-west4` (Netherlands) for EU locality
@@ -104,31 +104,51 @@ The default port is 8001, but you can customize it:
 
 **Data Generation Only:**
 ```bash
-docker-compose --profile datagen
+docker-compose --profile datagen up
 ```
 
 **Training Only:**
 ```bash
-docker-compose --profile training
+docker-compose --profile training up
 ```
 
 **Serving Only (requires trained models):**
 ```bash
-docker-compose --profile serve
+docker-compose --profile serve up
 ```
 
 ## <img src="readme_images/hippo.jpeg" width="20" height="20" style="vertical-align: middle; margin-right: 8px;"> Project Structure
 
 ```
-parent_directory/
-├── Data/
-│   └── alzearly/          # Data directory (created automatically)
-│       ├── raw/           # Raw generated data
-│       └── featurized/    # Processed features
-└── alzearly/           # Current project directory
-    ├── docker-compose.yml # Cross-platform orchestration
-    ├── artifacts/         # Trained models
-    └── ...
+alzearly/                    # Project root
+├── Dockerfile               # Main application image
+├── .dockerignore            # Docker exclusions
+├── src/                     # Source code
+│   ├── api/                # API server code
+│   │   └── run_serve.py    # FastAPI server
+│   ├── cli/                # Command-line tools
+│   │   ├── cli.py          # Main CLI interface
+│   │   ├── run_datagen.py  # Data generation
+│   │   └── run_training.py # Model training
+│   ├── config.py           # Configuration management
+│   ├── data_gen.py         # Data generation logic
+│   ├── preprocess.py       # Data preprocessing
+│   ├── train.py            # Model training
+│   ├── utils.py            # Utility functions
+│   └── ...                 # Other modules
+├── scripts/                 # Platform-specific scripts
+│   ├── start_compose.py    # Cross-platform launcher
+│   ├── start_compose.sh    # Linux/macOS startup
+│   └── start_compose.bat   # Windows startup
+├── config/                  # Configuration files
+│   ├── data_gen.yaml       # Data generation config
+│   ├── model.yaml          # Model training config
+│   ├── preprocess.yaml     # Preprocessing config
+│   └── serve.yaml          # Server configuration
+├── tests/                   # Test suite
+├── docker-compose.yml       # Service orchestration
+├── requirements.txt         # Python dependencies
+└── README.md               # This file
 ```
 
 ## <img src="readme_images/hippo.jpeg" width="20" height="20" style="vertical-align: middle; margin-right: 8px;"> Key Implementation Snippets
@@ -139,7 +159,7 @@ parent_directory/
 def run_training_pipeline():
     """Run the complete training pipeline automatically."""
     try:
-        from run_training import main
+        from src.cli.run_training import main
         return main() == 0
     except Exception as e:
         print(f"❌ Training pipeline failed: {e}")
@@ -155,27 +175,29 @@ If you prefer to run containers individually or need custom configurations:
 
 ### **Build Images**
 ```bash
-# Build all containers
-docker build -f Dockerfile.datagen -t alzearly-datagen .
-docker build -f Dockerfile.train -t alzearly-train .
-docker build -f Dockerfile.serve -t alzearly-serve .
+# Build main application image
+# Linux/macOS (with network host for faster builds)
+docker build --network=host -f Dockerfile -t alzearly:v1 .
+
+# Windows (without network host flag)
+docker build -f Dockerfile -t alzearly:v1 .
 ```
 
 ### **Run Individual Services**
 
 **Data Generation:**
 ```bash
-docker run --rm -v "$(pwd):/workspace" -v "$(pwd)/../Data/alzearly:/Data" alzearly-datagen:v1
+docker run --rm -v "$(pwd):/workspace" -v "$(pwd)/../Data/alzearly:/Data" alzearly:v1 python src/cli/run_datagen.py
 ```
 
 **Training:**
 ```bash
-docker run --rm -v "$(pwd):/workspace" -v "$(pwd)/../Data/alzearly:/Data" alzearly-train:v1
+docker run --rm -v "$(pwd):/workspace" -v "$(pwd)/../Data/alzearly:/Data" alzearly:v1 python src/cli/run_training.py
 ```
 
 **Serving (with port mapping):**
 ```bash
-docker run --rm -v "$(pwd)/artifacts:/workspace/artifacts" -v "$(pwd)/config:/workspace/config" -v "$(pwd)/src:/workspace/src" -v "$(pwd)/run_serve.py:/workspace/run_serve.py" -v "$(pwd)/utils.py:/workspace/utils.py" -p 8001:8001 alzearly-serve:v1
+docker run --rm -v "$(pwd):/workspace" -v "$(pwd)/../Data/alzearly:/Data" -p 8001:8001 alzearly:v1 python src/api/run_serve.py
 ```
 
 **Note:** These commands work on Windows, Linux, and Mac. Docker Compose is recommended for easier management.
@@ -267,11 +289,11 @@ train_patients, val_patients = train_test_split(
 
 <div>
 
-**Easiest way:** Visit `http://localhost:8000/docs` for interactive testing
+**Easiest way:** Visit `http://localhost:8001/docs` for interactive testing
 
 **Quick test with curl:**
 ```bash
-curl -s -X POST http://localhost:8000/predict \
+curl -s -X POST http://localhost:8001/predict \
   -H "Content-Type: application/json" \
   -d @examples/predict_request.json | jq .
 ```
@@ -329,9 +351,7 @@ curl -s -X POST http://localhost:8000/predict \
 ### **Container Specifications**
 | Container | Base Image | Purpose | Key Dependencies |
 |-----------|------------|---------|------------------|
-| `alzearly-datagen` | Python 3.10-slim | Data generation & preprocessing | pandas, polars, numpy |
-| `alzearly-train` | Python 3.10-slim | ML training & experiment tracking | xgboost, sklearn, mlflow |
-| `alzearly-serve` | Python 3.10-slim-bullseye | API serving | fastapi, uvicorn, pydantic |
+| `alzearly:v1` | Python 3.10-slim-bullseye | All services (datagen, train, serve) | pandas, polars, numpy, xgboost, sklearn, mlflow, fastapi, uvicorn |
 
 
 
@@ -415,7 +435,7 @@ xgboost:
 <div>
 
 ### **Common Issues:**
-- **Port Already in Use**: Let server auto-find port or specify: `python run_serve.py --port 8005`
+- **Port Already in Use**: Let server auto-find port or specify: `python src/api/run_serve.py --port 8005`
 - **Model Not Found**: Ensure training completed and `artifacts/latest/` exists
 - **YAML/PyYAML Issues**: Docker containers handle dependencies automatically
 
@@ -430,7 +450,11 @@ All Python dependencies (including PyYAML) are pre-installed in Docker container
 <div>
 
 - `docker-compose.yml` - Cross-platform orchestration
-- `run_serve.py` - Main server script
+- `Dockerfile` - Main application image
+- `src/api/run_serve.py` - FastAPI server script
+- `src/cli/run_training.py` - Model training script
+- `src/cli/run_datagen.py` - Data generation script
+- `scripts/start_compose.py` - Cross-platform launcher
 - `artifacts/latest/` - Trained model and metadata
 - `requirements.txt` - Python dependencies
 - `config/` - Configuration files directory
