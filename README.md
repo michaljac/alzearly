@@ -37,12 +37,17 @@ A FastAPI-based service for predicting Alzheimer's disease risk from patient cli
    cd alzearly
    ```
 2. **Prerequisites**
-- linux
+- **Linux/macOS:**
 ```bash
 mkdir -p ../Data/alzearly/{raw,featurized} && chmod -R 777 ../Data/alzearly
 mkdir -p artifacts && chmod -R 777 artifacts
 ```
-- windows
+- **Windows:**
+```cmd
+md ..\Data\alzearly\raw
+md ..\Data\alzearly\featurized
+md artifacts
+```
 
 3. **Build the image**
 - linux/macOS
