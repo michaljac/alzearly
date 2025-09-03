@@ -22,7 +22,7 @@ ENV PIP_NO_CACHE_DIR=1 \
 
 # Allow overriding at runtime (Compose) but provide sane defaults
 ENV APP_PORT=8001 \
-    HOST=0.0.0.0
+    APP_HOST=0.0.0.0
 
 WORKDIR /workspace
 

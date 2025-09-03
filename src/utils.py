@@ -149,61 +149,12 @@ def setup_experiment_tracker():
     warnings.filterwarnings("ignore", message="Field.*has conflict with protected namespace")
     warnings.filterwarnings("ignore", message="Valid config keys have changed in V2")
     
-    # Check if we're in non-interactive mode (Docker container)
-    import os
-    if os.environ.get('NON_INTERACTIVE', 'false').lower() == 'true':
-        print("\n🔬 Experiment Tracking Setup (Non-interactive mode)")
-        print("=" * 50)
-        print("✅ Using no experiment tracking for Docker container")
-        return None, "none"
-    
-    # Check if we're in a non-interactive environment
-    try:
-        import sys
-        if not sys.stdin.isatty():
-            print("\n🔬 Experiment Tracking Setup (Non-interactive environment)")
-            print("=" * 50)
-            print("✅ Using no experiment tracking for non-interactive environment")
-            return None, "none"
-    except:
-        # If we can't check, assume non-interactive
-        print("\n🔬 Experiment Tracking Setup (Non-interactive environment)")
-        print("=" * 50)
-        print("✅ Using no experiment tracking for non-interactive environment")
-        return None, "none"
-    
     print("\n🔬 Experiment Tracking Setup")
     print("=" * 50)
     
-    # Present menu to user
-    print("Select experiment tracker:")
-    print("1. MLflow (local)")
-    print("2. No tracking")
-    
-    while True:
-        try:
-            choice = input("\nEnter choice (1-2, default=1): ").strip()
-            if choice == "":
-                choice = "1"
-            
-            if choice in ["1", "2"]:
-                break
-            else:
-                print("❌ Invalid choice. Please enter 1, 2")
-                
-        except (KeyboardInterrupt, EOFError, OSError) as e:
-            print(f"\n\n⚠️  Input error ({type(e).__name__}). Using no tracking.")
-            print("💡 This might happen in non-interactive environments.")
-            return None, "none"
-    
-    # Handle MLflow selection
-    if choice == "1":
-        return setup_mlflow()
-    
-    # Handle no tracking
-    else:
-        print("✅ No experiment tracking will be used.")
-        return None, "none"
+    # Automatically choose MLflow (no user input required)
+    print("✅ Automatically selecting MLflow for experiment tracking")
+    return setup_mlflow()
 
 
 

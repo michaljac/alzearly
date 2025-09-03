@@ -45,33 +45,57 @@ mkdir -p artifacts && chmod -R 777 artifacts
 - windows
 
 3. **Build the image**
-- linux
+- linux/macOS
 ```bash
 docker build --network=host -t alzearly:v1 -f Dockerfile .
 ```
-
-4. **docker compose**
-```bash
-chmod +x scripts/start_compose.sh
-./scripts/start_compose.sh
-```
-  **re-train if wants to**
-```bash
-docker compose run --rm training && docker compose restart serve
-```
-
-
 - windows
 ```bash
 docker build -t alzearly:v1 -f Dockerfile .
 ```
 
+4. **Start the services (Cross-platform):**
+
+**Option A: Use the Python launcher (Recommended):**
+```bash
+python scripts/start_compose.py
+```
+
+**Option B: Use OS-specific scripts:**
+- **Linux/macOS:**
+  ```bash
+  chmod +x scripts/start_compose.sh
+  ./scripts/start_compose.sh
+  ```
+- **Windows:**
+  ```cmd
+  scripts\start_compose.bat
+  ```
+
+**Re-train if needed:**
+```bash
+python scripts/start_compose.py --retrain
+```
+
+**💡 Port Configuration:**
+The default port is 8001, but you can customize it:
+- **Environment variable:** `APP_PORT=8002 python scripts/start_compose.py`
+- **Config file:** Edit `config/serve.yaml` to change `app_port: 8002`
+- **Auto-port discovery:** If port 8001 is busy, the system will automatically find an available port
+
+
 4. **Access the API:**
-   - **API Documentation:** `http://localhost:8001/docs`
-   - **Health Check:** `http://localhost:8001/health`
-   - **Predictions:** `http://localhost:8001/predict`
+   - **API Documentation:** `http://localhost:8001/docs` (or your configured port)
+   - **Health Check:** `http://localhost:8001/health` (or your configured port)
+   - **Predictions:** `http://localhost:8001/predict` (or your configured port)
+
 
 **That's it!** The pipeline will automatically generate data, train models, and start the API server.
+
+**💡 Automation Features:**
+- **MLflow tracking** is automatically enabled (no user input required)
+- **Port discovery** automatically finds available ports if defaults are busy
+- **Smart data detection** only generates data when needed
 
 </div>
 
@@ -109,27 +133,6 @@ parent_directory/
 
 ## <img src="readme_images/hippo.jpeg" width="20" height="20" style="vertical-align: middle; margin-right: 8px;"> Key Implementation Snippets
 
-<div>
-
-**Docker Compose - Cross-Platform Pipeline:**
-```yaml
-# Complete pipeline with auto-serve (training + serving)
-pipeline-serve:
-  image: alzearly-train:v1
-  container_name: alzearly-pipeline-serve
-  network_mode: "host"
-  volumes:
-    - .:/workspace
-    - ../Data/alzearly:/Data
-  environment:
-    - PYTHONUNBUFFERED=1
-    - PYTHONPATH=/workspace
-    - NON_INTERACTIVE=true
-  working_dir: /workspace
-  command: ["python", "pipeline_with_server.py"]
-  profiles: [pipeline-serve]
-```
-
 **Smart Data Detection in Pipeline:**
 ```python
 # Automatically detects if data exists and generates if needed
@@ -142,9 +145,6 @@ def run_training_pipeline():
         print(f"❌ Training pipeline failed: {e}")
         return False
 ```
-
-
-
 
 
 ## <img src="readme_images/hippo.jpeg" width="20" height="20" style="vertical-align: middle; margin-right: 8px;"> Manual Docker Commands (Advanced)
@@ -370,7 +370,7 @@ class_imbalance:
 
 ### **Core Technologies & Libraries**
 - **🤖 ML Stack**: XGBoost, Scikit-learn, NumPy/Pandas, Polars
-- **📊 MLOps**: MLflow, Weights & Biases, Pydantic, FastAPI
+- **📊 MLOps**: MLflow (automatically enabled), Pydantic, FastAPI
 - **🐳 DevOps**: Docker, Volume Mounts, Environment Variables
 
 ### **Critical Parameters Explained**

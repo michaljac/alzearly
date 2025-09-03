@@ -40,15 +40,19 @@ from sklearn.metrics import (
 import xgboost as xgb
 from sklearn.linear_model import LogisticRegression
 from imblearn.over_sampling import SMOTE
-import optuna
-import matplotlib.pyplot as plt
-import seaborn as sns
+# Optional plotting imports - only import if needed
+try:
+    import matplotlib.pyplot as plt
+    import seaborn as sns
+    PLOTTING_AVAILABLE = True
+except ImportError:
+    PLOTTING_AVAILABLE = False
 from tqdm import tqdm
 
 logger = logging.getLogger(__name__)
 
 # Experiment tracking utils (kept as in your code)
-from utils import (
+from .utils import (
     log_metrics, log_artifact, log_table, log_plot,
     start_run, end_run, get_run_id, tracker, tracker_type
 )
@@ -455,70 +459,32 @@ class ModelTrainer:
 
     def _train_xgboost_with_tuning(self, X_train: np.ndarray, y_train: np.ndarray,
                                    X_val: np.ndarray, y_val: np.ndarray) -> xgb.XGBClassifier:
-        def objective(trial):
-            trial_start = time.time()
-            params = {
-                'n_estimators': trial.suggest_int('n_estimators', 50, 300),
-                'max_depth': trial.suggest_int('max_depth', 3, 10),
-                'learning_rate': trial.suggest_float('learning_rate', 0.01, 0.3, log=True),
-                'subsample': trial.suggest_float('subsample', 0.6, 1.0),
-                'colsample_bytree': trial.suggest_float('colsample_bytree', 0.6, 1.0),
-                'reg_alpha': trial.suggest_float('reg_alpha', 0.001, 10.0, log=True),
-                'reg_lambda': trial.suggest_float('reg_lambda', 0.001, 10.0, log=True),
-                'random_state': self.config.random_state,
-                'eval_metric': 'logloss'
-            }
-            if self.config.handle_imbalance == "class_weight":
-                neg = np.sum(y_train == 0); pos = np.sum(y_train == 1)
-                params['scale_pos_weight'] = (neg / max(pos, 1))
-            cv = StratifiedKFold(n_splits=2, shuffle=True, random_state=self.config.random_state)
-            scores = []
-            for tr_idx, va_idx in cv.split(X_train, y_train):
-                X_tr, X_va = X_train[tr_idx], X_train[va_idx]
-                y_tr, y_va = y_train[tr_idx], y_train[va_idx]
-                cv_params = params.copy()
-                cv_params.update({'n_estimators': min(25, params['n_estimators']), 'tree_method': 'hist', 'verbosity': 0})
-                model = xgb.XGBClassifier(**cv_params)
-                model.fit(X_tr, y_tr, verbose=False)
-                y_proba = model.predict_proba(X_va)[:, 1]
-                scores.append(roc_auc_score(y_va, y_proba))
-            if hasattr(self, 'tracker') and self.tracker:
-                self.tracker["log"]({
-                    'trial_number': trial.number,
-                    'cv_roc_auc_mean': float(np.mean(scores)),
-                    'cv_roc_auc_std': float(np.std(scores)),
-                    'training_time': time.time() - trial_start
-                })
-            return float(np.mean(scores))
-
-        study = optuna.create_study(direction='maximize',
-                                    sampler=optuna.samplers.TPESampler(seed=self.config.random_state))
-        n_trials = getattr(self.config, 'n_trials', 20)
-        print(f"  🔍 Hyperparameter tuning ({n_trials} trials)...")
-        with tqdm(total=n_trials, desc="Optuna trials", unit="trial",
-                  bar_format="{desc}: {percentage:3.0f}%|{bar}| {n_fmt}/{total_fmt} [{elapsed}<{remaining}]",
-                  ncols=60, ascii=True, position=1, leave=False) as pbar:
-            def cb(study_, trial_):
-                pbar.update(1)
-                pbar.set_postfix({'best': f"{study_.best_value:.4f}"})
-            study.optimize(objective, n_trials=n_trials, callbacks=[cb])
-
-        best_params = study.best_params
-        if hasattr(self, 'tracker') and self.tracker:
-            self.tracker["log"]({f"best_{k}": v for k, v in best_params.items()})
-            self.tracker["log"]({"best_cv_score": float(study.best_value)})
-
-        # Optional: importance plot saving skipped for brevity/robustness
-
-        final_params = best_params.copy()
-        final_params['random_state'] = self.config.random_state
-        final_params['eval_metric'] = 'logloss'
+        """Train XGBoost with optimized default parameters (no hyperparameter tuning)."""
+        print("  🚀 Training XGBoost with optimized defaults...")
+        
+        # Use the default parameters from config (already optimized)
+        params = self.config.xgb_params.copy()
+        
+        # Handle class imbalance
         if self.config.handle_imbalance == "class_weight":
-            neg = np.sum(y_train == 0); pos = np.sum(y_train == 1)
-            final_params['scale_pos_weight'] = (neg / max(pos, 1))
-        final_model = xgb.XGBClassifier(**final_params)
-        final_model.fit(X_train, y_train)
-        return final_model
+            neg = np.sum(y_train == 0)
+            pos = np.sum(y_train == 1)
+            params['scale_pos_weight'] = (neg / max(pos, 1))
+        
+        # Create and train model
+        model = xgb.XGBClassifier(**params)
+        
+        if X_val is not None and y_val is not None:
+            model.fit(X_train, y_train, eval_set=[(X_val, y_val)], verbose=False)
+        else:
+            model.fit(X_train, y_train, verbose=False)
+        
+        # Log the parameters used
+        if hasattr(self, 'tracker') and self.tracker:
+            self.tracker["log"]({f"xgb_{k}": v for k, v in params.items()})
+            self.tracker["log"]({"xgb_training_complete": True})
+        
+        return model
 
     def _evaluate_model(self, model, model_name: str, X: np.ndarray, y: np.ndarray, split_name: str) -> Dict[str, float]:
         y_pred = self._predict_model(model, model_name, X)
@@ -543,6 +509,11 @@ class ModelTrainer:
         return float(best)
 
     def _save_plots(self, model_name: str, model, X_test: np.ndarray, y_test: np.ndarray, run_id: str):
+        """Save model evaluation plots if plotting libraries are available."""
+        if not PLOTTING_AVAILABLE:
+            print("  ⚠️  Plotting libraries not available - skipping plots")
+            return
+            
         timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
         plots_dir = ensure_dir(Path("plots") / f"{model_name}_{timestamp}")
         try:
@@ -791,7 +762,7 @@ def train(
         
     # Tracking setup
     if tracker is None:
-        from utils import setup_experiment_tracker
+        from .utils import setup_experiment_tracker
         global_tracker, chosen_tracker_type = setup_experiment_tracker()
     else:
         tracker_lower = tracker.lower()
@@ -799,7 +770,7 @@ def train(
 
         if tracker_lower == "mlflow":
             os.environ['NON_INTERACTIVE'] = 'true'
-            from utils import setup_mlflow
+            from .utils import setup_mlflow
             global_tracker, chosen_tracker_type = setup_mlflow()
         elif tracker_lower == "none":
             os.environ['NON_INTERACTIVE'] = 'true'

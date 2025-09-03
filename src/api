@@ -46,7 +46,7 @@ app = FastAPI(
 # Global variables for model and metadata
 model = None
 feature_names = None
-model_metadata = None
+run_log = None
 optimal_threshold = None
 
 
@@ -169,14 +169,14 @@ class PredictionResponse(BaseModel):
 
 def load_model_and_metadata():
     """Load the trained model and metadata from artifacts/latest/ directory."""
-    global model, feature_names, model_metadata, optimal_threshold
+    global model, feature_names, run_log, optimal_threshold
 
     artifacts_dir = Path("artifacts/latest")
     if not artifacts_dir.exists():
         raise FileNotFoundError("artifacts/latest/ directory not found. Run training first.")
 
     # required files
-    required_files = ["model.pkl", "feature_names.json", "threshold.json", "metrics.json"]
+    required_files = ["model.pkl", "feature_names.json", "run_log.json"]
     for fname in required_files:
         if not (artifacts_dir / fname).exists():
             raise FileNotFoundError(f"Missing required file: {fname} in {artifacts_dir}")
@@ -191,17 +191,24 @@ def load_model_and_metadata():
         feature_names = json.load(f)
     print(f"✅ Feature names loaded: {len(feature_names)} features")
 
-    # Load threshold
-    with open(artifacts_dir / "threshold.json", "r") as f:
-        threshold_data = json.load(f)
-        optimal_threshold = threshold_data.get("optimal_threshold", 0.5)
+    # Load run log (contains metrics and thresholds)
+    with open(artifacts_dir / "run_log.json", "r") as f:
+        run_log = json.load(f)
+    
+    # Extract optimal threshold from run log
+    # Look for threshold in the metrics section
+    optimal_threshold = 0.5  # default
+    for metric_group in run_log.get("metrics", []):
+        for key, value in metric_group.items():
+            if "optimal_threshold" in key:
+                optimal_threshold = value
+                break
+        if optimal_threshold != 0.5:
+            break
+    
     print(f"✅ Threshold loaded: {optimal_threshold}")
-
-    # Load metadata
-    with open(artifacts_dir / "metrics.json", "r") as f:
-        model_metadata = json.load(f)
-    print(f"✅ Model metadata loaded: run_id={model_metadata.get('run_id', 'unknown')}")
-
+    print(f"✅ Model metadata loaded: run_name={run_log.get('run_name', 'unknown')}")
+    
     print("🎉 All artifacts loaded successfully!")
 
 
@@ -275,13 +282,13 @@ async def get_version():
     """
     Get model version information.
     
-    Returns the model version/run ID from metadata.
+    Returns the model version/run name from run log.
     """
-    if model_metadata is None:
+    if run_log is None:
         raise HTTPException(status_code=503, detail="Model metadata not loaded")
     
-    run_id = model_metadata.get('run_id', 'unknown')
-    return {"model_version": run_id}
+    run_name = run_log.get('run_name', 'unknown')
+    return {"model_version": run_name}
 
 
 @app.get("/predict", tags=["Prediction"])
@@ -397,6 +404,12 @@ def can_bind(host: str, port: int) -> bool:
             return False
 
 def find_available_port(start_port: int = 8001, max_attempts: int = 100, host: str = "localhost") -> int:
+    """Find an available port starting from start_port."""
+    # Try to get port from environment first
+    env_port = os.environ.get('APP_PORT')
+    if env_port and env_port.isdigit():
+        start_port = int(env_port)
+    
     for port in range(start_port, start_port + max_attempts):
         if can_bind(host, port):
             return port

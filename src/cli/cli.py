@@ -164,11 +164,11 @@ def run_with_python(args, modules) -> int:
         
         # Set random seed for deterministic runs
         if args.seed:
-            from utils import set_seed
+            from ..utils import set_seed
             set_seed(args.seed)
         else:
             # Use default seed if not specified
-            from utils import set_seed
+            from ..utils import set_seed
             set_seed(42)
         
         # Create artifacts directory

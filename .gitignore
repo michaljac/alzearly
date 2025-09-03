@@ -1,22 +1,74 @@
-.vscode/
+# Python
 __pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+build/
+develop-eggs/
+dist/
+downloads/
+eggs/
+.eggs/
+lib/
+lib64/
+parts/
+sdist/
+var/
+wheels/
+*.egg-info/
+.installed.cfg
+*.egg
+MANIFEST
+
+# Virtual environments
+.env
+.venv
+env/
+venv/
+ENV/
+env.bak/
+venv.bak/
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# Jupyter
 .ipynb_checkpoints/
-.venv/
+
+# ML & Data
 artifacts/
 mlruns/
-*.parquet
-*.pkl
 models/
 plots/
+*.parquet
+*.pkl
+*.h5
+*.hdf5
+
+# Logs
+*.log
+logs/
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Docker
+.dockerignore
 
 # Generated images (but keep the logo)
 *.jpg
 *.png
-# *.jpeg
-!hippo.jpeg  # Keep the project logo
+*.jpeg
+!readme_images/*.jpeg
+!readme_images/*.jpg
+!readme_images/*.png
 
-# Docker build context exclusions
-__pycache__/
-*.log
-
-upload_to_bigquery.py
+# Temporary files
+*.tmp
+*.temp

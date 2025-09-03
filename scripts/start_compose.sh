@@ -4,7 +4,7 @@ set -euo pipefail
 # --- Paths & requirements ---
 DATA_DIR="${DATA_DIR:-../Data/alzearly/featurized}"  # where featurized data ends up
 ART_DIR="${ART_DIR:-artifacts/latest}"               # where trained artifacts live
-REQ_ART=(model.pkl feature_names.json threshold.json metrics.json)
+REQ_ART=(model.pkl feature_names.json threshold.json)
 
 # --- Helpers ---
 have_data() {
@@ -43,9 +43,28 @@ else
 fi
 
 echo "🚀 Starting API server..."
+
+# Read configuration from serve.yaml
+if [ -f "config/serve.yaml" ]; then
+    APP_HOST=$(grep 'app_host:' config/serve.yaml | awk '{print $2}' | tr -d '"')
+    APP_PORT=$(grep 'app_port:' config/serve.yaml | awk '{print $2}' | tr -d '"')
+    
+    # Set default values if not found
+    APP_HOST=${APP_HOST:-0.0.0.0}
+    APP_PORT=${APP_PORT:-8001}
+    
+    echo "🌐 Using host: $APP_HOST"
+    echo "🔌 Using port: $APP_PORT"
+    
+    # Export for docker-compose
+    export APP_HOST APP_PORT
+else
+    echo "⚠️  config/serve.yaml not found, using defaults"
+fi
+
 docker compose up -d serve
 
 echo "📋 Current services:"
 docker compose ps
 
-echo "✅ Done. Open the docs at http://localhost:8001/docs (or the mapped port)"
+echo "✅ Done. Open the docs at http://localhost:${APP_PORT:-8001}/docs"
