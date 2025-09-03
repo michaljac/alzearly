@@ -3,8 +3,6 @@
 import argparse
 import os
 import sys
-import subprocess
-import importlib
 from pathlib import Path
 
 # ---- Permissions -------------------------------------------------------------
@@ -16,28 +14,31 @@ RAW_DIR   = DATA_ROOT / "raw"
 FEAT_DIR  = DATA_ROOT / "featurized"
 
 
-def set_permissive_umask() -> None:
+def set_permissive_umask():
     try:
         os.umask(0)
     except Exception as e:
         print(f"WARNING: could not set umask(0): {e}")
+    return
 
 
-def ensure_dir(p: Path) -> None:
+def ensure_dir(p):
     p.mkdir(parents=True, exist_ok=True)
     try:
         os.chmod(p, DIR_MODE)
     except Exception as e:
         print(f"WARNING: chmod {p} -> {oct(DIR_MODE)} failed: {e}")
+    return
 
 
-def ensure_tree() -> None:
+def ensure_tree():
     ensure_dir(DATA_ROOT)
     ensure_dir(RAW_DIR)
     ensure_dir(FEAT_DIR)
+    return
 
 
-def chmod_recursive(root: Path) -> None:
+def chmod_recursive(root):
     try:
         if root.is_dir():
             os.chmod(root, DIR_MODE)
@@ -52,49 +53,28 @@ def chmod_recursive(root: Path) -> None:
             os.chmod(root, FILE_MODE)
     except Exception as e:
         print(f"WARNING: recursive chmod at {root}: {e}")
+    return
 
 
 # ---- Setup / checks ----------------------------------------------------------
-def setup_paths() -> bool:
+def setup_paths():
     root = Path(__file__).parent.resolve()
-    src = root / "src"
+    # Navigate to project root (two levels up from src/cli/)
+    project_root = root.parent.parent
+    src = project_root / "src"
+    
     # Add both project root and src to sys.path
-    if str(root) not in sys.path:
-        sys.path.insert(0, str(root))
+    if str(project_root) not in sys.path:
+        sys.path.insert(0, str(project_root))
     if src.exists() and str(src) not in sys.path:
         sys.path.insert(0, str(src))
-    if not src.exists():
-        print(f"ERROR: src directory not found at {src}")
-        return False
+    
+    print(f"Project root: {project_root}")
+    print(f"Source directory: {src}")
     return True
 
 
-def check_dependencies() -> bool:
-    required = ["polars", "pyarrow", "faker", "pandas", "numpy"]
-    missing = []
-    for pkg in required:
-        try:
-            __import__(pkg)
-        except ImportError:
-            missing.append(pkg)
-
-    if missing:
-        print(f"Missing packages: {', '.join(missing)}")
-        print("Installing requirements-datagen.txt ...")
-        try:
-            subprocess.run(
-                [sys.executable, "-m", "pip", "install", "-r", "requirements-datagen.txt"],
-                check=True, capture_output=True, text=True
-            )
-            print("Dependencies installed.")
-            return True
-        except subprocess.CalledProcessError as e:
-            print(f"ERROR: pip install failed: {e}")
-            return False
-    return True
-
-
-def featurized_exists() -> bool:
+def featurized_exists():
     if FEAT_DIR.exists():
         if list(FEAT_DIR.glob("*.parquet")) or list(FEAT_DIR.glob("*.csv")):
             print(f"Found featurized data in {FEAT_DIR}")
@@ -102,105 +82,22 @@ def featurized_exists() -> bool:
     return False
 
 
-def try_import_generate():
-    """
-    Try multiple import patterns for the generate function:
-    - src.data_gen: module or package
-    - data_gen:     module or package
-    Returns a callable or raises ImportError with a helpful message.
-    """
-    candidates = [
-        ("src.data_gen", "generate"),
-        ("src.data_gen.generate", "generate"),
-        ("data_gen", "generate"),
-        ("data_gen.generate", "generate"),
-    ]
-    last_err = None
-    for modname, attr in candidates:
-        try:
-            mod = importlib.import_module(modname)
-            fn = getattr(mod, attr, None)
-            if callable(fn):
-                return fn
-        except Exception as e:
-            last_err = e
-    raise ImportError(
-        "Could not import a 'generate' function. "
-        "Create one of:\n"
-        "  - src/data_gen.py  (with def generate(...))\n"
-        "  - src/data_gen/__init__.py or /generate.py (with def generate(...))\n"
-        "  - data_gen.py or data_gen/ (with def generate(...))\n"
-        f"Last error: {last_err}"
-    )
-
-
-def try_import_preprocess():
-    """
-    Try multiple import patterns for the preprocess function:
-    - src.preprocess: module or package
-    - preprocess:     module or package
-    Returns a callable or raises ImportError with a helpful message.
-    """
-    candidates = [
-        ("src.preprocess", "preprocess"),
-        ("src.preprocess.preprocess", "preprocess"),
-        ("preprocess", "preprocess"),
-        ("preprocess.preprocess", "preprocess"),
-    ]
-    last_err = None
-    for modname, attr in candidates:
-        try:
-            mod = importlib.import_module(modname)
-            fn = getattr(mod, attr, None)
-            if callable(fn):
-                return fn
-        except Exception as e:
-            last_err = e
-    raise ImportError(
-        "Could not import a 'preprocess' function. "
-        "Create one of:\n"
-        "  - src/preprocess.py (with def preprocess(...))\n"
-        "  - src/preprocess/__init__.py or /preprocess.py (with def preprocess(...))\n"
-        "  - preprocess.py or preprocess/ (with def preprocess(...))\n"
-        f"Last error: {last_err}"
-    )
-
-
 # ---- Pipeline ----------------------------------------------------------------
-def run_pipeline(args) -> int:
+def run_pipeline(args):
     print("Alzearly Data Generation")
     print("=======================================")
 
     set_permissive_umask()
     ensure_tree()
 
-    # Optional config
-    load_config = None
+    # Check if modules exist (we'll call them via subprocess)
     try:
-        load_config = importlib.import_module("config").load_config
-    except Exception:
-        try:
-            load_config = importlib.import_module("src.config").load_config
-        except Exception:
-            load_config = None
-
-    try:
-        generate_data = try_import_generate()
-        preprocess_data = try_import_preprocess()
+        import src.data_gen
+        import src.preprocess
     except ImportError as e:
-        print(f"ERROR: {e}")
+        print(f"ERROR: Failed to import required modules: {e}")
+        print("Make sure src/data_gen.py and src/preprocess.py exist")
         return 1
-
-    # Defaults from config if available
-    default_n = 3000
-    default_seed = 42
-    if load_config:
-        try:
-            cfg = load_config("data_gen")
-            default_n = getattr(cfg, "n_patients", default_n)
-            default_seed = getattr(cfg, "seed", default_seed)
-        except Exception as e:
-            print(f"NOTE: could not load defaults from config: {e}")
 
     # Raw output dir
     raw_out = Path(args.output_dir or str(RAW_DIR))
@@ -220,26 +117,26 @@ def run_pipeline(args) -> int:
     # Data generation
     if not args.skip_data_gen:
         print("Step 1: Data Generation")
-        years, positive_rate = None, None
-        if load_config:
-            try:
-                cfg = load_config("data_gen")
-                years = getattr(cfg, "years", None)
-                positive_rate = getattr(cfg, "positive_rate", None)
-            except Exception as e:
-                print(f"NOTE: could not load extra params from config: {e}")
-        years = years or [2021, 2022, 2023, 2024]
-        positive_rate = positive_rate or 0.08
-
         try:
-            generate_data(
-                config_file=None,
-                n_patients=args.num_patients or default_n,
-                years=",".join(map(str, years)),
-                positive_rate=positive_rate,
-                out=str(raw_out),
-                seed=args.seed or default_seed,
-            )
+            # Call generate function through subprocess as CLI command
+            import subprocess
+            cmd = [
+                sys.executable, "-m", "src.data_gen",
+                "--n-patients", str(args.num_patients or 3000),
+                "--years", "2021,2022,2023,2024",
+                "--positive-rate", "0.08",
+                "--out", str(raw_out),
+                "--seed", str(args.seed or 42)
+            ]
+            print(f"Running command: {' '.join(cmd)}")
+            result = subprocess.run(cmd, capture_output=True, text=True)
+            
+            if result.returncode != 0:
+                print(f"ERROR: Command failed with exit code {result.returncode}")
+                print(f"STDOUT: {result.stdout}")
+                print(f"STDERR: {result.stderr}")
+                return 1
+                
             print("Data generation: done.")
         except Exception as e:
             print(f"ERROR: data generation failed: {e}")
@@ -250,24 +147,25 @@ def run_pipeline(args) -> int:
     # Preprocessing
     if not args.skip_preprocess:
         print("Step 2: Preprocessing")
-        rolling_window_years = 3
-        chunk_size = 3000
-        if load_config:
-            try:
-                cfg = load_config("data_gen")
-                chunk_size = getattr(cfg, "rows_per_chunk", chunk_size)
-            except Exception as e:
-                print(f"NOTE: could not load preprocess params: {e}")
-
         try:
-            preprocess_data(
-                config_file=None,
-                input_dir=str(raw_out),
-                output_dir=str(FEAT_DIR),
-                rolling_window_years=rolling_window_years,
-                chunk_size=chunk_size,
-                seed=args.seed or default_seed,
-            )
+            # Call preprocess function through subprocess as CLI command
+            cmd = [
+                sys.executable, "-m", "src.preprocess",
+                "--input-dir", str(raw_out),
+                "--output-dir", str(FEAT_DIR),
+                "--rolling-window", "3",
+                "--chunk-size", "3000",
+                "--seed", str(args.seed or 42)
+            ]
+            print(f"Running command: {' '.join(cmd)}")
+            result = subprocess.run(cmd, capture_output=True, text=True)
+            
+            if result.returncode != 0:
+                print(f"ERROR: Command failed with exit code {result.returncode}")
+                print(f"STDOUT: {result.stdout}")
+                print(f"STDERR: {result.stderr}")
+                return 1
+                
             print("Preprocessing: done.")
         except Exception as e:
             print(f"ERROR: preprocessing failed: {e}")
@@ -284,10 +182,8 @@ def run_pipeline(args) -> int:
 
 
 # ---- CLI ---------------------------------------------------------------------
-def main() -> int:
+def main():
     if not setup_paths():
-        return 1
-    if not check_dependencies():
         return 1
 
     ap = argparse.ArgumentParser(description="Alzearly Data Generation")

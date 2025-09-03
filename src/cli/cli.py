@@ -56,15 +56,19 @@ def check_dependencies() -> bool:
 
 def setup_paths() -> bool:
     """Setup Python paths and validate project structure."""
-    # Add src to Python path
-    src_path = Path(__file__).parent / "src"
-    if not src_path.exists():
-        print("❌ src/ directory not found. Are you in the project root?")
-        return False
+    # Navigate to project root (two levels up from src/cli/)
+    current_dir = Path(__file__).parent.absolute()
+    project_root = current_dir.parent.parent
+    src_path = project_root / "src"
     
-    if str(src_path) not in sys.path:
+    # Add both project root and src to sys.path
+    if str(project_root) not in sys.path:
+        sys.path.insert(0, str(project_root))
+    if src_path.exists() and str(src_path) not in sys.path:
         sys.path.insert(0, str(src_path))
     
+    print(f"Project root: {project_root}")
+    print(f"Source directory: {src_path}")
     return True
 
 def import_modules() -> Tuple[bool, dict]:

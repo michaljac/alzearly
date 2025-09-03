@@ -2,7 +2,7 @@ services:
   datagen:
     image: alzearly:v1
     working_dir: /workspace
-    command: ["python", "run_datagen.py", "--config", "config/data_gen.yaml"]
+    command: ["python", "src/cli/run_datagen.py"]
     volumes:
       - .:/workspace
       - ../Data/alzearly:/Data
@@ -14,7 +14,7 @@ services:
   training:
     image: alzearly:v1
     working_dir: /workspace
-    command: ["python", "run_training.py", "--config", "config/model.yaml"]
+    command: ["python", "src/cli/run_training.py"]
     volumes:
       - .:/workspace
       - ../Data/alzearly:/Data
@@ -29,7 +29,7 @@ services:
     ports:
       - "${APP_PORT:-8001}:8001"  # Map host port to container port
     working_dir: /workspace
-    command: ["python", "run_serve.py", "--host", "0.0.0.0", "--port", "8001"]
+    command: ["python", "src/cli/run_serve.py", "--host", "0.0.0.0", "--port", "8001"]
     volumes:
       - .:/workspace
       - ../Data/alzearly:/Data

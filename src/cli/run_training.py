@@ -103,18 +103,21 @@ def setup_paths() -> bool:
     print("🔍 Setting up paths...")
     print()
     
-    # Add src to path - FIXED: More robust path handling
+    # Navigate to project root (two levels up from src/cli/)
     current_dir = Path(__file__).parent.absolute()
-    src_path = current_dir / "src"
+    project_root = current_dir.parent.parent
+    src_path = project_root / "src"
     
-    if src_path.exists():
+    # Add both project root and src to sys.path
+    if str(project_root) not in sys.path:
+        sys.path.insert(0, str(project_root))
+    if src_path.exists() and str(src_path) not in sys.path:
         sys.path.insert(0, str(src_path))
-        print("✅ Project structure validated")
-        return True
-    else:
-        print(f"❌ Error: src directory not found at {src_path}")
-        print("💡 Make sure you're running from the project root directory")
-        return False
+    
+    print(f"Project root: {project_root}")
+    print(f"Source directory: {src_path}")
+    print("✅ Project structure validated")
+    return True
 
 
 def import_modules() -> Tuple[bool, object, object]:

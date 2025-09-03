@@ -26,18 +26,19 @@ logger = logging.getLogger(__name__)
 
 
 # Import the config loader
-from src.config import PreprocessConfig as ConfigPreprocessConfig
+# Config is loaded as dictionary, no need for type import
 
 
 class DataPreprocessor:
     """Preprocesses patient-year data with rolling features using Polars Lazy."""
 
-    def __init__(self, config: ConfigPreprocessConfig):
+    def __init__(self, config):
         self.config = config
 
         # Default numeric columns for feature engineering
-        if self.config.numeric_columns is None:
-            self.config.numeric_columns = [
+        if self.config.get('feature_engineering', {}).get('clinical', {}).get('numeric_columns') is None:
+            self.config.setdefault('feature_engineering', {}).setdefault('clinical', {})
+            self.config['feature_engineering']['clinical']['numeric_columns'] = [
                 "age", "bmi", "systolic_bp", "diastolic_bp", "heart_rate",
                 "temperature", "glucose", "cholesterol_total", "hdl", "ldl",
                 "triglycerides", "creatinine", "hemoglobin", "white_blood_cells",
@@ -48,12 +49,12 @@ class DataPreprocessor:
         self.target_column = "alzheimers_diagnosis"
         
         # Data size thresholds (in rows)
-        self.polars_threshold = 1_000_000  # Use Polars for < 1M rows
-        self.dask_threshold = 5_000_000    # Use Dask for > 5M rows
+        self.polars_threshold = self.config.get('memory', {}).get('framework_selection', {}).get('polars_threshold', 1_000_000)
+        self.dask_threshold = self.config.get('memory', {}).get('framework_selection', {}).get('dask_threshold', 5_000_000)
 
     def _estimate_data_size(self) -> int:
         """Estimate the total number of rows in the dataset."""
-        input_path = Path(self.config.input_dir)
+        input_path = Path(self.config['io']['input_dir'])
         total_rows = 0
         
         # Count rows in all parquet files
@@ -81,7 +82,7 @@ class DataPreprocessor:
                         <input_dir>/2019/*.parquet      (numeric dir)
         Ensures a 'year' column exists.
         """
-        input_path = Path(self.config.input_dir)
+        input_path = Path(self.config['io']['input_dir'])
         if not input_path.exists():
             raise FileNotFoundError(f"Input directory {input_path} does not exist")
 
@@ -116,7 +117,7 @@ class DataPreprocessor:
 
     def _get_dask_data(self):
         """Read partitioned Parquet data using Dask."""
-        input_path = Path(self.config.input_dir)
+        input_path = Path(self.config['io']['input_dir'])
         if not input_path.exists():
             raise FileNotFoundError(f"Input directory {input_path} does not exist")
 
@@ -148,7 +149,7 @@ class DataPreprocessor:
         """Compute aggregate features across all years for each patient (replicated per row)."""
         # Computing aggregate features per patient
         agg_exprs = []
-        for col in self.config.numeric_columns:
+        for col in self.config['feature_engineering']['clinical']['numeric_columns']:
             agg_exprs.extend([
                 pl.col(col).mean().over("patient_id").alias(f"{col}_patient_mean"),
                 pl.col(col).std().over("patient_id").alias(f"{col}_patient_std"),
@@ -189,13 +190,13 @@ class DataPreprocessor:
 
     def _encode_categorical_features(self, df: LazyFrame) -> LazyFrame:
         """Encode categorical features using the specified strategy."""
-        if not self.config.categorical_columns:
+        if not self.config.get('feature_engineering', {}).get('clinical', {}).get('categorical_columns'):
             return df
             
         # Encoding categorical columns
         
         # Get encoding configuration
-        encoding_config = self.config.categorical_encoding or {}
+        encoding_config = self.config.get('preprocessing', {}).get('categorical_encoding', {}) or {}
         strategy = encoding_config.get("strategy", "onehot")
         drop_first = encoding_config.get("drop_first", True)
         
@@ -211,7 +212,7 @@ class DataPreprocessor:
         """One-hot encode categorical columns."""
         encoding_exprs = []
         
-        for col in self.config.categorical_columns:
+        for col in self.config['feature_engineering']['clinical']['categorical_columns']:
             if col in df.columns:
                 # Get unique values for this column
                 unique_values = df.select(pl.col(col)).unique().collect()[col].to_list()
@@ -232,7 +233,7 @@ class DataPreprocessor:
         """Label encode categorical columns."""
         encoding_exprs = []
         
-        for col in self.config.categorical_columns:
+        for col in self.config['feature_engineering']['clinical']['categorical_columns']:
             if col in df.columns:
                 # Create a mapping of unique values to integers
                 unique_values = df.select(pl.col(col)).unique().collect()[col].to_list()
@@ -253,8 +254,8 @@ class DataPreprocessor:
         fill_exprs = []
 
         # Handle numeric columns (simplified since we skipped rolling/delta features)
-        if self.config.numeric_columns:
-            for col in self.config.numeric_columns:
+        if self.config.get('feature_engineering', {}).get('clinical', {}).get('numeric_columns'):
+            for col in self.config['feature_engineering']['clinical']['numeric_columns']:
                 fill_exprs.extend([
                     pl.col(f"{col}_patient_mean").fill_null(0),
                     pl.col(f"{col}_patient_std").fill_null(0),
@@ -263,9 +264,9 @@ class DataPreprocessor:
                 ])
 
         # Handle categorical columns
-        if self.config.categorical_columns:
-            categorical_fill = self.config.categorical_encoding.get("categorical_fill", "unknown") if self.config.categorical_encoding else "unknown"
-            for col in self.config.categorical_columns:
+        if self.config.get('feature_engineering', {}).get('clinical', {}).get('categorical_columns'):
+            categorical_fill = self.config.get('preprocessing', {}).get('categorical_encoding', {}).get("categorical_fill", "unknown") if self.config.get('preprocessing', {}).get('categorical_encoding', {}) else "unknown"
+            for col in self.config['feature_engineering']['clinical']['categorical_columns']:
                 fill_exprs.append(pl.col(col).fill_null(categorical_fill))
 
         # Handle risk features
@@ -415,7 +416,7 @@ class DataPreprocessor:
             df = self._handle_missing_values(df)
             pbar.update(1)
             
-            output_path = Path(self.config.output_dir)
+            output_path = Path(self.config['io']['output_dir'])
             self._write_partitioned_output(df, output_path)
             pbar.update(1)
 
@@ -459,7 +460,7 @@ class DataPreprocessor:
 
         # Step 3: Write output
         print("💾 Saving data with Dask...")
-        output_path = Path(self.config.output_dir)
+        output_path = Path(self.config['io']['output_dir'])
         self._write_dask_output(df, output_path)
 
         print(f"✅ Dask preprocessing complete! Dataset processed in chunks")
@@ -467,7 +468,7 @@ class DataPreprocessor:
     def _compute_dask_rolling_features(self, df):
         """Compute rolling features using Dask."""
         # Simplified rolling features for large datasets
-        numeric_cols = [col for col in self.config.numeric_columns if col in df.columns]
+        numeric_cols = [col for col in self.config['feature_engineering']['clinical']['numeric_columns'] if col in df.columns]
         
         for col in numeric_cols:
             # Group by patient_id and compute rolling statistics
@@ -480,7 +481,7 @@ class DataPreprocessor:
         """Compute aggregate features using Dask."""
         # Patient-level aggregates
         agg_features = df.groupby("patient_id").agg({
-            col: ["mean", "std", "min", "max"] for col in self.config.numeric_columns if col in df.columns
+            col: ["mean", "std", "min", "max"] for col in self.config['feature_engineering']['clinical']['numeric_columns'] if col in df.columns
         }).reset_index()
         
         return df.merge(agg_features, on="patient_id", how="left")
@@ -502,7 +503,7 @@ class DataPreprocessor:
     def _compute_dask_categorical_features(self, df):
         """Compute categorical features using Dask."""
         # One-hot encoding for categorical columns
-        categorical_cols = [col for col in self.config.categorical_columns if col in df.columns]
+        categorical_cols = [col for col in self.config['feature_engineering']['clinical']['categorical_columns'] if col in df.columns]
         
         for col in categorical_cols:
             df = dd.get_dummies(df, columns=[col], prefix=col)
@@ -512,7 +513,7 @@ class DataPreprocessor:
     def _handle_dask_missing_values(self, df):
         """Handle missing values using Dask."""
         # Fill numeric columns with 0
-        numeric_cols = [col for col in self.config.numeric_columns if col in df.columns]
+        numeric_cols = [col for col in self.config['feature_engineering']['clinical']['numeric_columns'] if col in df.columns]
         df[numeric_cols] = df[numeric_cols].fillna(0)
         
         return df
@@ -549,15 +550,18 @@ def preprocess(
     
     # Override config values if provided as command line arguments
     if input_dir is not None:
-        config.input_dir = input_dir
+        config['io']['input_dir'] = input_dir
     if output_dir is not None:
-        config.output_dir = output_dir
+        config['io']['output_dir'] = output_dir
     if rolling_window_years is not None:
-        config.rolling_window_years = rolling_window_years
+        config['feature_engineering']['temporal']['lookback_years'] = rolling_window_years
     if chunk_size is not None:
-        config.chunk_size = chunk_size
+        config['memory']['chunk_size'] = chunk_size
     if seed is not None:
-        config.seed = seed
+        # Add seed to config if it doesn't exist
+        if 'processing' not in config:
+            config['processing'] = {}
+        config['processing']['seed'] = seed
     
     DataPreprocessor(config).preprocess()
 

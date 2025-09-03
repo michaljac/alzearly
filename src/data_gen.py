@@ -24,18 +24,18 @@ logger = logging.getLogger(__name__)
 
 
 # Import the config loader
-from .config import DataGenConfig as ConfigDataGenConfig
+from .config import load_config
 
 
 class SyntheticDataGenerator:
     """Generates synthetic patient-year data with realistic features."""
     
-    def __init__(self, config: ConfigDataGenConfig):
+    def __init__(self, config):
         self.config = config
         self.fake = Faker()
-        Faker.seed(config.seed)
-        random.seed(config.seed)
-        np.random.seed(config.seed)
+        Faker.seed(config['processing']['seed'])
+        random.seed(config['processing']['seed'])
+        np.random.seed(config['processing']['seed'])
         
         # Initialize patient states for consistent generation
         self.patient_states = {}
@@ -131,7 +131,7 @@ class SyntheticDataGenerator:
         state = self._initialize_patient_state(patient_id)
         
         # Calculate age progression
-        age = state["base_age"] + (year - min(self.config.years))
+        age = state["base_age"] + (year - min(self.config['dataset']['years']))
         
         # Update random walks for temporal trends
         state["bmi_walk"] += np.random.normal(0, 0.5)
@@ -193,7 +193,7 @@ class SyntheticDataGenerator:
         
         # Apply the target positive rate (5-10%)
         # Use a sigmoid function to create a smooth probability curve
-        target_rate = self.config.positive_rate
+        target_rate = self.config['target']['positive_rate']
         base_prob = 1 / (1 + np.exp(-(combined_risk - 0.5) * 4))  # Sigmoid centered around 0.5
         
         # Scale to achieve target prevalence
@@ -234,15 +234,15 @@ class SyntheticDataGenerator:
     
     def _generate_chunk(self, chunk_size: int) -> Iterator[Dict[str, Any]]:
         """Generate a chunk of patient-year data."""
-        patients_per_chunk = chunk_size // len(self.config.years)
+        patients_per_chunk = chunk_size // len(self.config['dataset']['years'])
         
-        for i in range(0, self.config.n_patients, patients_per_chunk):
-            chunk_patients = min(patients_per_chunk, self.config.n_patients - i)
+        for i in range(0, self.config['dataset']['n_patients'], patients_per_chunk):
+            chunk_patients = min(patients_per_chunk, self.config['dataset']['n_patients'] - i)
             
             for j in range(chunk_patients):
                 patient_id = f"P{i + j:06d}"
                 
-                for year in self.config.years:
+                for year in self.config['dataset']['years']:
                     yield self._generate_patient_year_data(patient_id, year)
     
     def _write_chunk_to_parquet(self, chunk_data: List[Dict[str, Any]], output_path: Path):
@@ -265,11 +265,11 @@ class SyntheticDataGenerator:
     
     def generate(self) -> None:
         """Generate synthetic data and save to partitioned Parquet files (single-line bar on Windows)."""
-        output_path = Path(self.config.output_dir)
+        output_path = Path(self.config['output']['directory'])
         output_path.mkdir(parents=True, exist_ok=True)
 
-        total_rows = self.config.n_patients * len(self.config.years)
-        tqdm.write(f"🚀 Generating {self.config.n_patients:,} patients ({total_rows:,} total rows)...")
+        total_rows = self.config['dataset']['n_patients'] * len(self.config['dataset']['years'])
+        tqdm.write(f"🚀 Generating {self.config['dataset']['n_patients']:,} patients ({total_rows:,} total rows)...")
 
         chunk_data: List[Dict[str, Any]] = []
         rows_generated = 0
@@ -277,7 +277,7 @@ class SyntheticDataGenerator:
 
         # IMPORTANT: no prints inside this loop
         for row in tqdm(
-            self._generate_chunk(self.config.rows_per_chunk),
+            self._generate_chunk(self.config['processing']['rows_per_chunk']),
             total=total_rows,
             desc="Generating data",
             unit="rows",
@@ -295,7 +295,7 @@ class SyntheticDataGenerator:
             if row["alzheimers_diagnosis"] == 1:
                 positive_count += 1
 
-            if len(chunk_data) >= self.config.rows_per_chunk:
+            if len(chunk_data) >= self.config['processing']['rows_per_chunk']:
                 self._write_chunk_to_parquet(chunk_data, output_path)
                 chunk_data = []
 
@@ -335,15 +335,15 @@ def generate(
     
     # Override config values if provided as command line arguments
     if n_patients is not None:
-        config.n_patients = n_patients
+        config['dataset']['n_patients'] = n_patients
     if years is not None:
-        config.years = [int(y.strip()) for y in years.split(",")]
+        config['dataset']['years'] = [int(y.strip()) for y in years.split(",")]
     if positive_rate is not None:
-        config.positive_rate = positive_rate
+        config['target']['positive_rate'] = positive_rate
     if out is not None:
-        config.output_dir = out
+        config['output']['directory'] = out
     if seed is not None:
-        config.seed = seed
+        config['processing']['seed'] = seed
     
     generator = SyntheticDataGenerator(config)
     generator.generate()

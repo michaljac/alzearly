@@ -61,11 +61,12 @@ Thumbs.db
 # Docker
 .dockerignore
 
+# Platform-specific scripts (Linux script excluded)
+scripts/start_compose.sh
+
 # Generated images (but keep the logo)
 *.jpg
 *.png
-*.jpeg
-!readme_images/*.jpeg
 !readme_images/*.jpg
 !readme_images/*.png
 

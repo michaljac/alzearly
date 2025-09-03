@@ -37,11 +37,6 @@ A FastAPI-based service for predicting Alzheimer's disease risk from patient cli
    cd alzearly
    ```
 2. **Prerequisites**
-- **Linux/macOS:**
-```bash
-mkdir -p ../Data/alzearly/{raw,featurized} && chmod -R 777 ../Data/alzearly
-mkdir -p artifacts && chmod -R 777 artifacts
-```
 - **Windows:**
 ```cmd
 md ..\Data\alzearly\raw
@@ -50,11 +45,7 @@ md artifacts
 ```
 
 3. **Build the image**
-- linux/macOS
-```bash
-docker build --network=host -t alzearly:v1 -f Dockerfile .
-```
-- windows
+- **Windows:**
 ```bash
 docker build -t alzearly:v1 -f Dockerfile .
 ```
@@ -67,11 +58,6 @@ python scripts/start_compose.py
 ```
 
 **Option B: Use OS-specific scripts:**
-- **Linux/macOS:**
-  ```bash
-  chmod +x scripts/start_compose.sh
-  ./scripts/start_compose.sh
-  ```
 - **Windows:**
   ```cmd
   scripts\start_compose.bat
@@ -143,7 +129,6 @@ alzearly/                    # Project root
 │   └── ...                 # Other modules
 ├── scripts/                 # Platform-specific scripts
 │   ├── start_compose.py    # Cross-platform launcher
-│   ├── start_compose.sh    # Linux/macOS startup
 │   └── start_compose.bat   # Windows startup
 ├── config/                  # Configuration files
 │   ├── data_gen.yaml       # Data generation config
@@ -180,9 +165,6 @@ If you prefer to run containers individually or need custom configurations:
 
 ### **Build Images**
 ```bash
-# Build main application image
-# Linux/macOS (with network host for faster builds)
-docker build --network=host -f Dockerfile -t alzearly:v1 .
 
 # Windows (without network host flag)
 docker build -f Dockerfile -t alzearly:v1 .
@@ -205,7 +187,8 @@ docker run --rm -v "$(pwd):/workspace" -v "$(pwd)/../Data/alzearly:/Data" alzear
 docker run --rm -v "$(pwd):/workspace" -v "$(pwd)/../Data/alzearly:/Data" -p 8001:8001 alzearly:v1 python src/api/run_serve.py
 ```
 
-**Note:** These commands work on Windows, Linux, and Mac. Docker Compose is recommended for easier management.
+**Note:** These commands work on Windows.
+Docker Compose is recommended for easier management.
 
 ## <img src="readme_images/hippo.jpeg" width="20" height="20" style="vertical-align: middle; margin-right: 8px;"> API Endpoints
 
