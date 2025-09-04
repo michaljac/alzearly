@@ -20,10 +20,18 @@ if exist "%DATA_DIR%" (
     )
 )
 if "!HAS_DATA!"=="1" (
-    echo Data found
-    echo.
-    goto :check_artifacts
+    echo Data found. Regenerate? (y/n)
+    set /p REGEN_DATA=
+    if /i "!REGEN_DATA!"=="y" (
+        echo Regenerating data...
+        goto :generate_data
+    ) else (
+        echo Using existing data
+        echo.
+        goto :check_artifacts
+    )
 )
+:generate_data
 echo Generating data...
 if not exist "..\Data\alzearly\raw" md "..\Data\alzearly\raw" >nul
 if not exist "..\Data\alzearly\featurized" md "..\Data\alzearly\featurized" >nul
@@ -36,19 +44,32 @@ echo Data generated
 
 :check_artifacts
 echo Checking model...
+set "HAS_MODEL=1"
 for %%f in (%REQ_ART%) do (
     if not exist "%ART_DIR%\%%f" (
-        echo Training model...
-        docker compose run --rm training >nul
-        if errorlevel 1 (
-            echo Training failed
-            exit /b 1
-        )
-        echo Model trained
+        set "HAS_MODEL=0"
+    )
+)
+if "!HAS_MODEL!"=="1" (
+    echo Model found. Retrain? (y/n)
+    set /p RETRAIN_MODEL=
+    if /i "!RETRAIN_MODEL!"=="y" (
+        echo Retraining model...
+        goto :train_model
+    ) else (
+        echo Using existing model
+        echo.
         goto :start_server
     )
 )
-echo Model ready
+echo No model found. Training model...
+:train_model
+docker compose run --rm training >nul
+if errorlevel 1 (
+    echo Training failed
+    exit /b 1
+)
+echo Model trained
 echo.
 
 :check_retrain

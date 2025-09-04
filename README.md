@@ -25,6 +25,71 @@ A FastAPI-based service for predicting Alzheimer's disease risk from patient cli
 - **Local:** Docker volumes hold data + artifacts, FastAPI on port 8001  
 - **Cloud:** Cloud Run Jobs produce data/models in GCS → BigQuery queries data → Cloud Run serves predictions
 
+## <img src="readme_images/hippo.jpeg" width="20" height="20" style="vertical-align: middle; margin-right: 8px;"> Pipeline Architecture & Flow
+
+### Pipeline Overview
+The Alzearly system follows this intelligent pipeline with user control:
+
+1. **Data Generation** (`datagen` service)
+   - Creates synthetic patient data in `../Data/alzearly/raw/`
+   - Preprocesses data to `../Data/alzearly/featurized/`
+   - **Runs when**: Data doesn't exist OR user chooses to regenerate
+
+2. **Model Training** (`training` service)  
+   - Trains ML model using featurized data
+   - Saves artifacts to `artifacts/latest/`
+   - **Runs when**: Model doesn't exist OR user chooses to retrain
+
+3. **API Server** (`serve` service)
+   - Loads trained model and serves FastAPI endpoints
+   - **Runs when**: Both data and model exist
+   - **Cannot run** if data or model are missing
+
+### Pipeline Flow Examples
+
+#### Scenario 1: Fresh Start (No Data/Model)
+```
+1. User runs startup script
+2. System detects: No data, no model
+3. System: "No data found. Generating data..."
+4. System: "No model found. Training model..."
+5. System: "Starting server..."
+6. Result: ✅ Server running with fresh data and model
+```
+
+#### Scenario 2: Existing Data/Model
+```
+1. User runs startup script  
+2. System detects: Data exists, model exists
+3. System: "Data found. Regenerate? (y/n)"
+4. User: "n" (no)
+5. System: "Model found. Retrain? (y/n)" 
+6. User: "n" (no)
+7. System: "Starting server with existing data and model..."
+8. Result: ✅ Server running with existing data and model
+```
+
+#### Scenario 3: Partial Data (Data exists, no model)
+```
+1. User runs startup script
+2. System detects: Data exists, no model
+3. System: "Data found. Regenerate? (y/n)"
+4. User: "n" (no)
+5. System: "No model found. Training model..."
+6. System: "Starting server..."
+7. Result: ✅ Server running with existing data and new model
+```
+
+#### Scenario 4: Cannot Serve (Missing requirements)
+```
+1. User runs startup script
+2. System detects: No data, no model
+3. System: "No data found. Generating data..."
+4. System: "No model found. Training model..."
+5. System: "Starting server..."
+6. Result: ✅ Server running (data and model created)
+```
+
 ## <img src="readme_images/hippo.jpeg" width="20" height="20" style="vertical-align: middle; margin-right: 8px;"> Quick Start Summary
 
 <div>
@@ -86,7 +151,7 @@ The default port is 8001, but you can customize it:
 **💡 Automation Features:**
 - **MLflow tracking** is automatically enabled (no user input required)
 - **Port discovery** automatically finds available ports if defaults are busy
-- **Smart data detection** only generates data when needed
+- **Smart data detection** with user prompts for existing data/model regeneration
 
 </div>
 
@@ -107,6 +172,44 @@ docker-compose --profile training up
 ```bash
 docker-compose --profile serve up
 ```
+
+## <img src="readme_images/hippo.jpeg" width="20" height="20" style="vertical-align: middle; margin-right: 8px;"> Manual Service Execution
+
+### Run Individual Services Only
+If you want to run specific parts of the pipeline manually:
+
+#### Generate Data Only
+```bash
+# Create directories first
+mkdir -p ../Data/alzearly/{raw,featurized}
+mkdir -p artifacts
+
+# Generate data (always creates fresh data)
+docker compose run --rm datagen
+```
+
+#### Train Model Only (requires existing data)
+```bash
+# Train model (always creates fresh model)
+docker compose run --rm training
+```
+
+#### Serve API Only (requires existing data + model)
+```bash
+# Start server (only works if data and model exist)
+docker compose up serve
+```
+
+### Service Dependencies & Requirements
+- **Training** requires: Featurized data in `../Data/alzearly/featurized/`
+- **Serving** requires: Model artifacts in `artifacts/latest/`
+- **Data generation** creates: Raw and featurized data directories
+
+### ⚠️ Important Notes
+- **Cannot serve** without existing data and model
+- **Must generate data first** if it doesn't exist
+- **Must train model** after data generation
+- **User choice** determines if existing data/model should be regenerated
 
 ## <img src="readme_images/hippo.jpeg" width="20" height="20" style="vertical-align: middle; margin-right: 8px;"> Project Structure
 
@@ -432,6 +535,26 @@ All Python dependencies (including PyYAML) are pre-installed in Docker container
 
 
 </div>
+
+## <img src="readme_images/hippo.jpeg" width="20" height="20" style="vertical-align: middle; margin-right: 8px;"> Service Status & Debugging
+
+### Check Service Status
+```bash
+# View all services
+docker compose ps
+
+# View specific service
+docker compose ps serve
+
+# View service logs
+docker compose logs serve
+```
+
+### Common Issues
+- **"Service failed"**: Container may need more startup time (try increasing timeout)
+- **Port conflicts**: Change port in `config/serve.yaml`
+- **Missing artifacts**: Run `docker compose run --rm training` to create model
+- **Cannot serve without data/model**: Must generate data and train model first
 
 ## <img src="readme_images/hippo.jpeg" width="20" height="20" style="vertical-align: middle; margin-right: 8px;"> Related Files
 

@@ -4,7 +4,7 @@ set -euo pipefail
 # --- Paths & requirements ---
 DATA_DIR="${DATA_DIR:-../Data/alzearly/featurized}"  # where featurized data ends up
 ART_DIR="${ART_DIR:-artifacts/latest}"               # where trained artifacts live
-REQ_ART=(model.pkl feature_names.json threshold.json)
+REQ_ART=(model.pkl feature_names.json run_log.json)
 
 # --- Helpers ---
 have_data() {
@@ -27,6 +27,14 @@ if ! have_data; then
   docker compose run --rm datagen
 else
   echo "✅ Featurized data found."
+  echo "🔄 Regenerate data? (y/n)"
+  read -r REGEN_DATA
+  if [[ "$REGEN_DATA" == "y" || "$REGEN_DATA" == "Y" ]]; then
+    echo "🔄 Regenerating data..."
+    docker compose run --rm datagen
+  else
+    echo "✅ Using existing data."
+  fi
 fi
 
 if [[ "$RETRAIN" == "1" ]]; then
@@ -35,9 +43,17 @@ if [[ "$RETRAIN" == "1" ]]; then
 else
   echo "🔎 Checking artifacts in: $ART_DIR"
   if have_artifacts; then
-    echo "✅ Artifacts already present — skip training."
+    echo "✅ Model found."
+    echo "🔄 Retrain model? (y/n)"
+    read -r RETRAIN_MODEL
+    if [[ "$RETRAIN_MODEL" == "y" || "$RETRAIN_MODEL" == "Y" ]]; then
+      echo "🔄 Retraining model..."
+      docker compose run --rm training
+    else
+      echo "✅ Using existing model."
+    fi
   else
-    echo "🏋️ No artifacts — training once..."
+    echo "🏋️ No model found — training..."
     docker compose run --rm training
   fi
 fi
