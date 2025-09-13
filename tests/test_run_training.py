@@ -343,7 +343,7 @@ class TestRunTrainingIntegration:
         data_gen_content = '''
 def generate():
     """Mock data generation."""
-    print("✅ Mock data generation completed")
+    print("Mock data generation completed")
     return None
 '''
         with open("src/data_gen.py", "w") as f:
@@ -353,7 +353,7 @@ def generate():
         preprocess_content = '''
 def preprocess():
     """Mock preprocessing."""
-    print("✅ Mock preprocessing completed")
+    print("Mock preprocessing completed")
     return None
 '''
         with open("src/preprocess.py", "w") as f:
@@ -363,7 +363,7 @@ def preprocess():
         train_content = '''
 def train(config_file="config/model.yaml", tracker="none"):
     """Mock training."""
-    print("✅ Mock training completed")
+    print("Mock training completed")
     return None
 '''
         with open("src/train.py", "w") as f:
@@ -407,28 +407,28 @@ from src.train import train as train_model
 from utils import setup_experiment_tracker
 
 def main():
-    print("🧠 Alzheimer's Prediction Pipeline")
+    print("Alzheimer's Prediction Pipeline")
     print("=" * 60)
     
     # Setup experiment tracking
     tracker, tracker_type = setup_experiment_tracker()
     
     # Step 1: Data Generation
-    print("\\n📊 Step 1: Data Generation")
+    print("\\nStep 1: Data Generation")
     print("-" * 30)
     generate_data()
     
     # Step 2: Data Preprocessing
-    print("\\n🔧 Step 2: Data Preprocessing")
+    print("\\nStep 2: Data Preprocessing")
     print("-" * 30)
     preprocess_data()
     
     # Step 3: Model Training
-    print("\\n🤖 Step 3: Model Training")
+    print("\\nStep 3: Model Training")
     print("-" * 30)
     train_model(tracker=tracker_type)
     
-    print("\\n🎉 Training pipeline completed successfully!")
+    print("\\nTraining pipeline completed successfully!")
     return 0
 
 if __name__ == "__main__":
@@ -451,11 +451,11 @@ if __name__ == "__main__":
             
             # Verify execution was successful
             assert result.returncode == 0
-            assert "🧠 Alzheimer's Prediction Pipeline" in result.stdout
-            assert "✅ Mock data generation completed" in result.stdout
-            assert "✅ Mock preprocessing completed" in result.stdout
-            assert "✅ Mock training completed" in result.stdout
-            assert "🎉 Training pipeline completed successfully!" in result.stdout
+            assert "Alzheimer's Prediction Pipeline" in result.stdout
+            assert "Mock data generation completed" in result.stdout
+            assert "Mock preprocessing completed" in result.stdout
+            assert "Mock training completed" in result.stdout
+            assert "Training pipeline completed successfully!" in result.stdout
             
         except subprocess.TimeoutExpired:
             pytest.fail("Script execution timed out")

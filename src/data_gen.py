@@ -8,9 +8,8 @@ Supports chunked generation to handle large datasets efficiently.
 import sys
 import logging
 import random
+import shutil
 from pathlib import Path
-from typing import List, Optional, Dict, Any, Iterator
-from dataclasses import dataclass
 
 import typer
 import numpy as np
@@ -24,7 +23,7 @@ logger = logging.getLogger(__name__)
 
 
 # Import the config loader
-from .config import load_config
+from src.config import load_config
 
 
 class SyntheticDataGenerator:
@@ -40,7 +39,7 @@ class SyntheticDataGenerator:
         # Initialize patient states for consistent generation
         self.patient_states = {}
         
-    def _create_schema(self) -> pa.Schema:
+    def _create_schema(self):
         """Create PyArrow schema for the dataset."""
         return pa.schema([
             # Patient identifiers
@@ -81,7 +80,7 @@ class SyntheticDataGenerator:
             pa.field("alzheimers_diagnosis", pa.int8()),
         ])
     
-    def _initialize_patient_state(self, patient_id: str) -> Dict[str, Any]:
+    def _initialize_patient_state(self, patient_id):
         """Initialize or retrieve patient state for consistent generation."""
         if patient_id not in self.patient_states:
             # Generate stable demographic features
@@ -126,7 +125,7 @@ class SyntheticDataGenerator:
             }
         return self.patient_states[patient_id]
     
-    def _generate_patient_year_data(self, patient_id: str, year: int) -> Dict[str, Any]:
+    def _generate_patient_year_data(self, patient_id, year):
         """Generate data for a single patient-year combination."""
         state = self._initialize_patient_state(patient_id)
         
@@ -232,7 +231,7 @@ class SyntheticDataGenerator:
             "alzheimers_diagnosis": int(diagnosis),
         }
     
-    def _generate_chunk(self, chunk_size: int) -> Iterator[Dict[str, Any]]:
+    def _generate_chunk(self, chunk_size):
         """Generate a chunk of patient-year data."""
         patients_per_chunk = chunk_size // len(self.config['dataset']['years'])
         
@@ -245,7 +244,7 @@ class SyntheticDataGenerator:
                 for year in self.config['dataset']['years']:
                     yield self._generate_patient_year_data(patient_id, year)
     
-    def _write_chunk_to_parquet(self, chunk_data: List[Dict[str, Any]], output_path: Path):
+    def _write_chunk_to_parquet(self, chunk_data, output_path):
         """Write a chunk of data to Parquet with year partitioning."""
         if not chunk_data:
             return
@@ -263,15 +262,23 @@ class SyntheticDataGenerator:
             existing_data_behavior="overwrite_or_ignore",
         )
     
-    def generate(self) -> None:
+    def generate(self):
         """Generate synthetic data and save to partitioned Parquet files (single-line bar on Windows)."""
         output_path = Path(self.config['output']['directory'])
+        
+        # Clean existing data if requested
+        if self.config['output'].get('clean_existing', True):
+            if output_path.exists():
+                # Remove year directories (both old format YYYY and new format year=YYYY)
+                for item in output_path.iterdir():
+                    if item.is_dir() and (item.name.isdigit() or item.name.startswith('year=')):
+                        shutil.rmtree(item)
+        
         output_path.mkdir(parents=True, exist_ok=True)
 
         total_rows = self.config['dataset']['n_patients'] * len(self.config['dataset']['years'])
-        tqdm.write(f"🚀 Generating {self.config['dataset']['n_patients']:,} patients ({total_rows:,} total rows)...")
 
-        chunk_data: List[Dict[str, Any]] = []
+        chunk_data = []
         rows_generated = 0
         positive_count = 0
 
@@ -289,6 +296,7 @@ class SyntheticDataGenerator:
             position=0,
             leave=True,
             file=sys.stdout,
+            disable=True
         ):
             chunk_data.append(row)
             rows_generated += 1
@@ -303,21 +311,18 @@ class SyntheticDataGenerator:
             self._write_chunk_to_parquet(chunk_data, output_path)
 
         actual_positive_rate = positive_count / total_rows if total_rows else 0.0
-        tqdm.write(f"✅ Data generation complete! {rows_generated:,} rows generated")
-        tqdm.write(f"📈 Actual Alzheimer's positive rate: {actual_positive_rate:.1%}")
-        tqdm.write(f"📁 Output directory: {output_path.absolute()}")
 
 
 
 
 def generate(
-    config_file: str = typer.Option("config/data_gen.yaml", "--config", help="Configuration file path"),
-    n_patients: Optional[int] = typer.Option(None, "--n-patients", help="Override number of patients from config"),
-    years: Optional[str] = typer.Option(None, "--years", help="Override years from config (comma-separated)"),
-    positive_rate: Optional[float] = typer.Option(None, "--positive-rate", help="Override positive rate from config"),
-    out: Optional[str] = typer.Option(None, "--out", help="Override output directory from config"),
-    seed: Optional[int] = typer.Option(None, "--seed", help="Override seed from config"),
-) -> None:
+    config_file = typer.Option("config/data_gen.yaml", "--config", help="Configuration file path"),
+    n_patients = typer.Option(None, "--n-patients", help="Override number of patients from config"),
+    years = typer.Option(None, "--years", help="Override years from config (comma-separated)"),
+    positive_rate = typer.Option(None, "--positive-rate", help="Override positive rate from config"),
+    out = typer.Option(None, "--out", help="Override output directory from config"),
+    seed = typer.Option(None, "--seed", help="Override seed from config"),
+):
     """
     Generate synthetic patient-year data with realistic features for Alzheimer's prediction.
     

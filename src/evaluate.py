@@ -10,7 +10,6 @@ import json
 import pickle
 import time
 from pathlib import Path
-from typing import Dict, List, Tuple, Optional, Any
 import numpy as np
 import pandas as pd
 from sklearn.metrics import (
@@ -20,7 +19,6 @@ from sklearn.metrics import (
 )
 import wandb
 import matplotlib.pyplot as plt
-import seaborn as sns
 from tqdm import tqdm
 
 logger = logging.getLogger(__name__)
@@ -29,7 +27,7 @@ logger = logging.getLogger(__name__)
 class ModelEvaluator:
     """Comprehensive model evaluation with threshold optimization and time windows."""
     
-    def __init__(self, model_path: str, data_path: str, output_dir: str = "artifacts"):
+    def __init__(self, model_path, data_path, output_dir="artifacts"):
         self.model_path = Path(model_path)
         self.data_path = Path(data_path)
         self.output_dir = Path(output_dir)
@@ -48,13 +46,13 @@ class ModelEvaluator:
         try:
             with open(self.model_path, 'rb') as f:
                 model = pickle.load(f)
-            print(f"📁 Loaded model: {self.model_path.name}")
+            print(f"Loaded model: {self.model_path.name}")
             return model
         except Exception as e:
-            print(f"❌ Failed to load model: {e}")
+            print(f"Failed to load model: {e}")
             raise
     
-    def _load_data(self) -> pd.DataFrame:
+    def _load_data(self):
         """Load evaluation data."""
         try:
             # Try different file formats
@@ -66,13 +64,13 @@ class ModelEvaluator:
                 # Assume it's a directory with parquet files
                 data = pd.read_parquet(self.data_path)
             
-            print(f"📊 Loaded data: {data.shape[0]:,} samples, {data.shape[1]} features")
+            print(f"Loaded data: {data.shape[0]:,} samples, {data.shape[1]} features")
             return data
         except Exception as e:
-            print(f"❌ Failed to load data: {e}")
+            print(f"Failed to load data: {e}")
             raise
     
-    def _prepare_features(self, df: pd.DataFrame) -> Tuple[np.ndarray, np.ndarray, List[str]]:
+    def _prepare_features(self, df: pd.DataFrame):
         """Prepare features and target for evaluation."""
         # Load the model's metadata to get the exact feature names used during training
         model_dir = self.model_path.parent
@@ -82,7 +80,7 @@ class ModelEvaluator:
             with open(metadata_file, 'r') as f:
                 metadata = json.load(f)
             feature_names = metadata.get('feature_names', [])
-            print(f"🎯 Using {len(feature_names)} features from model metadata")
+            print(f"Using {len(feature_names)} features from model metadata")
         else:
             # Fallback: exclude non-feature columns
             exclude_cols = ['patient_id', 'year', 'alzheimers_diagnosis']
@@ -111,11 +109,11 @@ class ModelEvaluator:
         X = df[available_features].values.astype(float)
         y = df['alzheimers_diagnosis'].values
         
-        print(f"📈 Prepared: {X.shape[0]:,} samples, {X.shape[1]} features")
+        print(f"Prepared: {X.shape[0]:,} samples, {X.shape[1]} features")
         return X, y, available_features
     
-    def _compute_metrics_at_threshold(self, y_true: np.ndarray, y_pred_proba: np.ndarray, 
-                                    threshold: float) -> Dict[str, float]:
+    def _compute_metrics_at_threshold(self, y_true, y_pred_proba, 
+                                    threshold):
         """Compute metrics at a specific threshold."""
         y_pred = (y_pred_proba >= threshold).astype(int)
         
@@ -127,7 +125,7 @@ class ModelEvaluator:
             'f1': f1_score(y_true, y_pred, zero_division=0)
         }
     
-    def _find_optimal_threshold(self, y_true: np.ndarray, y_pred_proba: np.ndarray) -> Dict[str, Any]:
+    def _find_optimal_threshold(self, y_true, y_pred_proba):
         """Find optimal threshold using max F1 with fallback to recall target."""
         threshold_metrics = []
         
@@ -162,8 +160,8 @@ class ModelEvaluator:
             'threshold_metrics': threshold_metrics
         }
     
-    def _evaluate_time_window(self, df: pd.DataFrame, y_pred_proba: np.ndarray, 
-                            threshold: float, window_years: int = 1) -> Dict[str, float]:
+    def _evaluate_time_window(self, df, y_pred_proba, 
+                            threshold, window_years=1):
         """Evaluate metrics with ±N-year window for positive cases."""
         df_eval = df.copy()
         df_eval['prediction'] = (y_pred_proba >= threshold).astype(int)
@@ -233,8 +231,7 @@ class ModelEvaluator:
             'window_positive_patients': total_positive_preds
         }
     
-    def _save_plots(self, y_true: np.ndarray, y_pred_proba: np.ndarray, 
-                   threshold_metrics: List[Dict], run_id: str):
+    def _save_plots(self, y_true, y_pred_proba, threshold_metrics, run_id):
         """Save evaluation plots with meaningful names."""
         # Create plots directory with descriptive name
         timestamp = time.strftime("%Y%m%d_%H%M%S")
@@ -319,13 +316,13 @@ class ModelEvaluator:
         
         # Saved evaluation plots
     
-    def evaluate(self) -> Dict[str, Any]:
+    def evaluate(self):
         """Run comprehensive evaluation."""
         # Starting comprehensive model evaluation
-        print("🔍 Starting comprehensive model evaluation...")
+        print("Starting comprehensive model evaluation...")
         
         # Initialize wandb if not already initialized
-        print("📊 Initializing Weights & Biases...")
+        print("Initializing Weights & Biases...")
         if not wandb.run:
             run_name = f"evaluation_{time.strftime('%Y%m%d_%H%M%S')}"
             wandb.init(
@@ -409,24 +406,24 @@ class ModelEvaluator:
         run_id = wandb.run.id if wandb.run else "evaluation"
         self._save_plots(y_true, y_pred_proba, threshold_analysis['threshold_metrics'], run_id)
         
-        print(f"✅ Evaluation complete! Results saved to {self.output_dir}")
-        print(f"📊 AUROC: {auroc:.3f}, AUPRC: {auprc:.3f}")
-        print(f"🎯 Optimal threshold: {threshold_analysis['optimal_threshold']:.3f} (F1: {threshold_analysis['optimal_f1']:.3f})")
+        print(f"Evaluation complete! Results saved to {self.output_dir}")
+        print(f"AUROC: {auroc:.3f}, AUPRC: {auprc:.3f}")
+        print(f"Optimal threshold: {threshold_analysis['optimal_threshold']:.3f} (F1: {threshold_analysis['optimal_f1']:.3f})")
         
         return results
 
 
 def evaluate_model(
-    model_path: str,
-    data_path: str,
-    output_dir: str = "artifacts"
-) -> None:
+    model_path,
+    data_path,
+    output_dir="artifacts"
+):
     """Evaluate a trained model with comprehensive metrics."""
     evaluator = ModelEvaluator(model_path, data_path, output_dir)
     results = evaluator.evaluate()
     
-    print("✅ Model evaluation completed successfully!")
-    print(f"📁 Results saved to: {output_dir}")
+    print("Model evaluation completed successfully!")
+    print(f"Results saved to: {output_dir}")
 
 
 if __name__ == "__main__":
@@ -436,9 +433,9 @@ if __name__ == "__main__":
     
     @app.command()
     def evaluate(
-        model_path: str = typer.Argument(..., help="Path to trained model (.pkl)"),
-        data_path: str = typer.Argument(..., help="Path to evaluation data"),
-        output_dir: str = typer.Option("artifacts", help="Output directory for results")
+        model_path = typer.Argument(..., help="Path to trained model (.pkl)"),
+        data_path = typer.Argument(..., help="Path to evaluation data"),
+        output_dir = typer.Option("artifacts", help="Output directory for results")
     ):
         """Evaluate a trained model with comprehensive metrics."""
         evaluate_model(model_path, data_path, output_dir)

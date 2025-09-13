@@ -29,17 +29,17 @@ def run_script(script_path, args=None):
     script_path = script_path.replace('/', '\\')
     cmd = [script_path] + (args or [])
     
-    print(f"🚀 Running: {' '.join(cmd)}")
+    print(f"Running: {' '.join(cmd)}")
     print("=" * 60)
     
     try:
         result = subprocess.run(cmd, check=True)
         return result.returncode
     except subprocess.CalledProcessError as e:
-        print(f"❌ Script failed with exit code: {e.returncode}")
+        print(f"Script failed with exit code: {e.returncode}")
         return e.returncode
     except FileNotFoundError as e:
-        print(f"❌ Script not found: {e}")
+        print(f"Script not found: {e}")
         return 1
 
 
@@ -66,14 +66,17 @@ def main():
     
     args = parser.parse_args()
     
-    print("🧠 Alzearly")
+    print()
+    print("Alzearly Project")
     print("=" * 60)
+    print()
     
     try:
         # Always use Windows script
         script_path = detect_os()
-        print(f"🖥️  Using Windows environment")
-        print(f"📜 Using script: {script_path}")
+        print(f"Using Windows environment")
+        print(f"Using script: {script_path}")
+        print()
         
         # Check if script exists
         check_script_exists(script_path)
@@ -90,22 +93,23 @@ def main():
         # Set environment variables
         for key, value in env_vars.items():
             os.environ[key] = value
-            print(f"🔧 Set {key}={value}")
+            print(f"Set {key}={value}")
         
-        print()
+        if env_vars:
+            print()
         
         # Run the script
         return_code = run_script(script_path)
         
         if return_code == 0:
-            print("✅ Launcher completed successfully!")
+            print("Launcher completed successfully!")
         else:
-            print(f"❌ Launcher failed with exit code: {return_code}")
+            print(f"Launcher failed with exit code: {return_code}")
         
         return return_code
         
     except Exception as e:
-        print(f"❌ Launcher error: {e}")
+        print(f"Launcher error: {e}")
         return 1
 
 

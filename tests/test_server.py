@@ -19,13 +19,13 @@ def test_server():
     try:
         response = requests.get(f"{base_url}/health", timeout=5)
         if response.status_code == 200:
-            print("✅ Health check passed")
+            print("Health check passed")
             print(f"   Response: {response.json()}")
         else:
-            print(f"❌ Health check failed: {response.status_code}")
+            print(f"ERROR: Health check failed: {response.status_code}")
             return False
     except requests.exceptions.RequestException as e:
-        print(f"❌ Health check failed: {e}")
+        print(f"ERROR: Health check failed: {e}")
         return False
     
     # Test 2: Version endpoint
@@ -33,36 +33,36 @@ def test_server():
     try:
         response = requests.get(f"{base_url}/version", timeout=5)
         if response.status_code == 200:
-            print("✅ Version check passed")
+            print("Version check passed")
             print(f"   Response: {response.json()}")
         else:
-            print(f"❌ Version check failed: {response.status_code}")
+            print(f"ERROR: Version check failed: {response.status_code}")
     except requests.exceptions.RequestException as e:
-        print(f"❌ Version check failed: {e}")
+        print(f"ERROR: Version check failed: {e}")
     
     # Test 3: Root endpoint
     print("\n3. Testing root endpoint...")
     try:
         response = requests.get(f"{base_url}/", timeout=5)
         if response.status_code == 200:
-            print("✅ Root endpoint passed")
+            print("Root endpoint passed")
             print(f"   Response: {response.json()}")
         else:
-            print(f"❌ Root endpoint failed: {response.status_code}")
+            print(f"ERROR: Root endpoint failed: {response.status_code}")
     except requests.exceptions.RequestException as e:
-        print(f"❌ Root endpoint failed: {e}")
+        print(f"ERROR: Root endpoint failed: {e}")
     
     # Test 4: Prediction endpoint (info)
     print("\n4. Testing prediction info endpoint...")
     try:
         response = requests.get(f"{base_url}/predict", timeout=5)
         if response.status_code == 200:
-            print("✅ Prediction info endpoint passed")
+            print("Prediction info endpoint passed")
             print(f"   Response: {response.json()}")
         else:
-            print(f"❌ Prediction info endpoint failed: {response.status_code}")
+            print(f"ERROR: Prediction info endpoint failed: {response.status_code}")
     except requests.exceptions.RequestException as e:
-        print(f"❌ Prediction info endpoint failed: {e}")
+        print(f"ERROR: Prediction info endpoint failed: {e}")
     
     # Test 5: Actual prediction
     print("\n5. Testing actual prediction...")
@@ -94,18 +94,18 @@ def test_server():
     try:
         response = requests.post(f"{base_url}/predict", json=test_data, timeout=10)
         if response.status_code == 200:
-            print("✅ Prediction endpoint passed")
+            print("Prediction endpoint passed")
             result = response.json()
             print(f"   Response: {json.dumps(result, indent=2)}")
         else:
-            print(f"❌ Prediction endpoint failed: {response.status_code}")
+            print(f"ERROR: Prediction endpoint failed: {response.status_code}")
             print(f"   Error: {response.text}")
     except requests.exceptions.RequestException as e:
-        print(f"❌ Prediction endpoint failed: {e}")
+        print(f"ERROR: Prediction endpoint failed: {e}")
     
     print("\n" + "=" * 40)
-    print("🎉 Server test completed!")
-    print(f"📖 Interactive docs available at: {base_url}/docs")
+    print("Server test completed!")
+    print(f"Interactive docs available at: {base_url}/docs")
     return True
 
 if __name__ == "__main__":

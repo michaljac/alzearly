@@ -2,7 +2,19 @@ services:
   datagen:
     image: alzearly:v1
     working_dir: /workspace
-    command: ["python", "src/cli/run_datagen.py"]
+    command: ["python", "-m", "src.data_gen.generate", "--out", "/Data/raw"]
+    volumes:
+      - .:/workspace
+      - ../Data/alzearly:/Data
+    environment:
+      - PYTHONUNBUFFERED=1
+      - PYTHONPATH=/workspace
+    restart: "no"
+
+  preprocess:
+    image: alzearly:v1
+    working_dir: /workspace
+    command: ["python", "src/preprocess.py"]
     volumes:
       - .:/workspace
       - ../Data/alzearly:/Data

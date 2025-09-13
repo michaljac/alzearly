@@ -20,8 +20,6 @@ import time
 import os
 from datetime import datetime
 from pathlib import Path
-from typing import Dict, List, Tuple, Optional, Any
-from dataclasses import dataclass, field
 import pickle
 import stat
 
@@ -65,20 +63,20 @@ from tracking import tracker_run
 # Helpers: dirs & permissions
 # ---------------------------
 
-def ensure_dir(path: Path, mode: int = 0o777) -> Path:
+def ensure_dir(path, mode=0o777):
     """Create directory (parents ok) and set permissive permissions."""
     path.mkdir(parents=True, exist_ok=True)
     try:
         os.chmod(path, mode)
-    except Exception:
+    except OSError:
         pass
     return path
 
-def ensure_parent(file_path: Path, mode: int = 0o777) -> None:
+def ensure_parent(file_path, mode=0o777):
     """Ensure parent directory exists with desired permissions."""
     ensure_dir(file_path.parent, mode)
 
-def write_json(path: Path, data: Any, mode_file: int = 0o666, mode_dir: int = 0o777) -> None:
+def write_json(path, data, mode_file=0o666, mode_dir=0o777):
     """Write JSON atomically and apply permissions."""
     ensure_parent(path, mode_dir)
     tmp = path.with_suffix(path.suffix + ".tmp")
@@ -87,82 +85,83 @@ def write_json(path: Path, data: Any, mode_file: int = 0o666, mode_dir: int = 0o
     os.replace(tmp, path)
     try:
         os.chmod(path, mode_file)
-    except Exception:
+    except OSError:
         pass
 
-def write_pickle(path: Path, obj: Any, mode_file: int = 0o666, mode_dir: int = 0o777) -> None:
+def write_pickle(path, obj, mode_file=0o666, mode_dir=0o777):
     """Write pickle and apply permissions."""
     ensure_parent(path, mode_dir)
     with open(path, "wb") as f:
         pickle.dump(obj, f)
     try:
         os.chmod(path, mode_file)
-    except Exception:
+    except OSError:
         pass
 
 
-@dataclass
 class TrainingConfig:
     """Configuration for model training."""
-    # Data configuration
-    input_dir: str = "/Data/featurized"  # Will be overridden by _load_data to check multiple locations
-    target_column: str = "alzheimers_diagnosis"
-    exclude_columns: List[str] = field(default_factory=lambda: ["patient_id", "year"])
+    
+    def __init__(self):
+        # Data configuration
+        self.input_dir = "/Data/featurized"  # Will be overridden by _load_data to check multiple locations
+        self.target_column = "alzheimers_diagnosis"
+        self.exclude_columns = ["patient_id", "year"]
 
-    # Split configuration
-    test_size: float = 0.2
-    val_size: float = 0.2  # from training set
-    random_state: int = 42
-    stratify: bool = True
+        # Split configuration
+        self.test_size = 0.2
+        self.val_size = 0.2  # from training set
+        self.random_state = 42
+        self.stratify = True
 
-    # Feature selection
-    max_features: int = 150
-    variance_threshold: float = 0.01
+        # Feature selection
+        self.max_features = 150
+        self.variance_threshold = 0.01
 
-    # Class imbalance
-    handle_imbalance: str = "class_weight"  # "class_weight", "smote", "none"
+        # Class imbalance
+        self.handle_imbalance = "class_weight"  # "class_weight", "smote", "none"
 
-    # Model configuration
-    models: List[str] = field(default_factory=lambda: ["logistic_regression", "xgboost"])
+        # Model configuration
+        self.models = ["logistic_regression", "xgboost"]
 
-    # XGBoost parameters
-    xgb_params: Dict[str, Any] = field(default_factory=lambda: {
-        "n_estimators": 50,
-        "max_depth": 4,
-        "learning_rate": 0.2,
-        "subsample": 0.8,
-        "colsample_bytree": 0.8,
-        "random_state": 42,
-        "eval_metric": "logloss",
-        "tree_method": "hist",
-        "grow_policy": "lossguide",
-        "max_leaves": 32,
-        "verbosity": 0
-    })
+        # XGBoost parameters
+        self.xgb_params = {
+            "n_estimators": 50,
+            "max_depth": 4,
+            "learning_rate": 0.2,
+            "subsample": 0.8,
+            "colsample_bytree": 0.8,
+            "random_state": 42,
+            "eval_metric": "logloss",
+            "tree_method": "hist",
+            "grow_policy": "lossguide",
+            "max_leaves": 32,
+            "verbosity": 0
+        }
 
-    # Logistic Regression parameters
-    lr_params: Dict[str, Any] = field(default_factory=lambda: {
-        "random_state": 42,
-        "max_iter": 1000
-    })
+        # Logistic Regression parameters
+        self.lr_params = {
+            "random_state": 42,
+            "max_iter": 1000
+        }
 
-    # Output configuration
-    output_dir: str = "models"
-    save_metadata: bool = True
-    log_artifacts: bool = True
+        # Output configuration
+        self.output_dir = "models"
+        self.save_metadata = True
+        self.log_artifacts = True
 
 
 class ModelTrainer:
     """Handles model training with patient-level splits and feature selection."""
 
-    def __init__(self, config: TrainingConfig):
+    def __init__(self, config):
         self.config = config
         self.models = {}
         self.feature_names = []
         self.preprocessing_metadata = {}
         self.lr_scaler = None  # avoid attribute error
 
-    def _generate_model_name(self, run_type: str = "initial", include_timestamp: bool = True) -> str:
+    def _generate_model_name(self, run_type="initial", include_timestamp=True):
         current_date = datetime.now().strftime("%Y-%m-%d")
         current_time = datetime.now().strftime("%H:%M")
         run_descriptions = {
@@ -181,7 +180,7 @@ class ModelTrainer:
         else:
             return f"{description} | {models_str} | {features_str} | seed_{self.config.random_state}"
 
-    def _load_data(self) -> pd.DataFrame:
+    def _load_data(self):
         """Load featurized data from partitioned Parquet files."""
         possible_paths = [
             Path(self.config.input_dir),
@@ -191,7 +190,7 @@ class ModelTrainer:
         for path in possible_paths:
             if path.exists():
                 input_path = path
-                print(f"📁 Using data from: {input_path}")
+                print(f"Using data from: {input_path}")
                 break
         if input_path is None:
             raise FileNotFoundError(f"Input directory not found in any of: {[str(p) for p in possible_paths]}")
@@ -212,7 +211,7 @@ class ModelTrainer:
         df_pandas = self._handle_diagnosis_uncertainty(df_pandas)
         return df_pandas
 
-    def _patient_level_split(self, df: pd.DataFrame) -> Tuple[pd.DataFrame, pd.DataFrame, pd.DataFrame]:
+    def _patient_level_split(self, df):
         patients = df['patient_id'].unique()
         if self.config.stratify:
             patient_targets = df.groupby('patient_id')[self.config.target_column].agg(
@@ -253,7 +252,7 @@ class ModelTrainer:
         test_df = df[df['patient_id'].isin(test_patients)]
         return train_df, val_df, test_df
 
-    def _prepare_features(self, df: pd.DataFrame) -> Tuple[np.ndarray, np.ndarray, List[str]]:
+    def _prepare_features(self, df):
         feature_cols = [c for c in df.columns if c not in self.config.exclude_columns + [self.config.target_column]]
         numeric_cols, categorical_cols = [], []
         for col in tqdm(feature_cols, desc="Analyzing features", unit="feat", leave=False):
@@ -262,7 +261,7 @@ class ModelTrainer:
             else:
                 categorical_cols.append(col)
 
-        print(f"📊 Features: {len(numeric_cols)} numeric, {len(categorical_cols)} categorical")
+        print(f"Features: {len(numeric_cols)} numeric, {len(categorical_cols)} categorical")
 
         if categorical_cols:
             max_categorical_cols = 50
@@ -280,7 +279,7 @@ class ModelTrainer:
         y_array = df[self.config.target_column].values
         return X_array, y_array, feature_cols
 
-    def _feature_selection(self, X_train: np.ndarray, feature_names: List[str], y_train: np.ndarray) -> List[str]:
+    def _feature_selection(self, X_train, feature_names, y_train):
         variance_selector = VarianceThreshold(threshold=self.config.variance_threshold)
         X_train_var = variance_selector.fit_transform(X_train)
         var_features = [feature_names[i] for i in variance_selector.get_support(indices=True)]
@@ -316,7 +315,7 @@ class ModelTrainer:
             }
             return var_features
 
-    def _handle_class_imbalance(self, X: np.ndarray, y: np.ndarray) -> Tuple[np.ndarray, np.ndarray]:
+    def _handle_class_imbalance(self, X, y):
         if self.config.handle_imbalance == "smote":
             smote = SMOTE(random_state=self.config.random_state)
             return smote.fit_resample(X, y)
@@ -325,7 +324,7 @@ class ModelTrainer:
         else:
             return X, y
 
-    def _handle_diagnosis_uncertainty(self, df: pd.DataFrame) -> pd.DataFrame:
+    def _handle_diagnosis_uncertainty(self, df):
         df = df.copy()
         df['years_since_first_symptoms'] = np.random.normal(3.5, 1.0, len(df)).clip(1, 8)
         if 'year' in df.columns:
@@ -334,7 +333,7 @@ class ModelTrainer:
             df['diagnostic_confidence'] = (df['year'] - min_year) / denom
             df['cumulative_risk_factor'] = (df['age'] - 65) * (df['year'] - min_year) / 10
         else:
-            print("⚠️  No 'year' column found, creating synthetic year features")
+            print("WARNING: No 'year' column found, creating synthetic year features")
             df['year'] = 2023
             df['diagnostic_confidence'] = 0.5
             df['cumulative_risk_factor'] = (df['age'] - 65) / 10
@@ -344,7 +343,7 @@ class ModelTrainer:
         df.loc[alz_mask, 'diagnosis_year_uncertainty'] = noise[alz_mask]
         return df
 
-    def _clean_and_impute_data(self, X: np.ndarray) -> np.ndarray:
+    def _clean_and_impute_data(self, X):
         X_df = pd.DataFrame(X) if isinstance(X, np.ndarray) else X.copy()
         if X_df.isna().values.any():
             num_cols = X_df.select_dtypes(include=['float64', 'int64']).columns
@@ -358,8 +357,7 @@ class ModelTrainer:
                     X_df[col].fillna(mode_val, inplace=True)
         return X_df.values
 
-    def _select_optimal_threshold(self, y_true: np.ndarray, y_proba: np.ndarray,
-                                 method: str = "f1_optimization") -> float:
+    def _select_optimal_threshold(self, y_true, y_proba, method="f1_optimization"):
         thresholds = np.arange(0.1, 0.9, 0.05)
         best_threshold, best_score = 0.5, 0.0
         if method == "f1_optimization":
@@ -393,8 +391,8 @@ class ModelTrainer:
         }
         return best_threshold
 
-    def _train_logistic_regression(self, X_train: np.ndarray, y_train: np.ndarray) -> LogisticRegression:
-        print(f"  🚀 Training Logistic Regression...")
+    def _train_logistic_regression(self, X_train, y_train):
+        print(f"  Training Logistic Regression...")
         params = self.config.lr_params.copy()
         if self.config.handle_imbalance == "class_weight":
             params['class_weight'] = 'balanced'
@@ -409,7 +407,7 @@ class ModelTrainer:
         self.lr_scaler = scaler
         return model
 
-    def _predict_model(self, model, model_name: str, X: np.ndarray) -> np.ndarray:
+    def _predict_model(self, model, model_name, X):
         if model_name == "logistic_regression" and self.lr_scaler is not None:
             X_clean = self._clean_and_impute_data(X) if np.isnan(X).any() else X
             X_scaled = self.lr_scaler.transform(X_clean)
@@ -418,7 +416,7 @@ class ModelTrainer:
             X_clean = self._clean_and_impute_data(X) if np.isnan(X).any() else X
             return model.predict(X_clean)
 
-    def _predict_proba_model(self, model, model_name: str, X: np.ndarray) -> np.ndarray:
+    def _predict_proba_model(self, model, model_name, X):
         try:
             if model_name == "logistic_regression" and self.lr_scaler is not None:
                 X_clean = self._clean_and_impute_data(X) if np.isnan(X).any() else X
@@ -438,12 +436,11 @@ class ModelTrainer:
             logger.error(f"Input shape: {X.shape}, Model type: {type(model)}")
             raise
 
-    def _train_xgboost(self, X_train: np.ndarray, y_train: np.ndarray,
-                       X_val: np.ndarray = None, y_val: np.ndarray = None) -> xgb.XGBClassifier:
+    def _train_xgboost(self, X_train, y_train, X_val=None, y_val=None):
         if getattr(self.config, 'enable_hyperparameter_tuning', False):
             return self._train_xgboost_with_tuning(X_train, y_train, X_val, y_val)
         else:
-            print(f"  🚀 Training XGBoost (n_estimators={self.config.xgb_params.get('n_estimators', 50)})...")
+            print(f"  Training XGBoost (n_estimators={self.config.xgb_params.get('n_estimators', 50)})...")
             params = self.config.xgb_params.copy()
             if self.config.handle_imbalance == "class_weight":
                 neg_count = np.sum(y_train == 0)
@@ -457,10 +454,9 @@ class ModelTrainer:
                 model.fit(X_train, y_train, verbose=False)
             return model
 
-    def _train_xgboost_with_tuning(self, X_train: np.ndarray, y_train: np.ndarray,
-                                   X_val: np.ndarray, y_val: np.ndarray) -> xgb.XGBClassifier:
+    def _train_xgboost_with_tuning(self, X_train, y_train, X_val, y_val):
         """Train XGBoost with optimized default parameters (no hyperparameter tuning)."""
-        print("  🚀 Training XGBoost with optimized defaults...")
+        print("  Training XGBoost with optimized defaults...")
         
         # Use the default parameters from config (already optimized)
         params = self.config.xgb_params.copy()
@@ -486,7 +482,7 @@ class ModelTrainer:
         
         return model
 
-    def _evaluate_model(self, model, model_name: str, X: np.ndarray, y: np.ndarray, split_name: str) -> Dict[str, float]:
+    def _evaluate_model(self, model, model_name, X, y, split_name):
         y_pred = self._predict_model(model, model_name, X)
         y_pred_proba = self._predict_proba_model(model, model_name, X)[:, 1]
         return {
@@ -498,7 +494,7 @@ class ModelTrainer:
             f"{split_name}_pr_auc": float(average_precision_score(y, y_pred_proba))
         }
 
-    def _find_optimal_threshold(self, model, model_name: str, X_val: np.ndarray, y_val: np.ndarray) -> float:
+    def _find_optimal_threshold(self, model, model_name, X_val, y_val):
         y_proba = self._predict_proba_model(model, model_name, X_val)[:, 1]
         thresholds = np.arange(0.1, 0.9, 0.1)
         best, best_f1 = 0.5, 0.0
@@ -508,10 +504,10 @@ class ModelTrainer:
                 best_f1, best = f1, th
         return float(best)
 
-    def _save_plots(self, model_name: str, model, X_test: np.ndarray, y_test: np.ndarray, run_id: str):
+    def _save_plots(self, model_name, model, X_test, y_test, run_id):
         """Save model evaluation plots if plotting libraries are available."""
         if not PLOTTING_AVAILABLE:
-            print("  ⚠️  Plotting libraries not available - skipping plots")
+            print("  WARNING: Plotting libraries not available - skipping plots")
             return
             
         timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
@@ -573,21 +569,21 @@ class ModelTrainer:
         except Exception as e:
             logger.warning(f"Could not save plots for {model_name}: {e}")
 
-    def train(self, run_type: str = "initial", tracker_type: str = "none") -> Dict[str, Any]:
-        print("🚀 Starting model training pipeline...")
+    def train(self, run_type="initial", tracker_type="none"):
+        print("Starting model training pipeline...")
         run_name = self._generate_model_name(run_type, include_timestamp=True)
         self.tracker_enabled = tracker_type != "none"
         if self.tracker_enabled:
-            print(f"✅ {tracker_type.upper()} tracking enabled")
+            print(f"SUCCESS: {tracker_type.upper()} tracking enabled")
         else:
-            print("ℹ️  Using local JSON logging fallback")
+            print("INFO: Using local JSON logging fallback")
 
         with tracker_run(run_name, params=vars(self.config)) as tr:
             self.tracker = tr
             return self._train_with_tracking(run_type)
 
-    def _train_with_tracking(self, run_type: str) -> Dict[str, Any]:
-        print("📊 Loading and preparing data...")
+    def _train_with_tracking(self, run_type):
+        print("Loading and preparing data...")
         with tqdm(total=4, desc="Data Pipeline", unit="step",
                   bar_format="{desc}: {percentage:3.0f}%|{bar}| {n_fmt}/{total_fmt} [{elapsed}<{remaining}]",
                   ncols=80, ascii=True, position=0, leave=True) as pbar:
@@ -609,15 +605,15 @@ class ModelTrainer:
 
         total_samples = len(X_train) + len(X_val) + len(X_test)
         pos_rate = np.mean(y_train) * 100
-        print(f"📊 Dataset: {total_samples:,} samples, {len(selected_features)} features")
-        print(f"📈 Target: {np.bincount(y_train)[0]:,} negative, {np.bincount(y_train)[1]:,} positive ({pos_rate:.1f}% prevalence)\n")
+        print(f"Dataset: {total_samples:,} samples, {len(selected_features)} features")
+        print(f"Target: {np.bincount(y_train)[0]:,} negative, {np.bincount(y_train)[1]:,} positive ({pos_rate:.1f}% prevalence)\n")
 
         feat_idx = [feature_names.index(f) for f in selected_features]
         X_train_sel, X_val_sel, X_test_sel = X_train[:, feat_idx], X_val[:, feat_idx], X_test[:, feat_idx]
         X_train_bal, y_train_bal = self._handle_class_imbalance(X_train_sel, y_train)
 
-        results: Dict[str, Any] = {}
-        print("🤖 Training models...")
+        results = {}
+        print("Training models...")
         for model_name in tqdm(self.config.models, desc="Training models", unit="model",
                                bar_format="{desc}: {percentage:3.0f}%|{bar}| {n_fmt}/{total_fmt} [{elapsed}<{remaining}]",
                                ncols=80, ascii=True, position=0, dynamic_ncols=False,
@@ -654,7 +650,7 @@ class ModelTrainer:
                     precision, recall, _ = precision_recall_curve(y_test, y_proba)
                     log_plot({'precision': precision, 'recall': recall}, f"{model_name}_pr_curve", "pr_curve")
             except Exception as e:
-                print(f"⚠️  Plot logging skipped for {model_name}: {e}")
+                print(f"WARNING: Plot logging skipped for {model_name}: {e}")
 
             self.models[model_name] = model
             results[model_name] = {'metrics': model_metrics, 'optimal_threshold': float(optimal_th)}
@@ -686,7 +682,7 @@ class ModelTrainer:
 
         # metrics.json — consolidate useful metrics + run id + model name
         # flatten metrics with JSON-friendly types
-        metrics_payload: Dict[str, Any] = {
+        metrics_payload = {
             "run_id": run_id_clean,
             "best_model": best_name,
             "feature_count": len(self.feature_names),
@@ -709,7 +705,7 @@ class ModelTrainer:
         if self.config.log_artifacts and self.tracker_enabled:
             try:
                 log_artifact(run_dir, f"models-{run_id_clean}", "model")
-            except Exception:
+            except OSError:
                 pass
 
         # Feature importance logging
@@ -728,23 +724,23 @@ class ModelTrainer:
                             "model_feature_importance_mean": float(np.mean(xgb_model.feature_importances_)),
                             "model_feature_importance_std": float(np.std(xgb_model.feature_importances_)),
                         })
-                except Exception:
+                except OSError:
                     pass
 
-        print(f"🎉 Training complete! Model: {run_id_clean}")
-        print(f"💾 Artifacts saved to: {artifacts_dir}")
+        print(f"Training complete! Model: {run_id_clean}")
+        print(f"Artifacts saved to: {artifacts_dir}")
         print(f"   - model.pkl\n   - feature_names.json\n   - threshold.json\n   - metrics.json\n")
 
 
 def train(
-    config_file: str = typer.Option("config/model.yaml", "--config", help="Configuration file path"),
-    input_dir: Optional[str] = typer.Option(None, "--input-dir", help="Override input directory from config"),
-    output_dir: Optional[str] = typer.Option(None, "--output-dir", help="Override output directory from config"),
-    max_features: Optional[int] = typer.Option(None, "--max-features", help="Override max features from config"),
-    handle_imbalance: Optional[str] = typer.Option(None, "--handle-imbalance", help="Override imbalance handling from config"),
-    run_type: str = typer.Option("initial", "--run-type", help="Run type (initial, balanced, feature_optimized, hyperparameter_tuned, final, production)"),
-    tracker: Optional[str] = typer.Option(None, "--tracker"),
-) -> None:
+    config_file=typer.Option("config/model.yaml", "--config", help="Configuration file path"),
+    input_dir=typer.Option(None, "--input-dir", help="Override input directory from config"),
+    output_dir=typer.Option(None, "--output-dir", help="Override output directory from config"),
+    max_features=typer.Option(None, "--max-features", help="Override max features from config"),
+    handle_imbalance=typer.Option(None, "--handle-imbalance", help="Override imbalance handling from config"),
+    run_type=typer.Option("initial", "--run-type", help="Run type (initial, balanced, feature_optimized, hyperparameter_tuned, final, production)"),
+    tracker=typer.Option(None, "--tracker"),
+):
     """
     Train machine learning models for Alzheimer's prediction.
     """
@@ -766,7 +762,7 @@ def train(
         global_tracker, chosen_tracker_type = setup_experiment_tracker()
     else:
         tracker_lower = tracker.lower()
-        print(f"🔬 Setting up experiment tracking: {tracker_lower}")
+        print(f"Setting up experiment tracking: {tracker_lower}")
 
         if tracker_lower == "mlflow":
             os.environ['NON_INTERACTIVE'] = 'true'
@@ -776,7 +772,7 @@ def train(
             os.environ['NON_INTERACTIVE'] = 'true'
             global_tracker, chosen_tracker_type = None, "none"
         else:
-            print(f"❌ Invalid tracker option: {tracker}")
+            print(f"ERROR: Invalid tracker option: {tracker}")
             print("Valid options: none, mlflow")
             return
 
@@ -786,9 +782,9 @@ def train(
     trainer = ModelTrainer(config)
     results = trainer.train(run_type, chosen_tracker_type)
 
-    print("🎉 Training completed successfully!")
-    print(f"🆔 Run ID: {results['run_id']}")
-    print(f"📁 Artifact path: {results['artifact_path']}")
+    print("Training completed successfully!")
+    print(f"Run ID: {results['run_id']}")
+    print(f"Artifact path: {results['artifact_path']}")
 
 
 if __name__ == "__main__":
