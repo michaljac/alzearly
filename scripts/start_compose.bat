@@ -20,7 +20,7 @@ if exist "%DATA_DIR%" (
     )
 )
 if "!HAS_DATA!"=="1" (
-    echo Data found. Regenerate? (y/n)
+    echo Data found. Regenerate? (y/n^)
     set /p REGEN_DATA=
     if /i "!REGEN_DATA!"=="y" (
         echo Regenerating data...
@@ -51,7 +51,7 @@ for %%f in (%REQ_ART%) do (
     )
 )
 if "!HAS_MODEL!"=="1" (
-    echo Model found. Retrain? (y/n)
+    echo Model found. Retrain? (y/n^)
     set /p RETRAIN_MODEL=
     if /i "!RETRAIN_MODEL!"=="y" (
         echo Retraining model...

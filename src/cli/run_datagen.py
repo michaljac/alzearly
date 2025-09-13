@@ -186,10 +186,14 @@ def main():
     if not setup_paths():
         return 1
 
+    # Load config file for defaults
+    from src.config import load_config
+    config = load_config("data_gen")
+    
     ap = argparse.ArgumentParser(description="Alzearly Data Generation")
-    ap.add_argument("--num-patients", type=int, default=None)
+    ap.add_argument("--num-patients", type=int, default=config['dataset']['n_patients'])
     ap.add_argument("--output-dir", type=str, default=str(RAW_DIR))
-    ap.add_argument("--seed", type=int, default=None)
+    ap.add_argument("--seed", type=int, default=config['processing']['seed'])
     ap.add_argument("--force-regen", action="store_true")
     ap.add_argument("--skip-data-gen", action="store_true")
     ap.add_argument("--skip-preprocess", action="store_true", default=False)

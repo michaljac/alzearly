@@ -66,7 +66,7 @@ def main():
     
     args = parser.parse_args()
     
-    print("🧠 Alzearly - Cross-Platform Launcher")
+    print("🧠 Alzearly")
     print("=" * 60)
     
     try:

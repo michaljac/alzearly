@@ -3,7 +3,10 @@ Configuration management for the ML project.
 Loads and validates configuration from YAML files.
 """
 
-import yaml
+try:
+    import yaml
+except ImportError:
+    import ruamel.yaml as yaml
 from pathlib import Path
 
 
@@ -83,7 +86,7 @@ class ConfigLoader:
         if not self.config_dir.exists():
             raise FileNotFoundError(f"Configuration directory {config_dir} does not exist")
 
-    def load_yaml(self, filename: str):
+    def load_yaml(self, filename):
         filepath = Path(filename) if "/" in filename else self.config_dir / filename
         if not filepath.exists():
             raise FileNotFoundError(f"Configuration file {filepath} does not exist")
