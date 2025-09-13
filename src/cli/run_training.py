@@ -16,30 +16,29 @@ import os
 import sys
 import subprocess
 from pathlib import Path
-from typing import Optional, Tuple
 
 # Debugging disabled
 
 
-def run_data_generation() -> bool:
+def run_data_generation():
     """Run data generation subprocess."""
     try:
-        print("🔄 Running data generation...")
+        print("Running data generation...")
         result = subprocess.run([sys.executable, 'run_datagen.py', '--force-regen'], 
                               check=True, capture_output=False, text=True)
         return result.returncode == 0
     except subprocess.CalledProcessError:
-        print("❌ Data generation subprocess failed")
+        print("ERROR: Data generation subprocess failed")
         return False
     except FileNotFoundError:
-        print("❌ run_datagen.py not found")
-        print("💡 Make sure run_datagen.py exists in the current directory")
+        print("ERROR: run_datagen.py not found")
+        print("INFO: Make sure run_datagen.py exists in the current directory")
         return False
 
 
-def detect_environment() -> Tuple[bool, str]:
+def detect_environment():
     """Detect if Docker is available and determine the best execution method."""
-    print("🔍 Detecting environment...")
+    print("Detecting environment...")
     print()
     
     # Check if Docker is available
@@ -47,7 +46,7 @@ def detect_environment() -> Tuple[bool, str]:
         result = subprocess.run(['docker', '--version'], 
                               capture_output=True, text=True, timeout=5)
         if result.returncode == 0:
-            print("✅ Docker found - will use containerized execution")
+            print("SUCCESS: Docker found - will use containerized execution")
             return True, "docker"
     except (subprocess.TimeoutExpired, FileNotFoundError, OSError):
         pass
@@ -57,19 +56,19 @@ def detect_environment() -> Tuple[bool, str]:
         result = subprocess.run([sys.executable, '--version'], 
                               capture_output=True, text=True, timeout=5)
         if result.returncode == 0:
-            print("✅ Python found - will use local execution")
+            print("SUCCESS: Python found - will use local execution")
             return False, "python"
     except (subprocess.TimeoutExpired, FileNotFoundError, OSError):
         pass
     
-    print("❌ Neither Docker nor Python found")
-    print("💡 Please install either Docker or Python 3.8+")
+    print("ERROR: Neither Docker nor Python found")
+    print("INFO: Please install either Docker or Python 3.8+")
     return False, "none"
 
 
-def check_dependencies() -> bool:
+def check_dependencies():
     """Check if required Python dependencies are installed."""
-    print("🔍 Checking dependencies...")
+    print(" Checking dependencies...")
     print()
     
     required_packages = ['pandas', 'numpy', 'sklearn', 'xgboost']
@@ -82,25 +81,25 @@ def check_dependencies() -> bool:
             missing_packages.append(package)
     
     if missing_packages:
-        print(f"⚠️  Missing packages: {', '.join(missing_packages)}")
-        print("💡 Installing requirements...")
+        print(f"WARNING:  Missing packages: {', '.join(missing_packages)}")
+        print("INFO: Installing requirements...")
         try:
             subprocess.run([sys.executable, '-m', 'pip', 'install', '-r', 'requirements-train.txt'], 
                          check=True, capture_output=True, text=True)
-            print("✅ Dependencies installed successfully")
+            print("SUCCESS: Dependencies installed successfully")
             return True
         except subprocess.CalledProcessError as e:
-            print(f"❌ Failed to install dependencies: {e}")
-            print("💡 Please install manually: pip install -r requirements-train.txt")
+            print(f"ERROR: Failed to install dependencies: {e}")
+            print("INFO: Please install manually: pip install -r requirements-train.txt")
             return False
     
-    print("✅ All dependencies available")
+    print("SUCCESS: All dependencies available")
     return True
 
 
-def setup_paths() -> bool:
+def setup_paths():
     """Setup Python paths and validate project structure."""
-    print("🔍 Setting up paths...")
+    print(" Setting up paths...")
     print()
     
     # Navigate to project root (two levels up from src/cli/)
@@ -116,36 +115,36 @@ def setup_paths() -> bool:
     
     print(f"Project root: {project_root}")
     print(f"Source directory: {src_path}")
-    print("✅ Project structure validated")
+    print("SUCCESS: Project structure validated")
     return True
 
 
-def import_modules() -> Tuple[bool, object, object]:
+def import_modules():
     """Import required modules with comprehensive error handling."""
-    print("🔍 Importing modules...")
+    print("Importing modules...")
     print()
     
     try:
         from src.train import ModelTrainer, TrainingConfig
         from utils import setup_experiment_tracker
-        print("✅ Training modules imported successfully")
+        print("SUCCESS: Training modules imported successfully")
         return True, (ModelTrainer, TrainingConfig), setup_experiment_tracker
     except ImportError as e:
-        print(f"❌ Import error: {e}")
-        print("💡 Make sure all dependencies are installed:")
+        print(f"ERROR: Import error: {e}")
+        print("INFO: Make sure all dependencies are installed:")
         print("   pip install -r requirements-train.txt")
         return False, None, None
 
 
-def run_with_docker(args) -> int:
+def run_with_docker(args):
     """Run the pipeline using Docker."""
-    print("🐳 Building Docker image...")
+    print("Building Docker image...")
     
     try:
         # Build Docker image
         build_cmd = ['docker', 'build', '-f', 'Dockerfile.train', '-t', 'alzearly-train', '.', '--network=host']
         result = subprocess.run(build_cmd, check=True, capture_output=True, text=True)
-        print("✅ Docker image built successfully")
+        print("SUCCESS: Docker image built successfully")
         
         # Prepare Docker run command
         docker_cmd = ['docker', 'run', '-it', '--rm']
@@ -175,16 +174,16 @@ def run_with_docker(args) -> int:
         return result.returncode
         
     except subprocess.CalledProcessError as e:
-        print(f"❌ Docker execution failed: {e}")
+        print(f"ERROR: Docker execution failed: {e}")
         return 1
     except FileNotFoundError:
-        print("❌ Docker not found or not accessible")
+        print("ERROR: Docker not found or not accessible")
         return 1
 
 
-def run_with_python(args, modules) -> int:
+def run_with_python(args, modules):
     """Run the pipeline using local Python."""
-    print("🐍 Running pipeline with local Python...")
+    print("Running pipeline with local Python...")
     print()
     
     training_classes, setup_experiment_tracker = modules
@@ -193,10 +192,10 @@ def run_with_python(args, modules) -> int:
     return main_pipeline(args, training_classes, setup_experiment_tracker)
 
 
-def main_pipeline(args, training_classes, setup_experiment_tracker) -> int:
+def main_pipeline(args, training_classes, setup_experiment_tracker):
     """The main pipeline logic - TRAINING ONLY (data generation handled by shell scripts)."""
     
-    print("🤖 Alzheimer's Training Pipeline")
+    print(" Alzheimer's Training Pipeline")
     print("=" * 60)
     
     print()
@@ -216,11 +215,11 @@ def main_pipeline(args, training_classes, setup_experiment_tracker) -> int:
         data_files = list(docker_featurized_dir.rglob("*.parquet")) + list(docker_featurized_dir.rglob("*.csv"))
     
     if not data_files:
-        print("❌ No featurized data found")
-        print("💡 Please run the training service")
+        print("ERROR: No featurized data found")
+        print("INFO: Please run the training service")
         return 1
     
-    print(f"✅ Found {len(data_files)} data files - proceeding with training")
+    print(f"SUCCESS: Found {len(data_files)} data files - proceeding with training")
     
     print()
     print()
@@ -237,14 +236,14 @@ def main_pipeline(args, training_classes, setup_experiment_tracker) -> int:
         tracker = None  # Will be set up in the training module
     
     # Info about data generation
-    print("\n⚠️  Data generation and preprocessing handled separately")
-    print("💡 Use: python run_datagen.py to generate/update data")
+    print("\nWARNING:  Data generation and preprocessing handled separately")
+    print("INFO: Use: python run_datagen.py to generate/update data")
     
     print()
     print()
     
     # Step 1: Model Training (main focus now)
-    print("\n🤖 Step 1: Model Training")
+    print("\n Step 1: Model Training")
     print("-" * 30)
     print()
     
@@ -259,8 +258,8 @@ def main_pipeline(args, training_classes, setup_experiment_tracker) -> int:
     
     config_path = Path(config_file)
     if not config_path.exists():
-        print(f"❌ Configuration file not found: {config_file}")
-        print("💡 Check if the config file exists or use --config to specify a different file")
+        print(f"ERROR: Configuration file not found: {config_file}")
+        print("INFO: Check if the config file exists or use --config to specify a different file")
         return 1
     
     try:
@@ -283,19 +282,19 @@ def main_pipeline(args, training_classes, setup_experiment_tracker) -> int:
         
         print()
         print()
-        print("✅ Model training completed successfully!")
+        print("SUCCESS: Model training completed successfully!")
         print("📊 Training results saved to artifacts")
         
         print()
         print()
         
     except FileNotFoundError as e:
-        print(f"❌ Model training failed - missing file: {e}")
-        print("💡 Check if all required data files exist")
+        print(f"ERROR: Model training failed - missing file: {e}")
+        print("INFO: Check if all required data files exist")
         return 1
     except Exception as e:
-        print(f"❌ Model training failed: {e}")
-        print("💡 Check your model configuration and data")
+        print(f"ERROR: Model training failed: {e}")
+        print("INFO: Check your model configuration and data")
         return 1
     
     # Step 2: Verify artifacts were created
@@ -311,20 +310,20 @@ def main_pipeline(args, training_classes, setup_experiment_tracker) -> int:
     for file_name in required_files:
         file_path = artifacts_dir / file_name
         if file_path.exists():
-            print(f"✅ {file_name}")
+            print(f"SUCCESS: {file_name}")
         else:
-            print(f"❌ {file_name} - MISSING")
+            print(f"ERROR: {file_name} - MISSING")
             missing_files.append(file_name)
     
     if missing_files:
-        print(f"\n⚠️  Warning: {len(missing_files)} artifact files are missing:")
+        print(f"\nWARNING:  Warning: {len(missing_files)} artifact files are missing:")
         print()
         for file_name in missing_files:
             print(f"   - {file_name}")
         print()
-        print("💡 Check the training logs for errors")
+        print("INFO: Check the training logs for errors")
     else:
-        print("\n✅ All artifacts successfully created!")
+        print("\nSUCCESS: All artifacts successfully created!")
     
     print()
     print()
@@ -337,7 +336,7 @@ def main_pipeline(args, training_classes, setup_experiment_tracker) -> int:
 
 def main():
     """Training Pipeline Runner - Training focused (data generation separate)."""
-    print("🤖 Alzearly Training Runner")
+    print(" Alzearly Training Runner")
     print("===========================")
     print()
     

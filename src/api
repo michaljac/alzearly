@@ -11,8 +11,8 @@ import sys
 import json
 import pickle
 import socket
+import os
 from pathlib import Path
-from typing import List, Union, Dict, Any
 import uvicorn
 from fastapi import FastAPI, HTTPException
 from contextlib import asynccontextmanager
@@ -21,18 +21,18 @@ import numpy as np
 import pandas as pd
 
 @asynccontextmanager
-async def lifespan(app: FastAPI):
+async def lifespan(app):
     """Lifespan event handler for FastAPI app."""
     # Startup
     try:
         load_model_and_metadata()
-        print("🚀 Service started successfully!")
+        print("Service started successfully!")
     except Exception as e:
-        print(f"❌ Failed to start service: {e}")
+        print(f"ERROR: Failed to start service: {e}")
         raise
     yield
     # Shutdown
-    print("🛑 Service shutting down...")
+    print("Service shutting down...")
 
 
 # Initialize FastAPI app
@@ -99,7 +99,7 @@ class PredictionItem(BaseModel):
 
 class PredictionRequest(BaseModel):
     """Schema for prediction request - accepts single item or list of items."""
-    items: Union[PredictionItem, List[PredictionItem]] = Field(
+    items = Field(
         ..., 
         description="Single prediction item or list of prediction items"
     )
@@ -151,7 +151,7 @@ class PredictionResult(BaseModel):
 
 class PredictionResponse(BaseModel):
     """Schema for prediction response."""
-    predictions: List[PredictionResult] = Field(..., description="List of prediction results")
+    predictions = Field(..., description="List of prediction results")
 
     model_config = {
         "json_schema_extra": {
@@ -184,12 +184,12 @@ def load_model_and_metadata():
     # Load model
     with open(artifacts_dir / "model.pkl", "rb") as f:
         model = pickle.load(f)
-    print("✅ Model loaded successfully")
+    print("Model loaded successfully")
 
     # Load feature names
     with open(artifacts_dir / "feature_names.json", "r") as f:
         feature_names = json.load(f)
-    print(f"✅ Feature names loaded: {len(feature_names)} features")
+    print(f"Feature names loaded: {len(feature_names)} features")
 
     # Load run log (contains metrics and thresholds)
     with open(artifacts_dir / "run_log.json", "r") as f:
@@ -206,13 +206,13 @@ def load_model_and_metadata():
         if optimal_threshold != 0.5:
             break
     
-    print(f"✅ Threshold loaded: {optimal_threshold}")
-    print(f"✅ Model metadata loaded: run_name={run_log.get('run_name', 'unknown')}")
+    print(f"Threshold loaded: {optimal_threshold}")
+    print(f"Model metadata loaded: run_name={run_log.get('run_name', 'unknown')}")
     
-    print("🎉 All artifacts loaded successfully!")
+    print("All artifacts loaded successfully!")
 
 
-def prepare_features(item: PredictionItem) -> np.ndarray:
+def prepare_features(item):
     """Prepare features for prediction from a single item."""
     # Convert item to dictionary
     data_dict = item.dict()
@@ -234,13 +234,13 @@ def prepare_features(item: PredictionItem) -> np.ndarray:
     missing_features = [col for col in base_features if col not in df.columns]
     
     if missing_features:
-        print(f"⚠️  Missing base features: {missing_features}")
+        print(f"WARNING: Missing base features: {missing_features}")
     
     X = df[available_features].values.astype(float)
     
     # For now, return a simple prediction based on age and risk factors
     # This is a fallback since the model expects engineered features
-    print("⚠️  Using fallback prediction method - model expects engineered features")
+    print("WARNING: Using fallback prediction method - model expects engineered features")
     
     # Create a simple risk score based on age and clinical factors
     age = df['age'].iloc[0]
@@ -332,7 +332,7 @@ async def predict_info():
 
 
 @app.post("/predict", response_model=PredictionResponse, tags=["Prediction"])
-async def predict(request: PredictionRequest):
+async def predict(request):
     """
     Predict Alzheimer's disease risk for one or more patients.
     
@@ -375,7 +375,7 @@ async def predict(request: PredictionRequest):
         return PredictionResponse(predictions=predictions)
     
     except Exception as e:
-        print(f"❌ Prediction error: {e}")
+        print(f"ERROR: Prediction error: {e}")
         raise HTTPException(status_code=500, detail=f"Prediction failed: {str(e)}")
 
 
@@ -394,7 +394,7 @@ async def root():
     }
 
 
-def can_bind(host: str, port: int) -> bool:
+def can_bind(host, port):
     with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
         s.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
         try:
@@ -403,7 +403,7 @@ def can_bind(host: str, port: int) -> bool:
         except OSError:
             return False
 
-def find_available_port(start_port: int = 8001, max_attempts: int = 100, host: str = "localhost") -> int:
+def find_available_port(start_port=8001, max_attempts=100, host="localhost"):
     """Find an available port starting from start_port."""
     # Try to get port from environment first
     env_port = os.environ.get('APP_PORT')
@@ -423,29 +423,29 @@ def main():
     parser.add_argument("--reload", action="store_true", help="Enable auto-reload")
     args, unknown = parser.parse_known_args()
     if unknown:
-        print(f"⚠️  Ignoring unknown arguments: {unknown}")
+        print(f"WARNING: Ignoring unknown arguments: {unknown}")
 
     if args.port in (None, 0):
         selected_port = find_available_port(start_port=8001, host=args.host)
-        print(f"🔍 Auto-selected available port: {selected_port}")
+        print(f"Auto-selected available port: {selected_port}")
     else:
         if not can_bind(args.host, args.port):
-            print(f"❌ Port {args.port} is already in use on {args.host}.")
+            print(f"ERROR: Port {args.port} is already in use on {args.host}.")
             return 1
         selected_port = args.port
 
-    print("🧠 Alzearly - API Server")
+    print("Alzearly - API Server")
     print("=" * 40)
-    print(f"🌐 Server will be available at: http://{args.host}:{selected_port}")
-    print(f"📖 Interactive docs at: http://{args.host}:{selected_port}/docs")
-    print("🛑 Press Ctrl+C to stop the server\n")
+    print(f"Server will be available at: http://{args.host}:{selected_port}")
+    print(f"Interactive docs at: http://{args.host}:{selected_port}/docs")
+    print("Press Ctrl+C to stop the server\n")
 
     try:
         uvicorn.run("run_serve:app", host=args.host, port=selected_port, reload=args.reload, log_level="warning")
     except KeyboardInterrupt:
-        print("\n🛑 Server stopped by user")
+        print("\nServer stopped by user")
     except Exception as e:
-        print(f"❌ Failed to start server: {e}")
+        print(f"ERROR: Failed to start server: {e}")
         return 1
     return 0
 

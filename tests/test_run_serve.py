@@ -186,11 +186,11 @@ class TestRunServe(unittest.TestCase):
             
             # Verify expected output
             expected_calls = [
-                call("🧠 Alzearly - API Server"),
+                call("Alzearly - API Server"),
                 call("=" * 40),
-                call("🌐 Server will be available at: http://0.0.0.0:8000"),
-                call("📖 Interactive docs at: http://localhost:8000/docs"),
-                call("🛑 Press Ctrl+C to stop the server"),
+                call("Server will be available at: http://0.0.0.0:8000"),
+                call("Interactive docs at: http://localhost:8000/docs"),
+                call("Press Ctrl+C to stop the server"),
                 call()
             ]
             
@@ -210,11 +210,11 @@ class TestRunServe(unittest.TestCase):
             
             # Verify expected output with custom port
             expected_calls = [
-                call("🧠 Alzearly - API Server"),
+                call("Alzearly - API Server"),
                 call("=" * 40),
-                call("🌐 Server will be available at: http://0.0.0.0:9000"),
-                call("📖 Interactive docs at: http://localhost:8000/docs"),
-                call("🛑 Press Ctrl+C to stop the server"),
+                call("Server will be available at: http://0.0.0.0:9000"),
+                call("Interactive docs at: http://localhost:8000/docs"),
+                call("Press Ctrl+C to stop the server"),
                 call()
             ]
             
@@ -341,7 +341,7 @@ class TestRunServeIntegration(unittest.TestCase):
             from run_serve import app
             self.assertIsNotNone(app)
             self.assertTrue(hasattr(app, 'routes'))
-            print("✅ FastAPI app imported successfully")
+            print("FastAPI app imported successfully")
         except ImportError as e:
             self.fail(f"Failed to import FastAPI app: {e}")
 
@@ -357,7 +357,7 @@ class TestRunServeIntegration(unittest.TestCase):
             expected_routes = ['/', '/health', '/version', '/predict', '/docs', '/openapi.json']
             for route in expected_routes:
                 self.assertIn(route, routes, f"Expected route {route} not found")
-            print("✅ All expected routes found")
+            print("All expected routes found")
                 
         except ImportError as e:
             self.fail(f"Failed to import FastAPI app: {e}")
@@ -378,7 +378,7 @@ class TestRunServeIntegration(unittest.TestCase):
             # Verify it's a FastAPI app
             from fastapi import FastAPI
             self.assertIsInstance(app, FastAPI)
-            print("✅ Uvicorn app string is valid")
+            print("Uvicorn app string is valid")
             
         except (ImportError, AttributeError) as e:
             self.fail(f"Invalid app string 'run_serve:app': {e}")
@@ -399,7 +399,7 @@ class TestServeFunctionality(unittest.TestCase):
             import numpy as np
             import pandas as pd
             import pickle
-            print("✅ All required imports successful")
+            print("All required imports successful")
         except ImportError as e:
             self.fail(f"Import failed: {e}")
     
@@ -407,7 +407,7 @@ class TestServeFunctionality(unittest.TestCase):
         """Test model loading functionality."""
         try:
             from run_serve import load_model_and_metadata
-            print("✅ Model loading function imported successfully")
+            print("Model loading function imported successfully")
         except Exception as e:
             self.fail(f"Model loading function import failed: {e}")
     
@@ -452,7 +452,7 @@ class TestAPIEndpoints(unittest.TestCase):
             
             self.assertIsNotNone(health_route, "Health endpoint not found")
             self.assertEqual(health_route.methods, {'GET'}, "Health endpoint should be GET")
-            print("✅ Health endpoint function exists")
+            print("Health endpoint function exists")
             
         except Exception as e:
             self.fail(f"Health endpoint test failed: {e}")
@@ -471,7 +471,7 @@ class TestAPIEndpoints(unittest.TestCase):
             
             self.assertIsNotNone(version_route, "Version endpoint not found")
             self.assertEqual(version_route.methods, {'GET'}, "Version endpoint should be GET")
-            print("✅ Version endpoint function exists")
+            print("Version endpoint function exists")
             
         except Exception as e:
             self.fail(f"Version endpoint test failed: {e}")
@@ -491,7 +491,7 @@ class TestAPIEndpoints(unittest.TestCase):
             
             self.assertIsNotNone(predict_route, "Predict endpoint not found")
             self.assertEqual(predict_route.methods, {'POST'}, "Predict endpoint should be POST")
-            print("✅ Predict endpoint function exists")
+            print("Predict endpoint function exists")
             
             # Test that the request model can be instantiated
             payload = {
@@ -520,7 +520,7 @@ class TestAPIEndpoints(unittest.TestCase):
             # This should not raise an exception
             request = PredictionRequest(**payload)
             self.assertIsNotNone(request)
-            print("✅ Predict endpoint payload structure valid")
+            print("Predict endpoint payload structure valid")
             
         except Exception as e:
             self.fail(f"Predict endpoint test failed: {e}")
@@ -541,7 +541,7 @@ class TestAPIEndpoints(unittest.TestCase):
             # This should raise a validation error
             with self.assertRaises(Exception):
                 PredictionRequest(**invalid_payload)
-            print("✅ Predict endpoint validation working")
+            print("Predict endpoint validation working")
             
         except Exception as e:
             self.fail(f"Predict endpoint validation test failed: {e}")
@@ -560,7 +560,7 @@ class TestAPIEndpoints(unittest.TestCase):
             
             self.assertIsNotNone(root_route, "Root endpoint not found")
             self.assertEqual(root_route.methods, {'GET'}, "Root endpoint should be GET")
-            print("✅ Root endpoint function exists")
+            print("Root endpoint function exists")
             
         except Exception as e:
             self.fail(f"Root endpoint test failed: {e}")
@@ -596,7 +596,7 @@ class TestAPIIntegration(unittest.TestCase):
         data = response.json()
         self.assertIn("status", data)
         self.assertEqual(data["status"], "ok")
-        print("✅ Health endpoint integration test passed")
+        print("Health endpoint integration test passed")
     
     def test_version_endpoint_integration(self):
         """Test the version endpoint with actual HTTP request."""
@@ -609,7 +609,7 @@ class TestAPIIntegration(unittest.TestCase):
         data = response.json()
         self.assertIn("model_version", data)
         self.assertIsInstance(data["model_version"], str)
-        print("✅ Version endpoint integration test passed")
+        print("Version endpoint integration test passed")
     
     def test_predict_endpoint_integration(self):
         """Test the predict endpoint with actual HTTP request."""
@@ -658,7 +658,7 @@ class TestAPIIntegration(unittest.TestCase):
         self.assertIn("label", prediction)
         self.assertIsInstance(prediction["probability"], (int, float))
         self.assertIn(prediction["label"], [0, 1])
-        print("✅ Predict endpoint integration test passed")
+        print("Predict endpoint integration test passed")
     
     def test_predict_endpoint_multiple_items(self):
         """Test the predict endpoint with multiple items."""
@@ -728,7 +728,7 @@ class TestAPIIntegration(unittest.TestCase):
             self.assertIn("label", prediction)
             self.assertIsInstance(prediction["probability"], (int, float))
             self.assertIn(prediction["label"], [0, 1])
-        print("✅ Predict endpoint multiple items test passed")
+        print("Predict endpoint multiple items test passed")
 
 
 if __name__ == '__main__':

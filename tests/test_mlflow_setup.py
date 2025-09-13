@@ -24,21 +24,21 @@ def test_mlflow_setup():
         tracker, tracker_type = setup_mlflow()
         
         if tracker_type == "mlflow":
-            print("✅ MLflow setup successful!")
+            print("MLflow setup successful!")
             print(f"   Tracker type: {tracker_type}")
             return True
         else:
-            print(f"❌ MLflow setup failed, got: {tracker_type}")
+            print(f"ERROR: MLflow setup failed, got: {tracker_type}")
             return False
             
     except Exception as e:
-        print(f"❌ MLflow setup test failed: {e}")
+        print(f"ERROR: MLflow setup test failed: {e}")
         return False
 
 
 def test_warning_suppression():
     """Test that Pydantic warnings are suppressed."""
-    print("\n🔍 Testing warning suppression...")
+    print("\nTesting warning suppression...")
     
     try:
         # Read utils.py to check for warning suppression
@@ -47,13 +47,13 @@ def test_warning_suppression():
         
         # Check for warning suppression
         if "warnings.filterwarnings" in content:
-            print("✅ Warning suppression is configured")
+            print("Warning suppression is configured")
             return True
         else:
-            print("❌ Warning suppression not found")
+            print("ERROR: Warning suppression not found")
             return False
     except Exception as e:
-        print(f"❌ Error reading utils.py: {e}")
+        print(f"ERROR: Error reading utils.py: {e}")
         return False
 
 
@@ -77,26 +77,26 @@ def main():
         try:
             if test_func():
                 passed += 1
-                print(f"✅ {test_name} passed")
+                print(f"{test_name} passed")
             else:
                 failed += 1
-                print(f"❌ {test_name} failed")
+                print(f"ERROR: {test_name} failed")
         except Exception as e:
             failed += 1
-            print(f"❌ {test_name} failed with exception: {e}")
+            print(f"ERROR: {test_name} failed with exception: {e}")
     
     print("\n" + "=" * 50)
-    print("📊 Test Results")
-    print(f"✅ Passed: {passed}")
-    print(f"❌ Failed: {failed}")
+    print("Test Results")
+    print(f"Passed: {passed}")
+    print(f"Failed: {failed}")
     
     if failed == 0:
-        print("\n🎉 MLflow setup is working without warnings!")
-        print("\n💡 The Pydantic warnings have been suppressed.")
+        print("\nMLflow setup is working without warnings!")
+        print("\nThe Pydantic warnings have been suppressed.")
         print("   MLflow should now work cleanly without warning messages.")
         return True
     else:
-        print(f"\n⚠️  {failed} tests failed.")
+        print(f"\nWARNING: {failed} tests failed.")
         return False
 
 

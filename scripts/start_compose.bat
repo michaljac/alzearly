@@ -20,10 +20,9 @@ if exist "%DATA_DIR%" (
     )
 )
 if "!HAS_DATA!"=="1" (
-    echo Data found. Regenerate? (y/n)
+    echo Data found. Regenerate? (y/n^)
     set /p REGEN_DATA=
     if /i "!REGEN_DATA!"=="y" (
-        echo Regenerating data...
         goto :generate_data
     ) else (
         echo Using existing data
@@ -51,7 +50,7 @@ for %%f in (%REQ_ART%) do (
     )
 )
 if "!HAS_MODEL!"=="1" (
-    echo Model found. Retrain? (y/n)
+    echo Model found. Retrain? (y/n^)
     set /p RETRAIN_MODEL=
     if /i "!RETRAIN_MODEL!"=="y" (
         echo Retraining model...
@@ -94,7 +93,7 @@ REM Set defaults
 if "%APP_HOST%"=="" set "APP_HOST=0.0.0.0"
 if "%APP_PORT%"=="" set "APP_PORT=8001"
 
-echo Access: http://localhost:%APP_PORT%
+@REM echo Access: http://localhost:%APP_PORT%
 
 REM Start service silently
 docker compose up -d serve >nul

@@ -44,7 +44,7 @@ class TestConfigurationSystem:
             assert isinstance(config.years, list)
             assert isinstance(config.positive_rate, float)
             
-            print("✅ Configuration loading works correctly")
+            print("Configuration loading works correctly")
             
         except Exception as e:
             pytest.fail(f"Configuration loading failed: {e}")
@@ -61,7 +61,7 @@ class TestConfigurationSystem:
             assert config.seed >= 0
             assert len(config.years) > 0
             
-            print("✅ Configuration defaults are reasonable")
+            print("Configuration defaults are reasonable")
             
         except Exception as e:
             pytest.fail(f"Configuration defaults test failed: {e}")
@@ -90,7 +90,7 @@ class TestConfigurationSystem:
             for var in required_vars:
                 assert var in config_vars, f"Missing {var} in get_config.py output"
             
-            print("✅ get_config.py script works correctly")
+            print("get_config.py script works correctly")
             
         except Exception as e:
             pytest.fail(f"get_config.py test failed: {e}")
@@ -103,7 +103,7 @@ class TestDataGeneration:
         """Test that data generation modules can be imported."""
         try:
             from src.data_gen import generate
-            print("✅ Data generation module imports successfully")
+            print("Data generation module imports successfully")
         except Exception as e:
             pytest.fail(f"Data generation import failed: {e}")
     
@@ -111,7 +111,7 @@ class TestDataGeneration:
         """Test that preprocessing modules can be imported."""
         try:
             from src.preprocess import preprocess
-            print("✅ Preprocessing module imports successfully")
+            print("Preprocessing module imports successfully")
         except Exception as e:
             pytest.fail(f"Preprocessing import failed: {e}")
     
@@ -129,7 +129,7 @@ class TestDataGeneration:
             assert result.returncode == 0, f"run_datagen.py --help failed: {result.stderr}"
             assert "Alzearly Data Generation Pipeline" in result.stdout
             
-            print("✅ run_datagen.py script is executable")
+            print("run_datagen.py script is executable")
             
         except Exception as e:
             pytest.fail(f"run_datagen.py test failed: {e}")
@@ -172,7 +172,7 @@ class TestDataGeneration:
                     output_files = list(Path(temp_dir).glob("*.parquet"))
                     assert len(output_files) > 0, "No output files created"
                     
-                    print("✅ Data generation works with temporary directory")
+                    print("Data generation works with temporary directory")
                     
             except Exception as e:
                 pytest.fail(f"Data generation test failed: {e}")
@@ -185,7 +185,7 @@ class TestTrainingPipeline:
         """Test that training modules can be imported."""
         try:
             from src.train import train_model
-            print("✅ Training module imports successfully")
+            print("Training module imports successfully")
         except Exception as e:
             pytest.fail(f"Training import failed: {e}")
     
@@ -202,7 +202,7 @@ class TestTrainingPipeline:
             assert result.returncode == 0, f"run_training.py --help failed: {result.stderr}"
             assert "Alzearly Training Pipeline" in result.stdout
             
-            print("✅ run_training.py script is executable")
+            print("run_training.py script is executable")
             
         except Exception as e:
             pytest.fail(f"run_training.py test failed: {e}")
@@ -222,12 +222,12 @@ class TestDockerIntegration:
         for dockerfile in required_dockerfiles:
             assert Path(dockerfile).exists(), f"Missing {dockerfile}"
         
-        print("✅ All required Dockerfiles exist")
+        print("All required Dockerfiles exist")
     
     def test_docker_compose_exists(self):
         """Test that docker-compose.yml exists."""
         assert Path("docker-compose.yml").exists(), "Missing docker-compose.yml"
-        print("✅ docker-compose.yml exists")
+        print("docker-compose.yml exists")
     
     def test_docker_build_commands(self):
         """Test that Docker build commands are valid."""
@@ -241,16 +241,16 @@ class TestDockerIntegration:
             )
             
             if result.returncode == 0:
-                print("✅ Docker datagen build works")
+                print("Docker datagen build works")
                 # Clean up
                 subprocess.run(["docker", "rmi", "test-datagen"], capture_output=True)
             else:
-                print(f"⚠️  Docker datagen build failed: {result.stderr}")
+                print(f"WARNING: Docker datagen build failed: {result.stderr}")
                 
         except subprocess.TimeoutExpired:
-            print("⚠️  Docker build timed out (this is normal for first build)")
+            print("WARNING: Docker build timed out (this is normal for first build)")
         except Exception as e:
-            print(f"⚠️  Docker build test failed: {e}")
+            print(f"WARNING: Docker build test failed: {e}")
 
 
 class TestCrossPlatformCompatibility:
@@ -273,7 +273,7 @@ class TestCrossPlatformCompatibility:
                 # Just test that Path can handle it
                 assert str(path) is not None
                 
-            print("✅ Path handling works across platforms")
+            print("Path handling works across platforms")
             
         except Exception as e:
             pytest.fail(f"Path handling test failed: {e}")
@@ -301,12 +301,12 @@ class TestCrossPlatformCompatibility:
                 )
                 
                 if result.returncode == 0:
-                    print(f"✅ {script} is executable")
+                    print(f"{script} is executable")
                 else:
-                    print(f"⚠️  {script} help failed: {result.stderr}")
+                    print(f"WARNING: {script} help failed: {result.stderr}")
                     
             except Exception as e:
-                print(f"⚠️  {script} execution test failed: {e}")
+                print(f"WARNING: {script} execution test failed: {e}")
 
 
 class TestDataFlow:
@@ -325,7 +325,7 @@ class TestDataFlow:
             assert config.output_dir is not None
             assert config.seed >= 0
             
-            print("✅ Config parameters are valid for data generation")
+            print("Config parameters are valid for data generation")
             
         except Exception as e:
             pytest.fail(f"Config to data flow test failed: {e}")
@@ -353,7 +353,7 @@ class TestDataFlow:
                 output_files = list(Path(temp_dir).glob("*.parquet"))
                 assert len(output_files) > 0, "No data files generated"
                 
-                print("✅ Data generation output is compatible with preprocessing")
+                print("Data generation output is compatible with preprocessing")
                 
         except Exception as e:
             pytest.fail(f"Data to preprocessing flow test failed: {e}")
@@ -371,7 +371,7 @@ class TestErrorHandling:
             with pytest.raises(Exception):
                 load_config("non_existent_config")
                 
-            print("✅ Missing config file is handled gracefully")
+            print("Missing config file is handled gracefully")
             
         except Exception as e:
             pytest.fail(f"Missing config test failed: {e}")
@@ -391,11 +391,11 @@ class TestErrorHandling:
                     seed=42
                 )
                 
-            print("✅ Invalid parameters are handled gracefully")
+            print("Invalid parameters are handled gracefully")
             
         except Exception as e:
             # This is expected to fail, so we're good
-            print("✅ Invalid parameters correctly rejected")
+            print("Invalid parameters correctly rejected")
 
 
 def run_all_tests():
@@ -429,26 +429,26 @@ def run_all_tests():
                 method = getattr(test_instance, method_name)
                 method()
                 passed += 1
-                print(f"✅ {method_name}")
+                print(f"{method_name}")
             except Exception as e:
-                if "⚠️" in str(e):
+                if "WARNING" in str(e):
                     warnings += 1
-                    print(f"⚠️  {method_name}: {e}")
+                    print(f"WARNING: {method_name}: {e}")
                 else:
                     failed += 1
-                    print(f"❌ {method_name}: {e}")
+                    print(f"ERROR: {method_name}: {e}")
     
     print("\n" + "=" * 50)
-    print("📊 Test Results Summary")
-    print(f"✅ Passed: {passed}")
-    print(f"❌ Failed: {failed}")
-    print(f"⚠️  Warnings: {warnings}")
+    print("Test Results Summary")
+    print(f"Passed: {passed}")
+    print(f"Failed: {failed}")
+    print(f"Warnings: {warnings}")
     
     if failed == 0:
-        print("\n🎉 All critical tests passed! Architecture is working correctly.")
+        print("\nAll critical tests passed! Architecture is working correctly.")
         return True
     else:
-        print(f"\n⚠️  {failed} tests failed. Please review the issues above.")
+        print(f"\nWARNING: {failed} tests failed. Please review the issues above.")
         return False
 
 

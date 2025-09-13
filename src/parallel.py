@@ -7,17 +7,14 @@ using Dask, Ray, and joblib. It supports both data processing and model training
 
 import pandas as pd
 import numpy as np
-from typing import Dict, List, Optional, Callable, Any, Union
-import logging
 import os
-from concurrent.futures import ProcessPoolExecutor, ThreadPoolExecutor
+from concurrent.futures import ProcessPoolExecutor
 import multiprocessing as mp
-from functools import partial
 import warnings
 
 # Dask disabled due to IPython conflicts
 DASK_AVAILABLE = False
-print("ℹ️  Dask disabled - using alternative parallel processing methods.")
+print("INFO: Dask disabled - using alternative parallel processing methods.")
 
 try:
     import ray
@@ -38,11 +35,7 @@ logger = logging.getLogger(__name__)
 class ParallelProcessor:
     """Handles parallel and distributed data processing."""
     
-    def __init__(self, 
-                 backend: str = "auto",
-                 n_jobs: Optional[int] = None,
-                 memory_limit: str = "2GB",
-                 dask_cluster: Optional[Client] = None):
+    def __init__(self, backend="auto", n_jobs=None, memory_limit="2GB", dask_cluster=None):
         """
         Initialize parallel processor.
         
@@ -100,11 +93,7 @@ class ParallelProcessor:
             # Using multiprocessing
             pass
     
-    def process_dataframe_parallel(self, 
-                                 df: pd.DataFrame,
-                                 func: Callable,
-                                 chunk_size: Optional[int] = None,
-                                 **kwargs) -> pd.DataFrame:
+    def process_dataframe_parallel(self, df, func, chunk_size=None, **kwargs):
         """
         Process DataFrame in parallel using the selected backend.
         
@@ -129,7 +118,7 @@ class ParallelProcessor:
         else:
             return self._process_with_multiprocessing(df, func, chunk_size, **kwargs)
     
-    def _process_with_dask(self, df: pd.DataFrame, func: Callable, chunk_size: int, **kwargs) -> pd.DataFrame:
+    def _process_with_dask(self, df, func, chunk_size, **kwargs):
         """Process DataFrame using Dask."""
         # Convert to Dask DataFrame
         ddf = dd.from_pandas(df, npartitions=self.n_jobs)
@@ -141,7 +130,7 @@ class ParallelProcessor:
         result = result_ddf.compute()
         return result
     
-    def _process_with_ray(self, df: pd.DataFrame, func: Callable, chunk_size: int, **kwargs) -> pd.DataFrame:
+    def _process_with_ray(self, df, func, chunk_size, **kwargs):
         """Process DataFrame using Ray."""
         # Split DataFrame into chunks
         chunks = [df[i:i+chunk_size] for i in range(0, len(df), chunk_size)]
@@ -169,7 +158,7 @@ class ParallelProcessor:
         # Combine results
         return pd.concat(results, ignore_index=True)
     
-    def _process_with_joblib(self, df: pd.DataFrame, func: Callable, chunk_size: int, **kwargs) -> pd.DataFrame:
+    def _process_with_joblib(self, df, func, chunk_size, **kwargs):
         """Process DataFrame using Joblib."""
         # Split DataFrame into chunks
         chunks = [df[i:i+chunk_size] for i in range(0, len(df), chunk_size)]
@@ -182,7 +171,7 @@ class ParallelProcessor:
         # Combine results
         return pd.concat(results, ignore_index=True)
     
-    def _process_with_multiprocessing(self, df: pd.DataFrame, func: Callable, chunk_size: int, **kwargs) -> pd.DataFrame:
+    def _process_with_multiprocessing(self, df, func, chunk_size, **kwargs):
         """Process DataFrame using multiprocessing."""
         # Split DataFrame into chunks
         chunks = [df[i:i+chunk_size] for i in range(0, len(df), chunk_size)]
@@ -204,11 +193,7 @@ class ParallelProcessor:
         # Combine results
         return pd.concat(results, ignore_index=True)
     
-    def train_models_parallel(self, 
-                            X: np.ndarray,
-                            y: np.ndarray,
-                            models: List[Any],
-                            cv_folds: int = 5) -> Dict[str, Any]:
+    def train_models_parallel(self, X, y, models, cv_folds=5):
         """
         Train multiple models in parallel.
         
@@ -228,7 +213,7 @@ class ParallelProcessor:
         else:
             return self._train_with_multiprocessing(X, y, models, cv_folds)
     
-    def _train_with_ray(self, X: np.ndarray, y: np.ndarray, models: List[Any], cv_folds: int) -> Dict[str, Any]:
+    def _train_with_ray(self, X, y, models, cv_folds):
         """Train models using Ray."""
         from sklearn.model_selection import cross_val_score
         
@@ -260,7 +245,7 @@ class ParallelProcessor:
         
         return {f"model_{i}": result for i, result in enumerate(results)}
     
-    def _train_with_joblib(self, X: np.ndarray, y: np.ndarray, models: List[Any], cv_folds: int) -> Dict[str, Any]:
+    def _train_with_joblib(self, X, y, models, cv_folds):
         """Train models using Joblib."""
         from sklearn.model_selection import cross_val_score
         
@@ -281,7 +266,7 @@ class ParallelProcessor:
         
         return {f"model_{i}": result for i, result in enumerate(results)}
     
-    def _train_with_multiprocessing(self, X: np.ndarray, y: np.ndarray, models: List[Any], cv_folds: int) -> Dict[str, Any]:
+    def _train_with_multiprocessing(self, X, y, models, cv_folds):
         """Train models using multiprocessing."""
         from sklearn.model_selection import cross_val_score
         
@@ -313,11 +298,7 @@ class ParallelProcessor:
             # Shutdown Ray
 
 # Convenience functions
-def parallel_process_dataframe(df: pd.DataFrame, 
-                             func: Callable,
-                             backend: str = "auto",
-                             n_jobs: Optional[int] = None,
-                             **kwargs) -> pd.DataFrame:
+def parallel_process_dataframe(df, func, backend="auto", n_jobs=None, **kwargs):
     """Convenience function for parallel DataFrame processing."""
     processor = ParallelProcessor(backend=backend, n_jobs=n_jobs)
     try:
@@ -325,12 +306,7 @@ def parallel_process_dataframe(df: pd.DataFrame,
     finally:
         processor.cleanup()
 
-def parallel_train_models(X: np.ndarray,
-                         y: np.ndarray,
-                         models: List[Any],
-                         backend: str = "auto",
-                         n_jobs: Optional[int] = None,
-                         cv_folds: int = 5) -> Dict[str, Any]:
+def parallel_train_models(X, y, models, backend="auto", n_jobs=None, cv_folds=5):
     """Convenience function for parallel model training."""
     processor = ParallelProcessor(backend=backend, n_jobs=n_jobs)
     try:

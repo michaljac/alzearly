@@ -8,29 +8,24 @@ conversions (e.g., mg/dL vs. mmol/L, cm vs. inches).
 
 import pandas as pd
 import numpy as np
-from typing import Dict, List, Optional, Tuple, Union
-from dataclasses import dataclass
 import logging
-from pint import UnitRegistry, Quantity
 import warnings
 
 logger = logging.getLogger(__name__)
 
-# Initialize Pint unit registry
-ureg = UnitRegistry()
-
-@dataclass
 class ClinicalField:
     """Represents a clinical field with its units and conversion rules."""
-    name: str
-    standard_unit: str
-    allowed_units: List[str]
-    conversion_factors: Dict[str, float]
-    description: str = ""
-    min_value: Optional[float] = None
-    max_value: Optional[float] = None
     
-    def convert_to_standard(self, value: float, from_unit: str) -> float:
+    def __init__(self, name, standard_unit, allowed_units, conversion_factors, description="", min_value=None, max_value=None):
+        self.name = name
+        self.standard_unit = standard_unit
+        self.allowed_units = allowed_units
+        self.conversion_factors = conversion_factors
+        self.description = description
+        self.min_value = min_value
+        self.max_value = max_value
+    
+    def convert_to_standard(self, value, from_unit):
         """Convert value from given unit to standard unit."""
         if from_unit == self.standard_unit:
             return value
@@ -41,7 +36,7 @@ class ClinicalField:
         
         return value * self.conversion_factors[from_unit]
     
-    def convert_from_standard(self, value: float, to_unit: str) -> float:
+    def convert_from_standard(self, value, to_unit):
         """Convert value from standard unit to given unit."""
         if to_unit == self.standard_unit:
             return value
@@ -52,7 +47,7 @@ class ClinicalField:
         
         return value / self.conversion_factors[to_unit]
     
-    def validate_value(self, value: float, unit: str) -> bool:
+    def validate_value(self, value, unit):
         """Validate if value is within acceptable range for the unit."""
         if self.min_value is None and self.max_value is None:
             return True
@@ -73,7 +68,7 @@ class ClinicalUnitConverter:
     def __init__(self):
         self.fields = self._initialize_clinical_fields()
     
-    def _initialize_clinical_fields(self) -> Dict[str, ClinicalField]:
+    def _initialize_clinical_fields(self):
         """Initialize standard clinical fields with their units and conversions."""
         return {
             # Blood glucose
@@ -183,14 +178,14 @@ class ClinicalUnitConverter:
             )
         }
     
-    def get_field(self, field_name: str) -> ClinicalField:
+    def get_field(self, field_name):
         """Get clinical field by name."""
         if field_name not in self.fields:
             raise ValueError(f"Unknown clinical field: {field_name}. "
                            f"Available fields: {list(self.fields.keys())}")
         return self.fields[field_name]
     
-    def convert_value(self, value: float, field_name: str, from_unit: str, to_unit: str) -> float:
+    def convert_value(self, value, field_name, from_unit, to_unit):
         """Convert a value from one unit to another for a specific field."""
         field = self.get_field(field_name)
         
@@ -198,7 +193,7 @@ class ClinicalUnitConverter:
         std_value = field.convert_to_standard(value, from_unit)
         return field.convert_from_standard(std_value, to_unit)
     
-    def standardize_dataframe(self, df: pd.DataFrame, unit_mapping: Dict[str, str]) -> pd.DataFrame:
+    def standardize_dataframe(self, df, unit_mapping):
         """
         Standardize all clinical values in a dataframe to their standard units.
         
@@ -225,7 +220,7 @@ class ClinicalUnitConverter:
         
         return df_std
     
-    def validate_dataframe(self, df: pd.DataFrame, unit_mapping: Dict[str, str]) -> Dict[str, List[int]]:
+    def validate_dataframe(self, df, unit_mapping):
         """
         Validate clinical values in a dataframe.
         
@@ -249,7 +244,7 @@ class ClinicalUnitConverter:
         
         return invalid_rows
     
-    def get_unit_info(self, field_name: str) -> Dict[str, any]:
+    def get_unit_info(self, field_name):
         """Get information about a clinical field's units."""
         field = self.get_field(field_name)
         return {
@@ -264,14 +259,14 @@ class ClinicalUnitConverter:
 # Global converter instance
 clinical_converter = ClinicalUnitConverter()
 
-def convert_clinical_value(value: float, field_name: str, from_unit: str, to_unit: str) -> float:
+def convert_clinical_value(value, field_name, from_unit, to_unit):
     """Convenience function for converting a single clinical value."""
     return clinical_converter.convert_value(value, field_name, from_unit, to_unit)
 
-def standardize_clinical_data(df: pd.DataFrame, unit_mapping: Dict[str, str]) -> pd.DataFrame:
+def standardize_clinical_data(df, unit_mapping):
     """Convenience function for standardizing clinical data."""
     return clinical_converter.standardize_dataframe(df, unit_mapping)
 
-def validate_clinical_data(df: pd.DataFrame, unit_mapping: Dict[str, str]) -> Dict[str, List[int]]:
+def validate_clinical_data(df, unit_mapping):
     """Convenience function for validating clinical data."""
     return clinical_converter.validate_dataframe(df, unit_mapping)

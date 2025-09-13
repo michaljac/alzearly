@@ -14,9 +14,8 @@ import subprocess
 import platform
 from pathlib import Path
 from datetime import datetime
-from typing import Optional, Tuple
 
-def detect_environment() -> Tuple[bool, str]:
+def detect_environment():
     """Detect if Docker is available and determine the best execution method."""
     try:
         # Check if Docker is available
@@ -36,7 +35,7 @@ def detect_environment() -> Tuple[bool, str]:
     except ImportError:
         return False, "none"
 
-def check_dependencies() -> bool:
+def check_dependencies():
     """Check if required Python dependencies are installed."""
     required_packages = ['pandas', 'numpy', 'sklearn', 'polars', 'typer']
     missing_packages = []
@@ -48,13 +47,13 @@ def check_dependencies() -> bool:
             missing_packages.append(package)
     
     if missing_packages:
-        print(f"❌ Missing required packages: {', '.join(missing_packages)}")
-        print("💡 Install with: pip install -r requirements-train.txt")
+        print(f"ERROR: Missing required packages: {', '.join(missing_packages)}")
+        print("Install with: pip install -r requirements-train.txt")
         return False
     
     return True
 
-def setup_paths() -> bool:
+def setup_paths():
     """Setup Python paths and validate project structure."""
     # Navigate to project root (two levels up from src/cli/)
     current_dir = Path(__file__).parent.absolute()
@@ -71,7 +70,7 @@ def setup_paths() -> bool:
     print(f"Source directory: {src_path}")
     return True
 
-def import_modules() -> Tuple[bool, dict]:
+def import_modules():
     """Import required modules with comprehensive error handling."""
     modules = {}
     
@@ -98,7 +97,7 @@ def import_modules() -> Tuple[bool, dict]:
     
     return True, modules
 
-def run_with_docker(args) -> int:
+def run_with_docker(args):
     """Run the pipeline using Docker."""
     try:
         # Build command
@@ -119,51 +118,58 @@ def run_with_docker(args) -> int:
         if args.seed:
             cmd.extend(['--seed', str(args.seed)])
         
-        print(f"🚀 Running: {' '.join(cmd)}")
+        print(f"Running: {' '.join(cmd)}")
         result = subprocess.run(cmd)
         return result.returncode
         
     except Exception as e:
-        print(f"❌ Docker execution failed: {e}")
+        print(f"Docker execution failed: {e}")
         return 1
 
-def run_with_python(args, modules) -> int:
+def run_with_python(args, modules):
     """Run the pipeline using local Python."""
     try:
-        print("🧠 Alzearly Training Pipeline")
+        print("Alzearly Training Pipeline")
         print("=" * 50)
+        print()
         
         # Check for cached data
         featurized_path = Path("/Data/featurized")
         if featurized_path.exists() and any(featurized_path.glob("*")):
-            print("✅ Cache hit: Found existing featurized data")
+            print("Cache hit: Found existing featurized data")
             skip_data_gen = True
             skip_preprocess = True
         else:
-            print("📁 No cached data found - will generate new data")
+            print("No cached data found - will generate new data")
             skip_data_gen = False
             skip_preprocess = False
         
+        print()
+        
         # Step 1: Data Generation
         if not skip_data_gen:
-            print("\n📊 Step 1: Data Generation")
+            print("Step 1: Data Generation")
             if args.rows:
                 print(f"   Generating {args.rows} rows...")
             modules['generate']()
-            print("✅ Data generation completed")
+            print("Data generation completed")
         else:
-            print("\n📊 Step 1: Data Generation (skipped - using cached data)")
+            print("Step 1: Data Generation (skipped - using cached data)")
+        
+        print()
         
         # Step 2: Preprocessing
         if not skip_preprocess:
-            print("\n🔧 Step 2: Data Preprocessing")
+            print("Step 2: Data Preprocessing")
             modules['preprocess']()
-            print("✅ Data preprocessing completed")
+            print("Data preprocessing completed")
         else:
-            print("\n🔧 Step 2: Data Preprocessing (skipped - using cached data)")
+            print("Step 2: Data Preprocessing (skipped - using cached data)")
+        
+        print()
         
         # Step 3: Training
-        print("\n🤖 Step 3: Model Training")
+        print("Step 3: Model Training")
         print(f"   Tracker: {args.tracker}")
         
         # Set random seed for deterministic runs
@@ -224,10 +230,12 @@ def run_with_python(args, modules) -> int:
         # Run training
         results = trainer.train(run_type="initial", tracker_type=tracker_type)
         
-        print("✅ Model training completed")
+        print("Model training completed")
+        
+        print()
         
         # Step 4: Export artifacts
-        print("\n📦 Step 4: Exporting Artifacts")
+        print("Step 4: Exporting Artifacts")
         
         # The training already saved artifacts to artifacts/latest/
         # Just copy them to the timestamped directory
@@ -241,21 +249,23 @@ def run_with_python(args, modules) -> int:
             if file.is_file():
                 shutil.copy2(file, timestamped_dir / file.name)
         
-        print(f"✅ Artifacts saved to: {latest_path}")
-        print(f"✅ Artifacts mirrored to: {timestamped_dir}")
+        print(f"Artifacts saved to: {latest_path}")
+        print(f"Artifacts mirrored to: {timestamped_dir}")
+        
+        print()
         
         # Print final artifact path
         model_path = latest_path / "model.pkl"
         if model_path.exists():
-            print(f"\n🎉 Training completed successfully!")
-            print(f"📁 Final model path: {model_path.absolute()}")
+            print("Training completed successfully!")
+            print(f"Final model path: {model_path.absolute()}")
             return 0
         else:
-            print("❌ Model file not found after training")
+            print("ERROR: Model file not found after training")
             return 1
             
     except Exception as e:
-        print(f"❌ Pipeline execution failed: {e}")
+        print(f"ERROR: Pipeline execution failed: {e}")
         import traceback
         traceback.print_exc()
         return 1
