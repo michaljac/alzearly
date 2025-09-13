@@ -4,6 +4,17 @@ globs: backend
 alwaysApply: true
 ---
 
+## Rule Governance (Versioned Edits Allowed)
+
+This document contains governed engineering rules with formal versioning:
+
+- **Rule Format**: Each rule has a unique ID and version (e.g., R-CR-001 v1.0)
+- **Version Control**: Editing a rule bumps its version and requires adding an entry to the "Rule Change Log"
+- **Change Tracking**: Log format: Date UTC, Rule ID, From→To, Reason, Link
+- **History Preservation**: Previous versions remain documented; deprecated rules are clearly labeled
+- **Approval Process**: Rule changes follow standard version bump procedures
+
+---
 
 Role:
 
@@ -110,3 +121,46 @@ Other
 * If a request is unclear or lacks sufficient information, ask clarifying questions before proceeding.
 * Always consider the security implications of your code, especially when dealing with user inputs and external data.
 * Actively use and promote best practices for the specific tasks at hand (LLM app development, data cleaning, demo creation, etc.).
+
+---
+
+## Engineering & Ops Rules
+
+### Data Generation & Storage
+- **R-DATA-001 v1.0**: Synthetic patient-year tabular data with ≥20 mixed features; 5–10% positives configurable; scalable; stored columnar/partitioned (Parquet).
+
+### Feature Engineering
+- **R-FEAT-001 v1.0**: Temporal rolling features over previous X years (configurable); standard preprocessing and categorical treatment; write feature_names.json.
+
+### Model Training & Validation
+- **R-IMB-001 v1.0**: Handle class imbalance via class_weight/scale_pos_weight or resampling.
+- **R-LABEL-001 v1.0**: Evaluation supports diagnosis-year uncertainty window (±k years configurable).
+- **R-FS-001 v1.0**: Apply feature selection/reduction under memory constraints.
+- **R-THR-001 v1.0**: Select decision threshold on validation and persist threshold.json.
+
+### Artifacts & Persistence
+- **R-ART-001 v1.0**: Persist model.pkl, feature_names.json, threshold.json, metrics.json, params.json to artifacts/runs/<run_id>/ and maintain artifacts/latest/ + manifest.json {run_id, created, sha?}.
+
+### Service & API
+- **R-SERVE-001 v1.0**: FastAPI service with /health, /live, /ready, /version, /predict; readiness validates required files in MODEL_DIR; structured logs.
+
+### Infrastructure
+- **R-DOCKER-001 v1.0**: Train and Serve must run in Docker; README documents end-to-end.
+- **R-GCP-001 v1.0**: Cloud target: europe-west4; images in Artifact Registry; Cloud Run Service for serving; Cloud Run Jobs for batch; IAM least-privilege; smoke tests documented.
+
+---
+
+## Rule Change Log
+
+| Date (UTC) | Rule ID | From→To | Reason | Link |
+|------------|---------|---------|--------|------|
+| 2024-12-28 | R-DATA-001 | -→v1.0 | Initial engineering rules formalization | - |
+| 2024-12-28 | R-FEAT-001 | -→v1.0 | Initial engineering rules formalization | - |
+| 2024-12-28 | R-IMB-001 | -→v1.0 | Initial engineering rules formalization | - |
+| 2024-12-28 | R-LABEL-001 | -→v1.0 | Initial engineering rules formalization | - |
+| 2024-12-28 | R-FS-001 | -→v1.0 | Initial engineering rules formalization | - |
+| 2024-12-28 | R-THR-001 | -→v1.0 | Initial engineering rules formalization | - |
+| 2024-12-28 | R-ART-001 | -→v1.0 | Initial engineering rules formalization | - |
+| 2024-12-28 | R-SERVE-001 | -→v1.0 | Initial engineering rules formalization | - |
+| 2024-12-28 | R-DOCKER-001 | -→v1.0 | Initial engineering rules formalization | - |
+| 2024-12-28 | R-GCP-001 | -→v1.0 | Initial engineering rules formalization | - |
