@@ -2,6 +2,10 @@
 
 A FastAPI-based service for predicting Alzheimer's disease risk from patient clinical data using docker compose.
 
+## Engineering Standards
+
+This repository follows governed engineering rules documented in `docs/rules.mdc` with formal versioning (R-* v1.0+). Rule changes require version bumps and change log entries.
+
 ![Model Comparison](readme_images/model_comparison.jpeg)
 
 *Performance comparison between XGBoost and Logistic Regression models across different metrics including accuracy, precision, recall, and F1-score.*
