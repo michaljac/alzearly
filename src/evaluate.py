@@ -46,7 +46,7 @@ class ModelEvaluator:
         try:
             with open(self.model_path, 'rb') as f:
                 model = pickle.load(f)
-            print(f"📁 Loaded model: {self.model_path.name}")
+            print(f"Loaded model: {self.model_path.name}")
             return model
         except Exception as e:
             print(f"Failed to load model: {e}")

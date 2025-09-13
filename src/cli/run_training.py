@@ -23,7 +23,7 @@ from pathlib import Path
 def run_data_generation():
     """Run data generation subprocess."""
     try:
-        print("Running data generation...")
+        # print("Running data generation...")
         result = subprocess.run([sys.executable, 'run_datagen.py', '--force-regen'], 
                               check=True, capture_output=False, text=True)
         return result.returncode == 0
@@ -169,7 +169,7 @@ def run_with_docker(args):
         if args.config != "config/model.yaml":
             docker_cmd.extend(['--config', args.config])
         
-        print("🚀 Running pipeline with Docker...")
+        print("Running pipeline with Docker...")
         result = subprocess.run(docker_cmd, check=True)
         return result.returncode
         
@@ -268,7 +268,7 @@ def main_pipeline(args, training_classes, setup_experiment_tracker):
         config = TrainingConfig()
         
         # Create trainer and run training
-        print("🚀 Starting model training...")
+        print("Starting model training...")
         print()
         print("⏳ This may take several minutes. Progress will be shown below:")
         print()
@@ -421,11 +421,11 @@ Note: Data generation is now separate - use run_datagen.py first
     
     # Step 5: Run the pipeline
     if use_docker and not args.force_python:
-        print("\n🚀 Using Docker for execution...")
+        print("\nUsing Docker for execution...")
         print()
         return run_with_docker(args)
     else:
-        print("\n🚀 Using local Python for execution...")
+        print("\nUsing local Python for execution...")
         print()
         return run_with_python(args, modules)
 

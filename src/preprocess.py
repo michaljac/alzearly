@@ -18,7 +18,6 @@ from tqdm import tqdm
 # Use only Polars for data processing
 import pandas as pd  # Needed for some operations
 DASK_AVAILABLE = False
-print("ℹ️  Using Polars for all data processing (Dask disabled).")
 
 logger = logging.getLogger(__name__)
 
@@ -134,13 +133,11 @@ class DataPreprocessor:
     def _compute_rolling_features(self, df):
         """Compute rolling features over previous years for each patient."""
         # Skip rolling features to avoid Polars panic - use simpler aggregate features instead
-        print("⚠️  Skipping rolling features to avoid Polars compatibility issues")
         return df
 
     def _compute_delta_features(self, df):
         """Compute delta features (change from previous year) for numeric columns."""
         # Skip delta features to avoid Polars panic - use simpler features instead
-        print("⚠️  Skipping delta features to avoid Polars compatibility issues")
         return df
 
     def _compute_aggregate_features(self, df):
@@ -286,25 +283,20 @@ class DataPreprocessor:
         try:
             # First try to get schema to understand the data structure
             schema = df.schema
-            print(f"📊 Schema has {len(schema)} columns")
             
             # Try collecting with a limit first to test
             test_df = df.limit(100).collect()
-            print(f"✅ Test collection successful with {len(test_df)} rows")
             
             # Now collect the full dataset
             collected_df = df.collect()
-            print(f"✅ Full collection successful with {len(collected_df)} rows")
             
             # Write to parquet
             collected_df.write_parquet(
                 file=str(output_path / "data.parquet"),
                 compression="snappy"
             )
-            print(f"✅ Data written to {output_path / 'data.parquet'}")
             
         except Exception as e:
-            print(f"⚠️  Collection failed: {e}")
             print("🔄 Trying alternative approach...")
             
             try:
@@ -313,7 +305,7 @@ class DataPreprocessor:
                     path=str(output_path / "data.parquet"),
                     compression="snappy"
                 )
-                print(f"✅ Data written using sink_parquet to {output_path / 'data.parquet'}")
+                print(f"Data written using sink_parquet to {output_path / 'data.parquet'}")
             except Exception as e2:
                 print(f"⚠️  sink_parquet also failed: {e2}")
                 print("🔄 Trying CSV fallback...")
@@ -324,9 +316,9 @@ class DataPreprocessor:
                     collected_df.write_csv(
                         file=str(output_path / "data.csv")
                     )
-                    print(f"✅ Data written as CSV to {output_path / 'data.csv'}")
+                    print(f"Data written as CSV to {output_path / 'data.csv'}")
                 except Exception as e3:
-                    print(f"❌ All write methods failed: {e3}")
+                    print(f"ERROR: All write methods failed: {e3}")
                     raise
 
     def _analyze_prevalence(self, df):
@@ -357,21 +349,17 @@ class DataPreprocessor:
 
     def preprocess(self):
         """Main preprocessing pipeline with automatic framework selection."""
-        print("🚀 Starting data preprocessing pipeline...")
         
         # Step 1: Estimate data size and choose framework
-        print("📊 Analyzing dataset size...")
         data_size = self._estimate_data_size()
         framework = self._choose_framework(data_size)
         
-        print(f"📈 Dataset size: {data_size:,} rows")
-        print(f"🔧 Using framework: {framework.upper()}")
-        
+
+     
         if framework == "dask":
             print("⚡ Using Dask for large dataset processing")
             self._preprocess_with_dask(data_size)
         else:
-            print("🚀 Using Polars for efficient processing")
             self._preprocess_with_polars(data_size)
 
     def _preprocess_with_polars(self, data_size):
@@ -383,11 +371,10 @@ class DataPreprocessor:
         self._analyze_prevalence(df)
         
         # Step 3: Feature engineering with single progress bar
-        print("🔧 Computing features...")
         with tqdm(total=5, desc="Feature engineering", unit="step", 
                  bar_format="{desc}: {percentage:3.0f}%|{bar}| {n_fmt}/{total_fmt} [{elapsed}<{remaining}]",
                  ncols=80, ascii=True, position=0, dynamic_ncols=False, 
-                 mininterval=0.1, maxinterval=1.0) as pbar:
+                 mininterval=0.1, maxinterval=1.0, disable=True) as pbar:
             
             df = self._compute_rolling_features(df)
             pbar.update(1)
@@ -405,11 +392,10 @@ class DataPreprocessor:
             pbar.update(1)
 
         # Step 4: Handle missing values and write output
-        print("💾 Finalizing and saving data...")
-        with tqdm(total=2, desc="Finalizing", unit="step",
+        with tqdm(total=2, desc="", unit="step",
                  bar_format="{desc}: {percentage:3.0f}%|{bar}| {n_fmt}/{total_fmt} [{elapsed}<{remaining}]",
                  ncols=80, ascii=True, position=0, dynamic_ncols=False, 
-                 mininterval=0.1, maxinterval=1.0) as pbar:
+                 mininterval=0.1, maxinterval=1.0, disable=True) as pbar:
             
             df = self._handle_missing_values(df)
             pbar.update(1)
@@ -417,8 +403,6 @@ class DataPreprocessor:
             output_path = Path(self.config['io']['output_dir'])
             self._write_partitioned_output(df, output_path)
             pbar.update(1)
-
-        print(f"✅ Polars preprocessing complete! {len(df.schema)} columns created")
 
     def _preprocess_with_dask(self, data_size):
         """Preprocess using Dask framework for large datasets."""
@@ -434,7 +418,7 @@ class DataPreprocessor:
         with tqdm(total=5, desc="Feature engineering", unit="step", 
                  bar_format="{desc}: {percentage:3.0f}%|{bar}| {n_fmt}/{total_fmt} [{elapsed}<{remaining}]",
                  ncols=80, ascii=True, position=0, dynamic_ncols=False, 
-                 mininterval=0.1, maxinterval=1.0) as pbar:
+                 mininterval=0.1, maxinterval=1.0, disable=True) as pbar:
             
             # Dask rolling features (simplified for large datasets)
             df = self._compute_dask_rolling_features(df)
@@ -461,7 +445,7 @@ class DataPreprocessor:
         output_path = Path(self.config['io']['output_dir'])
         self._write_dask_output(df, output_path)
 
-        print(f"✅ Dask preprocessing complete! Dataset processed in chunks")
+        print(f"Dask preprocessing complete! Dataset processed in chunks")
 
     def _compute_dask_rolling_features(self, df):
         """Compute rolling features using Dask."""

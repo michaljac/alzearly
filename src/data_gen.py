@@ -8,6 +8,7 @@ Supports chunked generation to handle large datasets efficiently.
 import sys
 import logging
 import random
+import shutil
 from pathlib import Path
 
 import typer
@@ -22,7 +23,7 @@ logger = logging.getLogger(__name__)
 
 
 # Import the config loader
-from .config import load_config
+from src.config import load_config
 
 
 class SyntheticDataGenerator:
@@ -264,10 +265,18 @@ class SyntheticDataGenerator:
     def generate(self):
         """Generate synthetic data and save to partitioned Parquet files (single-line bar on Windows)."""
         output_path = Path(self.config['output']['directory'])
+        
+        # Clean existing data if requested
+        if self.config['output'].get('clean_existing', True):
+            if output_path.exists():
+                # Remove year directories (both old format YYYY and new format year=YYYY)
+                for item in output_path.iterdir():
+                    if item.is_dir() and (item.name.isdigit() or item.name.startswith('year=')):
+                        shutil.rmtree(item)
+        
         output_path.mkdir(parents=True, exist_ok=True)
 
         total_rows = self.config['dataset']['n_patients'] * len(self.config['dataset']['years'])
-        tqdm.write(f"🚀 Generating {self.config['dataset']['n_patients']:,} patients ({total_rows:,} total rows)...")
 
         chunk_data = []
         rows_generated = 0
@@ -287,6 +296,7 @@ class SyntheticDataGenerator:
             position=0,
             leave=True,
             file=sys.stdout,
+            disable=True
         ):
             chunk_data.append(row)
             rows_generated += 1
@@ -301,9 +311,6 @@ class SyntheticDataGenerator:
             self._write_chunk_to_parquet(chunk_data, output_path)
 
         actual_positive_rate = positive_count / total_rows if total_rows else 0.0
-        tqdm.write(f"✅ Data generation complete! {rows_generated:,} rows generated")
-        tqdm.write(f"📈 Actual Alzheimer's positive rate: {actual_positive_rate:.1%}")
-        tqdm.write(f"📁 Output directory: {output_path.absolute()}")
 
 
 

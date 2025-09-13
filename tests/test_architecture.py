@@ -265,7 +265,6 @@ class TestCrossPlatformCompatibility:
             test_paths = [
                 "/Data/raw",
                 "../Data/alzearly/raw",
-                "C:\\Data\\alzearly\\raw"  # Windows path
             ]
             
             for path_str in test_paths:

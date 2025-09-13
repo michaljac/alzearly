@@ -78,21 +78,21 @@ def import_modules():
         from src.data_gen import generate
         modules['generate'] = generate
     except ImportError as e:
-        print(f"❌ Failed to import data_gen: {e}")
+        print(f"ERROR: Failed to import data_gen: {e}")
         return False, {}
     
     try:
         from src.preprocess import preprocess
         modules['preprocess'] = preprocess
     except ImportError as e:
-        print(f"❌ Failed to import preprocess: {e}")
+        print(f"ERROR: Failed to import preprocess: {e}")
         return False, {}
     
     try:
         from src.train import train
         modules['train'] = train
     except ImportError as e:
-        print(f"❌ Failed to import train: {e}")
+        print(f"ERROR: Failed to import train: {e}")
         return False, {}
     
     return True, modules
@@ -162,7 +162,6 @@ def run_with_python(args, modules):
         if not skip_preprocess:
             print("Step 2: Data Preprocessing")
             modules['preprocess']()
-            print("Data preprocessing completed")
         else:
             print("Step 2: Data Preprocessing (skipped - using cached data)")
         
@@ -199,7 +198,7 @@ def run_with_python(args, modules):
             print(f"🔬 Setting up experiment tracking: {args.tracker}")
             global_tracker, tracker_type = None, "none"
         else:
-            print(f"❌ Invalid tracker option: {args.tracker}")
+            print(f"ERROR: Invalid tracker option: {args.tracker}")
             return 1
         
         # Set global tracker variables for the training module
@@ -272,12 +271,12 @@ def run_with_python(args, modules):
 
 def train_command(args):
     """Execute the training pipeline."""
-    print("🚀 Starting Alzearly Training Pipeline")
+    print("Starting Alzearly Training Pipeline")
     
     # Detect environment
     use_docker, env_type = detect_environment()
     if env_type == "none":
-        print("❌ Neither Docker nor Python dependencies available")
+        print("ERROR: Neither Docker nor Python dependencies available")
         return 1
     
     # Setup paths
