@@ -9,7 +9,6 @@ import pickle
 import os
 import numpy as np
 from pathlib import Path
-from typing import Any, Dict, List
 
 # Permissions to apply (dirs: rwx for all; files: rw for all)
 DIR_MODE = 0o777
@@ -29,7 +28,7 @@ def _json_serializable(obj):
         return [_json_serializable(x) for x in obj]
     return obj
 
-def _ensure_parent_dir(path: Path) -> None:
+def _ensure_parent_dir(path):
     """
     Ensure parent directory exists and set permissions.
     """
@@ -37,15 +36,15 @@ def _ensure_parent_dir(path: Path) -> None:
     parent.mkdir(parents=True, exist_ok=True)
     try:
         os.chmod(parent, DIR_MODE)
-    except Exception as e:
-        print(f"⚠️  Could not chmod {parent} to {oct(DIR_MODE)}: {e}")
+    except OSError as e:
+        print(f"WARNING: Could not chmod {parent} to {oct(DIR_MODE)}: {e}")
 
-def _chmod_file(path: Path) -> None:
+def _chmod_file(path):
     """Set file permissions after writing."""
     try:
         os.chmod(path, FILE_MODE)
-    except Exception as e:
-        print(f"⚠️  Could not chmod {path} to {oct(FILE_MODE)}: {e}")
+    except OSError as e:
+        print(f"WARNING: Could not chmod {path} to {oct(FILE_MODE)}: {e}")
 
 # ---------------------------------------------------------------------
 # Paths API (as you already have)
@@ -58,7 +57,7 @@ from src.io.paths import (
 )
 # ---------------------------------------------------------------------
 
-def save_model(model: Any, model_name: str = "model.pkl") -> Path:
+def save_model(model, model_name="model.pkl"):
     """Save trained model to artifacts/latest/<model_name>."""
     model_path = get_model_path(model_name)
     _ensure_parent_dir(model_path)
@@ -68,7 +67,7 @@ def save_model(model: Any, model_name: str = "model.pkl") -> Path:
     _chmod_file(model_path)
     return model_path
 
-def save_feature_names(feature_names: List[str]) -> Path:
+def save_feature_names(feature_names):
     """Save feature names to artifacts/latest/feature_names.json."""
     feature_path = get_feature_names_path()
     _ensure_parent_dir(feature_path)
@@ -78,7 +77,7 @@ def save_feature_names(feature_names: List[str]) -> Path:
     _chmod_file(feature_path)
     return feature_path
 
-def save_threshold(threshold: float) -> Path:
+def save_threshold(threshold):
     """Save optimal threshold to artifacts/latest/threshold.json."""
     threshold_path = get_threshold_path()
     _ensure_parent_dir(threshold_path)
@@ -90,7 +89,7 @@ def save_threshold(threshold: float) -> Path:
     _chmod_file(threshold_path)
     return threshold_path
 
-def save_metrics(metrics: Dict[str, Any]) -> Path:
+def save_metrics(metrics):
     """Save training metrics to artifacts/latest/metrics.json."""
     metrics_path = get_metrics_path()
     _ensure_parent_dir(metrics_path)
@@ -102,20 +101,20 @@ def save_metrics(metrics: Dict[str, Any]) -> Path:
     return metrics_path
 
 def save_all_artifacts(
-    model: Any,
-    feature_names: List[str],
-    threshold: float,
-    metrics: Dict[str, Any],
-    model_name: str = "model.pkl",
-) -> Dict[str, Path]:
+    model,
+    feature_names,
+    threshold,
+    metrics,
+    model_name="model.pkl",
+):
     """Save all required artifacts after training."""
     print("Saving training artifacts...")
     # Ensure artifacts base dir exists (and set perms)
     artifacts_dir = get_latest_artifacts_dir()
     try:
         os.chmod(Path(artifacts_dir), DIR_MODE)
-    except Exception as e:
-        print(f"⚠️  Could not chmod {artifacts_dir} to {oct(DIR_MODE)}: {e}")
+    except OSError as e:
+        print(f"WARNING: Could not chmod {artifacts_dir} to {oct(DIR_MODE)}: {e}")
 
     saved_paths = {
         "model": save_model(model, model_name),
@@ -126,7 +125,7 @@ def save_all_artifacts(
     print("All artifacts saved successfully!")
     return saved_paths
 
-def load_model(model_name: str = "model.pkl") -> Any:
+def load_model(model_name="model.pkl"):
     """Load trained model from artifacts/latest/."""
     model_path = get_model_path(model_name)
     if not model_path.exists():
@@ -134,7 +133,7 @@ def load_model(model_name: str = "model.pkl") -> Any:
     with open(model_path, "rb") as f:
         return pickle.load(f)
 
-def load_feature_names() -> List[str]:
+def load_feature_names():
     """Load feature names from artifacts/latest/feature_names.json."""
     feature_path = get_feature_names_path()
     if not feature_path.exists():
@@ -142,7 +141,7 @@ def load_feature_names() -> List[str]:
     with open(feature_path, "r") as f:
         return json.load(f)
 
-def load_threshold() -> float:
+def load_threshold():
     """Load threshold from artifacts/latest/threshold.json."""
     threshold_path = get_threshold_path()
     if not threshold_path.exists():
@@ -152,7 +151,7 @@ def load_threshold() -> float:
         # Backward-compat: accept either key
         return float(data.get("optimal_threshold", data.get("threshold")))
 
-def load_metrics() -> Dict[str, Any]:
+def load_metrics():
     """Load metrics from artifacts/latest/metrics.json."""
     metrics_path = get_metrics_path()
     if not metrics_path.exists():

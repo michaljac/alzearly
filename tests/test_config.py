@@ -45,7 +45,7 @@ class TestConfigLoading:
         assert 0.0 <= config.positive_rate <= 1.0
         assert config.seed >= 0
         
-        print(f"✅ Config loaded successfully:")
+        print(f"Config loaded successfully:")
         print(f"   n_patients: {config.n_patients}")
         print(f"   years: {config.years}")
         print(f"   positive_rate: {config.positive_rate}")
@@ -152,7 +152,7 @@ class TestGetConfigScript:
         assert float(config_vars['CONFIG_POSITIVE_RATE']) > 0
         assert config_vars['CONFIG_SEED'].isdigit()
         
-        print(f"✅ get_config.py output format is correct")
+        print(f"get_config.py output format is correct")
         print(f"   Variables found: {list(config_vars.keys())}")
 
 
@@ -169,4 +169,4 @@ if __name__ == "__main__":
     test_script = TestGetConfigScript()
     test_script.test_get_config_output_format()
     
-    print("✅ All configuration tests passed!")
+    print("All configuration tests passed!")

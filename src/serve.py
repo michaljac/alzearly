@@ -7,7 +7,6 @@ Provides endpoints for single patient prediction and health checks.
 import json
 import pickle
 from pathlib import Path
-from typing import Dict, List, Any, Optional
 import numpy as np
 import pandas as pd
 from fastapi import FastAPI, HTTPException
@@ -30,31 +29,31 @@ fallback_threshold = None
 
 class PatientData(BaseModel):
     """Schema for patient input data."""
-    patient_id: str = Field(..., description="Unique patient identifier")
-    sex: str = Field(..., description="Patient sex (M/F)")
-    region: str = Field(..., description="Geographic region")
-    occupation: str = Field(..., description="Patient occupation")
-    education_level: str = Field(..., description="Education level")
-    marital_status: str = Field(..., description="Marital status")
-    insurance_type: str = Field(..., description="Insurance type")
-    age: float = Field(..., ge=0, le=120, description="Patient age")
-    bmi: float = Field(..., ge=10, le=100, description="Body mass index")
-    systolic_bp: float = Field(..., ge=50, le=300, description="Systolic blood pressure")
-    diastolic_bp: float = Field(..., ge=30, le=200, description="Diastolic blood pressure")
-    heart_rate: float = Field(..., ge=30, le=200, description="Heart rate")
-    temperature: float = Field(..., ge=30, le=45, description="Body temperature")
-    glucose: float = Field(..., ge=20, le=1000, description="Blood glucose level")
-    cholesterol_total: float = Field(..., ge=50, le=500, description="Total cholesterol")
-    hdl: float = Field(..., ge=10, le=200, description="HDL cholesterol")
-    ldl: float = Field(..., ge=10, le=300, description="LDL cholesterol")
-    triglycerides: float = Field(..., ge=10, le=1000, description="Triglycerides")
-    creatinine: float = Field(..., ge=0.1, le=20, description="Creatinine level")
-    hemoglobin: float = Field(..., ge=5, le=25, description="Hemoglobin level")
-    white_blood_cells: float = Field(..., ge=1, le=50, description="White blood cell count")
-    platelets: float = Field(..., ge=50, le=1000, description="Platelet count")
-    num_encounters: int = Field(..., ge=0, description="Number of healthcare encounters")
-    num_medications: int = Field(..., ge=0, description="Number of medications")
-    num_lab_tests: int = Field(..., ge=0, description="Number of lab tests")
+    patient_id = Field(..., description="Unique patient identifier")
+    sex = Field(..., description="Patient sex (M/F)")
+    region = Field(..., description="Geographic region")
+    occupation = Field(..., description="Patient occupation")
+    education_level = Field(..., description="Education level")
+    marital_status = Field(..., description="Marital status")
+    insurance_type = Field(..., description="Insurance type")
+    age = Field(..., ge=0, le=120, description="Patient age")
+    bmi = Field(..., ge=10, le=100, description="Body mass index")
+    systolic_bp = Field(..., ge=50, le=300, description="Systolic blood pressure")
+    diastolic_bp = Field(..., ge=30, le=200, description="Diastolic blood pressure")
+    heart_rate = Field(..., ge=30, le=200, description="Heart rate")
+    temperature = Field(..., ge=30, le=45, description="Body temperature")
+    glucose = Field(..., ge=20, le=1000, description="Blood glucose level")
+    cholesterol_total = Field(..., ge=50, le=500, description="Total cholesterol")
+    hdl = Field(..., ge=10, le=200, description="HDL cholesterol")
+    ldl = Field(..., ge=10, le=300, description="LDL cholesterol")
+    triglycerides = Field(..., ge=10, le=1000, description="Triglycerides")
+    creatinine = Field(..., ge=0.1, le=20, description="Creatinine level")
+    hemoglobin = Field(..., ge=5, le=25, description="Hemoglobin level")
+    white_blood_cells = Field(..., ge=1, le=50, description="White blood cell count")
+    platelets = Field(..., ge=50, le=1000, description="Platelet count")
+    num_encounters = Field(..., ge=0, description="Number of healthcare encounters")
+    num_medications = Field(..., ge=0, description="Number of medications")
+    num_lab_tests = Field(..., ge=0, description="Number of lab tests")
 
     model_config = {
         "json_schema_extra": {
@@ -91,11 +90,11 @@ class PatientData(BaseModel):
 
 class PredictionResponse(BaseModel):
     """Schema for prediction response."""
-    patient_id: str = Field(..., description="Patient identifier")
-    probability: float = Field(..., ge=0, le=1, description="Predicted probability of Alzheimer's")
-    label: int = Field(..., description="Predicted label (0=negative, 1=positive)")
-    threshold_used: str = Field(..., description="Threshold used for prediction (optimal/fallback)")
-    threshold_value: float = Field(..., description="Actual threshold value used")
+    patient_id = Field(..., description="Patient identifier")
+    probability = Field(..., ge=0, le=1, description="Predicted probability of Alzheimer's")
+    label = Field(..., description="Predicted label (0=negative, 1=positive)")
+    threshold_used = Field(..., description="Threshold used for prediction (optimal/fallback)")
+    threshold_value = Field(..., description="Actual threshold value used")
 
     model_config = {
         "json_schema_extra": {
@@ -112,11 +111,11 @@ class PredictionResponse(BaseModel):
 
 class HealthResponse(BaseModel):
     """Schema for health check response."""
-    status: str = Field(..., description="Service status")
-    model_loaded: bool = Field(..., description="Whether model is loaded")
-    feature_count: Optional[int] = Field(None, description="Number of features in model")
-    optimal_threshold: Optional[float] = Field(None, description="Optimal threshold value")
-    fallback_threshold: Optional[float] = Field(None, description="Fallback threshold value")
+    status = Field(..., description="Service status")
+    model_loaded = Field(..., description="Whether model is loaded")
+    feature_count = Field(None, description="Number of features in model")
+    optimal_threshold = Field(None, description="Optimal threshold value")
+    fallback_threshold = Field(None, description="Fallback threshold value")
 
     model_config = {
         "json_schema_extra": {
@@ -143,29 +142,29 @@ def load_model_and_metadata():
         
         # Load model
         model = load_model("model.pkl")
-        print("✅ Model loaded successfully")
+        print("Model loaded successfully")
         
         # Load feature names
         feature_names = load_feature_names()
-        print(f"✅ Feature names loaded: {len(feature_names)} features")
+        print(f"Feature names loaded: {len(feature_names)} features")
         
         # Load threshold
         optimal_threshold = load_threshold()
         fallback_threshold = optimal_threshold  # Use same threshold as fallback
-        print(f"✅ Threshold loaded: {optimal_threshold}")
+        print(f"Threshold loaded: {optimal_threshold}")
         
         # Load metrics (optional, for logging)
         try:
             metrics = load_metrics()
-            print(f"✅ Metrics loaded: run_id={metrics.get('run_id', 'unknown')}")
+            print(f"Metrics loaded: run_id={metrics.get('run_id', 'unknown')}")
         except FileNotFoundError:
-            print("⚠️  Metrics file not found, continuing without metrics")
+            print("WARNING: Metrics file not found, continuing without metrics")
         
-        print("🎉 All artifacts loaded successfully!")
+        print("All artifacts loaded successfully!")
         
     except FileNotFoundError as e:
         error_msg = f"Missing required artifacts: {e}"
-        print(f"❌ {error_msg}")
+        print(f"ERROR: {error_msg}")
         print("Expected files in artifacts/latest/:")
         print("  - model.pkl")
         print("  - feature_names.json") 
@@ -174,11 +173,11 @@ def load_model_and_metadata():
         raise FileNotFoundError(error_msg)
     except Exception as e:
         error_msg = f"Failed to load artifacts: {e}"
-        print(f"❌ {error_msg}")
+        print(f"ERROR: {error_msg}")
         raise Exception(error_msg)
 
 
-def prepare_features(patient_data: PatientData) -> np.ndarray:
+def prepare_features(patient_data):
     """Prepare features for prediction from patient data."""
     # Convert patient data to dictionary
     data_dict = patient_data.dict()
@@ -214,13 +213,13 @@ def prepare_features(patient_data: PatientData) -> np.ndarray:
     missing_features = [col for col in base_features if col not in df.columns]
     
     if missing_features:
-        print(f"⚠️  Missing base features: {missing_features}")
+        print(f"WARNING: Missing base features: {missing_features}")
     
     X = df[available_features].values.astype(float)
     
     # For now, return a simple prediction based on age and risk factors
     # This is a fallback since the model expects engineered features
-    print("⚠️  Using fallback prediction method - model expects engineered features")
+    print("WARNING: Using fallback prediction method - model expects engineered features")
     
     # Create a simple risk score based on age and clinical factors
     age = df['age'].iloc[0]
@@ -249,9 +248,9 @@ async def startup_event():
     """Load model and metadata on startup."""
     try:
         load_model_and_metadata()
-        print("🚀 Service started successfully!")
+        print("Service started successfully!")
     except Exception as e:
-        print(f"❌ Failed to start service: {e}")
+        print(f"ERROR: Failed to start service: {e}")
         raise
 
 
@@ -272,7 +271,7 @@ async def health_check():
 
 
 @app.post("/predict", response_model=PredictionResponse, tags=["Prediction"])
-async def predict(patient_data: PatientData, use_fallback: bool = False):
+async def predict(patient_data, use_fallback=False):
     """
     Predict Alzheimer's disease risk for a single patient.
     
@@ -309,7 +308,7 @@ async def predict(patient_data: PatientData, use_fallback: bool = False):
         )
     
     except Exception as e:
-        print(f"❌ Prediction error: {e}")
+        print(f"ERROR: Prediction error: {e}")
         raise HTTPException(status_code=500, detail=f"Prediction failed: {str(e)}")
 
 

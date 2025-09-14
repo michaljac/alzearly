@@ -24,7 +24,12 @@ logger = logging.getLogger(__name__)
 
 
 # Import the config loader
-from .config import load_config
+try:
+    # Try relative import first (when run as part of package)
+    from .config import load_config
+except ImportError:
+    # Fall back to absolute import (when run directly or imported without package context)
+    from config import load_config
 
 
 class SyntheticDataGenerator:
@@ -330,7 +335,12 @@ def generate(
         python cli.py data-gen --config config/data_gen.yaml --n-patients 5000 --positive-rate 0.08
     """
     # Load configuration from file
-    from .config import load_config
+    try:
+        # Try relative import first (when run as part of package)
+        from .config import load_config
+    except ImportError:
+        # Fall back to absolute import (when run directly or imported without package context)
+        from config import load_config
     config = load_config("data_gen", config_file)
     
     # Override config values if provided as command line arguments

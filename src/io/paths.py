@@ -34,43 +34,43 @@ CONFIG_DIR = PROJECT_ROOT / "config"
 SRC_DIR = PROJECT_ROOT / "src"
 
 
-def ensure_dir(path: Path) -> Path:
+def ensure_dir(path):
     """Ensure directory exists, create if it doesn't."""
     path.mkdir(parents=True, exist_ok=True)
     return path
 
 
-def get_latest_artifacts_dir() -> Path:
+def get_latest_artifacts_dir():
     """Get the latest artifacts directory, create if it doesn't exist."""
     return ensure_dir(LATEST_ARTIFACTS_DIR)
 
 
-def get_model_path(model_name: str = "model.pkl") -> Path:
+def get_model_path(model_name="model.pkl"):
     """Get path for model file in latest artifacts."""
     return get_latest_artifacts_dir() / model_name
 
 
-def get_feature_names_path() -> Path:
+def get_feature_names_path():
     """Get path for feature names JSON file."""
     return get_latest_artifacts_dir() / "feature_names.json"
 
 
-def get_threshold_path() -> Path:
+def get_threshold_path():
     """Get path for threshold JSON file."""
     return get_latest_artifacts_dir() / "threshold.json"
 
 
-def get_metrics_path() -> Path:
+def get_metrics_path():
     """Get path for metrics JSON file."""
     return get_latest_artifacts_dir() / "metrics.json"
 
 
-def get_plot_path(plot_name: str) -> Path:
+def get_plot_path(plot_name):
     """Get path for plot file."""
     return ensure_dir(PLOTS_DIR) / plot_name
 
 
-def get_config_path(config_name: str) -> Path:
+def get_config_path(config_name):
     """Get path for configuration file."""
     return CONFIG_DIR / config_name
 

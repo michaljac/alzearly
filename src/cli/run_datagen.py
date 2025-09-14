@@ -120,23 +120,27 @@ def run_pipeline(args):
     if not args.skip_data_gen:
         print("Step 1: Data Generation")
         try:
-            # Use direct import instead of subprocess
-            from src.data_gen import SyntheticDataGenerator
-            from src.config import load_config
+            # Call generate function through subprocess as CLI command
+            import subprocess
+            cmd = [
+                sys.executable, "-m", "src.data_gen",
+                "--n-patients", str(args.num_patients or 3000),
+                "--years", "2021,2022,2023,2024",
+                "--positive-rate", "0.08",
+                "--out", str(raw_out),
+                "--seed", str(args.seed or 42)
+            ]
+            print(f"Running command: {' '.join(cmd)}")
+            result = subprocess.run(cmd, capture_output=True, text=True)
             
-            # Load config and set parameters
-            config = load_config("data_gen")
-            config['dataset']['n_patients'] = args.num_patients or config['dataset']['n_patients']
-            config['processing']['seed'] = args.seed or config['processing']['seed']
-            config['output']['directory'] = str(raw_out)
-            config['output']['clean_existing'] = args.force_regen
-            
-            # Generate data
-            generator = SyntheticDataGenerator(config)
-            generator.generate()
+            if result.returncode != 0:
+                print(f"ERROR: Command failed with exit code {result.returncode}")
+                print(f"STDOUT: {result.stdout}")
+                print(f"STDERR: {result.stderr}")
+                return 1
                 
             print("Data generation: done.")
-        except Exception as e:
+        except (subprocess.SubprocessError, OSError) as e:
             print(f"ERROR: data generation failed: {e}")
             return 1
     else:

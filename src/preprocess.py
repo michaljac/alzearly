@@ -8,8 +8,6 @@ Uses Polars Lazy for smaller datasets and Dask for larger datasets.
 import logging
 import re
 from pathlib import Path
-from typing import List, Optional
-from dataclasses import dataclass
 
 import typer
 import polars as pl
@@ -20,7 +18,6 @@ from tqdm import tqdm
 # Use only Polars for data processing
 import pandas as pd  # Needed for some operations
 DASK_AVAILABLE = False
-print("ℹ️  Using Polars for all data processing (Dask disabled).")
 
 logger = logging.getLogger(__name__)
 
@@ -52,7 +49,7 @@ class DataPreprocessor:
         self.polars_threshold = self.config.get('memory', {}).get('framework_selection', {}).get('polars_threshold', 1_000_000)
         self.dask_threshold = self.config.get('memory', {}).get('framework_selection', {}).get('dask_threshold', 5_000_000)
 
-    def _estimate_data_size(self) -> int:
+    def _estimate_data_size(self):
         """Estimate the total number of rows in the dataset."""
         input_path = Path(self.config['io']['input_dir'])
         total_rows = 0
@@ -70,12 +67,12 @@ class DataPreprocessor:
         
         return total_rows
 
-    def _choose_framework(self, data_size: int) -> str:
+    def _choose_framework(self, data_size):
         """Choose the appropriate framework based on data size."""
         # Always use Polars since Dask is disabled
         return "polars"
 
-    def _get_partitioned_data(self) -> LazyFrame:
+    def _get_partitioned_data(self):
         """Read partitioned Parquet data using Polars Lazy.
 
         Supports both:  <input_dir>/year=2019/*.parquet  (Hive style)
@@ -86,7 +83,7 @@ class DataPreprocessor:
         if not input_path.exists():
             raise FileNotFoundError(f"Input directory {input_path} does not exist")
 
-        lazy_frames: List[LazyFrame] = []
+        lazy_frames = []
 
         # First try Hive-style: year=YYYY
         for d in input_path.iterdir():
@@ -133,19 +130,17 @@ class DataPreprocessor:
         
         return df
 
-    def _compute_rolling_features(self, df: LazyFrame) -> LazyFrame:
+    def _compute_rolling_features(self, df):
         """Compute rolling features over previous years for each patient."""
         # Skip rolling features to avoid Polars panic - use simpler aggregate features instead
-        print("⚠️  Skipping rolling features to avoid Polars compatibility issues")
         return df
 
-    def _compute_delta_features(self, df: LazyFrame) -> LazyFrame:
+    def _compute_delta_features(self, df):
         """Compute delta features (change from previous year) for numeric columns."""
         # Skip delta features to avoid Polars panic - use simpler features instead
-        print("⚠️  Skipping delta features to avoid Polars compatibility issues")
         return df
 
-    def _compute_aggregate_features(self, df: LazyFrame) -> LazyFrame:
+    def _compute_aggregate_features(self, df):
         """Compute aggregate features across all years for each patient (replicated per row)."""
         # Computing aggregate features per patient
         agg_exprs = []
@@ -158,7 +153,7 @@ class DataPreprocessor:
             ])
         return df.with_columns(agg_exprs)
 
-    def _compute_risk_features(self, df: LazyFrame) -> LazyFrame:
+    def _compute_risk_features(self, df):
         """Compute risk-based features and flags."""
         # Computing risk-based features
         risk_exprs = [
@@ -188,7 +183,7 @@ class DataPreprocessor:
         ]
         return df.with_columns(risk_exprs)
 
-    def _encode_categorical_features(self, df: LazyFrame) -> LazyFrame:
+    def _encode_categorical_features(self, df):
         """Encode categorical features using the specified strategy."""
         if not self.config.get('feature_engineering', {}).get('clinical', {}).get('categorical_columns'):
             return df
@@ -208,7 +203,7 @@ class DataPreprocessor:
             logger.warning(f"Unknown encoding strategy: {strategy}. Using one-hot encoding.")
             return self._onehot_encode_categoricals(df)
     
-    def _onehot_encode_categoricals(self, df: LazyFrame) -> LazyFrame:
+    def _onehot_encode_categoricals(self, df):
         """One-hot encode categorical columns."""
         encoding_exprs = []
         
@@ -229,7 +224,7 @@ class DataPreprocessor:
             return df.with_columns(encoding_exprs)
         return df
     
-    def _label_encode_categoricals(self, df: LazyFrame) -> LazyFrame:
+    def _label_encode_categoricals(self, df):
         """Label encode categorical columns."""
         encoding_exprs = []
         
@@ -248,7 +243,7 @@ class DataPreprocessor:
             return df.with_columns(encoding_exprs)
         return df
 
-    def _handle_missing_values(self, df: LazyFrame) -> LazyFrame:
+    def _handle_missing_values(self, df):
         """Handle missing values in the dataset."""
         # Handling missing values
         fill_exprs = []
@@ -280,7 +275,7 @@ class DataPreprocessor:
 
         return df.with_columns(fill_exprs)
 
-    def _write_partitioned_output(self, df: LazyFrame, output_path: Path) -> None:
+    def _write_partitioned_output(self, df, output_path):
         """Write featurized data to partitioned Parquet files (Hive style) using Polars."""
         output_path.mkdir(parents=True, exist_ok=True)
 
@@ -288,25 +283,20 @@ class DataPreprocessor:
         try:
             # First try to get schema to understand the data structure
             schema = df.schema
-            print(f"📊 Schema has {len(schema)} columns")
             
             # Try collecting with a limit first to test
             test_df = df.limit(100).collect()
-            print(f"✅ Test collection successful with {len(test_df)} rows")
             
             # Now collect the full dataset
             collected_df = df.collect()
-            print(f"✅ Full collection successful with {len(collected_df)} rows")
             
             # Write to parquet
             collected_df.write_parquet(
                 file=str(output_path / "data.parquet"),
                 compression="snappy"
             )
-            print(f"✅ Data written to {output_path / 'data.parquet'}")
             
         except Exception as e:
-            print(f"⚠️  Collection failed: {e}")
             print("🔄 Trying alternative approach...")
             
             try:
@@ -315,7 +305,7 @@ class DataPreprocessor:
                     path=str(output_path / "data.parquet"),
                     compression="snappy"
                 )
-                print(f"✅ Data written using sink_parquet to {output_path / 'data.parquet'}")
+                print(f"Data written using sink_parquet to {output_path / 'data.parquet'}")
             except Exception as e2:
                 print(f"⚠️  sink_parquet also failed: {e2}")
                 print("🔄 Trying CSV fallback...")
@@ -326,12 +316,12 @@ class DataPreprocessor:
                     collected_df.write_csv(
                         file=str(output_path / "data.csv")
                     )
-                    print(f"✅ Data written as CSV to {output_path / 'data.csv'}")
+                    print(f"Data written as CSV to {output_path / 'data.csv'}")
                 except Exception as e3:
-                    print(f"❌ All write methods failed: {e3}")
+                    print(f"ERROR: All write methods failed: {e3}")
                     raise
 
-    def _analyze_prevalence(self, df: LazyFrame) -> None:
+    def _analyze_prevalence(self, df):
         """Analyze the prevalence of Alzheimer's diagnosis in the dataset."""
         # Get overall statistics
         stats = df.select([
@@ -357,26 +347,22 @@ class DataPreprocessor:
             "year_stats": year_stats
         }
 
-    def preprocess(self) -> None:
+    def preprocess(self):
         """Main preprocessing pipeline with automatic framework selection."""
-        print("🚀 Starting data preprocessing pipeline...")
         
         # Step 1: Estimate data size and choose framework
-        print("📊 Analyzing dataset size...")
         data_size = self._estimate_data_size()
         framework = self._choose_framework(data_size)
         
-        print(f"📈 Dataset size: {data_size:,} rows")
-        print(f"🔧 Using framework: {framework.upper()}")
-        
+
+     
         if framework == "dask":
             print("⚡ Using Dask for large dataset processing")
             self._preprocess_with_dask(data_size)
         else:
-            print("🚀 Using Polars for efficient processing")
             self._preprocess_with_polars(data_size)
 
-    def _preprocess_with_polars(self, data_size: int) -> None:
+    def _preprocess_with_polars(self, data_size):
         """Preprocess using Polars Lazy framework."""
         # Step 1: Load data
         df = self._get_partitioned_data()
@@ -385,11 +371,10 @@ class DataPreprocessor:
         self._analyze_prevalence(df)
         
         # Step 3: Feature engineering with single progress bar
-        print("🔧 Computing features...")
         with tqdm(total=5, desc="Feature engineering", unit="step", 
                  bar_format="{desc}: {percentage:3.0f}%|{bar}| {n_fmt}/{total_fmt} [{elapsed}<{remaining}]",
                  ncols=80, ascii=True, position=0, dynamic_ncols=False, 
-                 mininterval=0.1, maxinterval=1.0) as pbar:
+                 mininterval=0.1, maxinterval=1.0, disable=True) as pbar:
             
             df = self._compute_rolling_features(df)
             pbar.update(1)
@@ -407,11 +392,10 @@ class DataPreprocessor:
             pbar.update(1)
 
         # Step 4: Handle missing values and write output
-        print("💾 Finalizing and saving data...")
-        with tqdm(total=2, desc="Finalizing", unit="step",
+        with tqdm(total=2, desc="", unit="step",
                  bar_format="{desc}: {percentage:3.0f}%|{bar}| {n_fmt}/{total_fmt} [{elapsed}<{remaining}]",
                  ncols=80, ascii=True, position=0, dynamic_ncols=False, 
-                 mininterval=0.1, maxinterval=1.0) as pbar:
+                 mininterval=0.1, maxinterval=1.0, disable=True) as pbar:
             
             df = self._handle_missing_values(df)
             pbar.update(1)
@@ -420,9 +404,7 @@ class DataPreprocessor:
             self._write_partitioned_output(df, output_path)
             pbar.update(1)
 
-        print(f"✅ Polars preprocessing complete! {len(df.schema)} columns created")
-
-    def _preprocess_with_dask(self, data_size: int) -> None:
+    def _preprocess_with_dask(self, data_size):
         """Preprocess using Dask framework for large datasets."""
         if not DASK_AVAILABLE:
             raise ImportError("Dask is required for large datasets but not available")
@@ -436,7 +418,7 @@ class DataPreprocessor:
         with tqdm(total=5, desc="Feature engineering", unit="step", 
                  bar_format="{desc}: {percentage:3.0f}%|{bar}| {n_fmt}/{total_fmt} [{elapsed}<{remaining}]",
                  ncols=80, ascii=True, position=0, dynamic_ncols=False, 
-                 mininterval=0.1, maxinterval=1.0) as pbar:
+                 mininterval=0.1, maxinterval=1.0, disable=True) as pbar:
             
             # Dask rolling features (simplified for large datasets)
             df = self._compute_dask_rolling_features(df)
@@ -463,7 +445,7 @@ class DataPreprocessor:
         output_path = Path(self.config['io']['output_dir'])
         self._write_dask_output(df, output_path)
 
-        print(f"✅ Dask preprocessing complete! Dataset processed in chunks")
+        print(f"Dask preprocessing complete! Dataset processed in chunks")
 
     def _compute_dask_rolling_features(self, df):
         """Compute rolling features using Dask."""
@@ -530,13 +512,13 @@ class DataPreprocessor:
 
 
 def preprocess(
-    config_file: str = typer.Option("config/preprocess.yaml", "--config", help="Configuration file path"),
-    input_dir: Optional[str] = typer.Option(None, "--input-dir", help="Override input directory from config"),
-    output_dir: Optional[str] = typer.Option(None, "--output-dir", help="Override output directory from config"),
-    rolling_window_years: Optional[int] = typer.Option(None, "--rolling-window", help="Override rolling window from config"),
-    chunk_size: Optional[int] = typer.Option(None, "--chunk-size", help="Override chunk size from config"),
-    seed: Optional[int] = typer.Option(None, "--seed", help="Override seed from config"),
-) -> None:
+    config_file = typer.Option("config/preprocess.yaml", "--config", help="Configuration file path"),
+    input_dir = typer.Option(None, "--input-dir", help="Override input directory from config"),
+    output_dir = typer.Option(None, "--output-dir", help="Override output directory from config"),
+    rolling_window_years = typer.Option(None, "--rolling-window", help="Override rolling window from config"),
+    chunk_size = typer.Option(None, "--chunk-size", help="Override chunk size from config"),
+    seed = typer.Option(None, "--seed", help="Override seed from config"),
+):
     """
     Preprocess patient-year data with rolling features using Polars Lazy.
 

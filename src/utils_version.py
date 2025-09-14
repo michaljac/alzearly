@@ -21,42 +21,51 @@ Usage (typical):
 >>> print(get_version_string(ctx))
 
 """
-from __future__ import annotations
 
 import json
 import os
 import re
 import subprocess
-from dataclasses import asdict, dataclass
 from datetime import datetime, timezone
 from pathlib import Path
-from typing import Any, Dict, Optional
-
 
 # ----------------------------
 # Dataclasses & core helpers
 # ----------------------------
 
-@dataclass
 class RunContext:
     """Holds lightweight run metadata."""
-    timestamp: str  # UTC ISO8601, e.g. 2025-08-31T15:22:11Z
-    run_id: str     # e.g. 20250831_152211
-    git_sha: str    # short SHA or "unknown"
-    git_dirty: bool
-    version: str    # semver‑ish string, e.g. 0.1.3
-    base_artifacts_dir: Path
-    run_dir: Path
+    
+    def __init__(self, timestamp, run_id, git_sha, git_dirty, version, base_artifacts_dir, run_dir):
+        self.timestamp = timestamp  # UTC ISO8601, e.g. 2025-08-31T15:22:11Z
+        self.run_id = run_id        # e.g. 20250831_152211
+        self.git_sha = git_sha      # short SHA or "unknown"
+        self.git_dirty = git_dirty
+        self.version = version      # semver‑ish string, e.g. 0.1.3
+        self.base_artifacts_dir = base_artifacts_dir
+        self.run_dir = run_dir
+    
+    def asdict(self):
+        """Convert to dictionary for JSON serialization."""
+        return {
+            'timestamp': self.timestamp,
+            'run_id': self.run_id,
+            'git_sha': self.git_sha,
+            'git_dirty': self.git_dirty,
+            'version': self.version,
+            'base_artifacts_dir': str(self.base_artifacts_dir),
+            'run_dir': str(self.run_dir)
+        }
 
 
 ISO_FMT = "%Y-%m-%dT%H:%M:%SZ"
 
 
-def _utc_now() -> datetime:
+def _utc_now():
     return datetime.now(timezone.utc)
 
 
-def _ts_str(dt: Optional[datetime] = None) -> str:
+def _ts_str(dt=None):
     dt = dt or _utc_now()
     return dt.strftime("%Y%m%d_%H%M%S")
 
@@ -65,7 +74,7 @@ def _ts_str(dt: Optional[datetime] = None) -> str:
 # Git info (safe fallbacks)
 # ----------------------------
 
-def get_git_short_sha() -> str:
+def get_git_short_sha():
     """Return short SHA if repo exists; otherwise 'unknown'."""
     try:
         out = subprocess.check_output(
@@ -76,7 +85,7 @@ def get_git_short_sha() -> str:
         return "unknown"
 
 
-def get_git_dirty() -> bool:
+def get_git_dirty():
     """Return True if repo has uncommitted changes, else False.
     Returns False if git is not available.
     """
@@ -97,7 +106,7 @@ def get_git_dirty() -> bool:
 SEMVER_RE = re.compile(r"^(\d+)\.(\d+)\.(\d+)$")
 
 
-def _read_version_file(path: Path) -> Optional[str]:
+def _read_version_file(path):
     try:
         if path.exists():
             txt = path.read_text().strip()
@@ -108,7 +117,7 @@ def _read_version_file(path: Path) -> Optional[str]:
     return None
 
 
-def _bump_patch(ver: str) -> str:
+def _bump_patch(ver):
     m = SEMVER_RE.match(ver)
     if not m:
         return "0.1.0"
@@ -116,7 +125,7 @@ def _bump_patch(ver: str) -> str:
     return f"{major}.{minor}.{patch + 1}"
 
 
-def compute_model_version(base_artifacts_dir: Path) -> str:
+def compute_model_version(base_artifacts_dir):
     """Compute a semver‑ish version.
 
     Priority:
@@ -135,7 +144,7 @@ def compute_model_version(base_artifacts_dir: Path) -> str:
     return "0.1.0"
 
 
-def persist_version(base_artifacts_dir: Path, version: str) -> None:
+def persist_version(base_artifacts_dir, version):
     try:
         (base_artifacts_dir).mkdir(parents=True, exist_ok=True)
         (base_artifacts_dir / "VERSION").write_text(version + "\n")
@@ -148,12 +157,12 @@ def persist_version(base_artifacts_dir: Path, version: str) -> None:
 # Run bootstrap & metadata
 # ----------------------------
 
-def ensure_dir(p: Path) -> Path:
+def ensure_dir(p):
     p.mkdir(parents=True, exist_ok=True)
     return p
 
 
-def safe_symlink(target: Path, link_name: Path) -> None:
+def safe_symlink(target, link_name):
     try:
         if link_name.is_symlink() or link_name.exists():
             try:
@@ -171,8 +180,7 @@ def safe_symlink(target: Path, link_name: Path) -> None:
         pass
 
 
-def start_run(base_artifacts_dir: str | Path = "artifacts",
-              run_prefix: str = "run") -> RunContext:
+def start_run(base_artifacts_dir="artifacts", run_prefix="run"):
     """Create a fresh run directory and return a RunContext.
 
     Structure:
@@ -211,17 +219,17 @@ def start_run(base_artifacts_dir: str | Path = "artifacts",
     return ctx
 
 
-def get_version_string(ctx: RunContext | Dict[str, Any] | None = None) -> str:
+def get_version_string(ctx):
     """Return a human‑readable version string for logging/filenames."""
     if ctx is None:
         # best‑effort standalone
         return f"v{compute_model_version(Path('artifacts'))}"
-    d = asdict(ctx) if isinstance(ctx, RunContext) else dict(ctx)
+    d = ctx.asdict() if isinstance(ctx, RunContext) else dict(ctx)
     dirty = "+dirty" if d.get("git_dirty") else ""
     return f"v{d.get('version','0.1.0')}({d.get('git_sha','unknown')}{dirty})_{d.get('run_id','')}"
 
 
-def write_metadata(path: Path | str, data: Dict[str, Any]) -> None:
+def write_metadata(path, data):
     path = Path(path)
     ensure_dir(path.parent)
     try:
@@ -232,7 +240,7 @@ def write_metadata(path: Path | str, data: Dict[str, Any]) -> None:
         pass
 
 
-def load_metadata(path: Path | str) -> Dict[str, Any]:
+def load_metadata(path):
     path = Path(path)
     try:
         with path.open("r", encoding="utf-8") as f:

@@ -8,7 +8,6 @@ import json
 import pickle
 import socket
 from pathlib import Path
-from typing import List, Optional
 
 import uvicorn
 from fastapi import FastAPI, HTTPException
@@ -22,34 +21,34 @@ optimal_threshold = 0.5
 
 # Pydantic models for API
 class PatientData(BaseModel):
-    age: float = Field(..., ge=0, le=120, description="Patient age")
-    bmi: float = Field(..., ge=10, le=100, description="Body mass index")
-    systolic_bp: float = Field(..., ge=50, le=300, description="Systolic blood pressure")
-    diastolic_bp: float = Field(..., ge=30, le=200, description="Diastolic blood pressure")
-    heart_rate: float = Field(..., ge=30, le=200, description="Heart rate")
-    temperature: float = Field(..., ge=35, le=42, description="Body temperature (Celsius)")
-    glucose: float = Field(..., ge=20, le=1000, description="Blood glucose level")
-    cholesterol_total: float = Field(..., ge=50, le=500, description="Total cholesterol")
-    hdl: float = Field(..., ge=10, le=200, description="HDL cholesterol")
-    ldl: float = Field(..., ge=10, le=300, description="LDL cholesterol")
-    triglycerides: float = Field(..., ge=10, le=1000, description="Triglycerides")
-    creatinine: float = Field(..., ge=0.1, le=20, description="Creatinine level")
-    hemoglobin: float = Field(..., ge=5, le=25, description="Hemoglobin level")
-    white_blood_cells: float = Field(..., ge=1, le=50, description="White blood cell count")
-    platelets: float = Field(..., ge=50, le=1000, description="Platelet count")
-    num_encounters: int = Field(..., ge=0, description="Number of healthcare encounters")
-    num_medications: int = Field(..., ge=0, description="Number of medications")
-    num_lab_tests: int = Field(..., ge=0, description="Number of lab tests")
+    age = Field(..., ge=0, le=120, description="Patient age")
+    bmi = Field(..., ge=10, le=100, description="Body mass index")
+    systolic_bp = Field(..., ge=50, le=300, description="Systolic blood pressure")
+    diastolic_bp = Field(..., ge=30, le=200, description="Diastolic blood pressure")
+    heart_rate = Field(..., ge=30, le=200, description="Heart rate")
+    temperature = Field(..., ge=35, le=42, description="Body temperature (Celsius)")
+    glucose = Field(..., ge=20, le=1000, description="Blood glucose level")
+    cholesterol_total = Field(..., ge=50, le=500, description="Total cholesterol")
+    hdl = Field(..., ge=10, le=200, description="HDL cholesterol")
+    ldl = Field(..., ge=10, le=300, description="LDL cholesterol")
+    triglycerides = Field(..., ge=10, le=1000, description="Triglycerides")
+    creatinine = Field(..., ge=0.1, le=20, description="Creatinine level")
+    hemoglobin = Field(..., ge=5, le=25, description="Hemoglobin level")
+    white_blood_cells = Field(..., ge=1, le=50, description="White blood cell count")
+    platelets = Field(..., ge=50, le=1000, description="Platelet count")
+    num_encounters = Field(..., ge=0, description="Number of healthcare encounters")
+    num_medications = Field(..., ge=0, description="Number of medications")
+    num_lab_tests = Field(..., ge=0, description="Number of lab tests")
 
 class PredictionRequest(BaseModel):
-    items: List[PatientData]
+    items = Field(..., description="List of patient data items")
 
 class Prediction(BaseModel):
-    probability: float = Field(..., ge=0, le=1, description="Risk probability (0.0 = no risk, 1.0 = high risk)")
-    label: int = Field(..., description="Prediction label (0 = low risk, 1 = high risk)")
+    probability = Field(..., ge=0, le=1, description="Risk probability (0.0 = no risk, 1.0 = high risk)")
+    label = Field(..., description="Prediction label (0 = low risk, 1 = high risk)")
 
 class PredictionResponse(BaseModel):
-    predictions: List[Prediction]
+    predictions = Field(..., description="List of predictions")
 
 # FastAPI app
 app = FastAPI(
@@ -58,7 +57,7 @@ app = FastAPI(
     version="1.0.0"
 )
 
-def find_available_port(start_port: int = 8001, max_attempts: int = 100) -> int:
+def find_available_port(start_port=8001, max_attempts=100):
     """Find an available port starting from start_port."""
     # First check if APP_PORT environment variable is set
     import os
@@ -103,21 +102,21 @@ def load_model_and_metadata():
     # Load model
     with open(artifacts_dir / "model.pkl", "rb") as f:
         model = pickle.load(f)
-    print("✅ Model loaded successfully")
+    print("Model loaded successfully")
 
     # Load feature names
     with open(artifacts_dir / "feature_names.json", "r") as f:
         feature_names = json.load(f)
-    print(f"✅ Feature names loaded: {len(feature_names)} features")
+    print(f"Feature names loaded: {len(feature_names)} features")
 
     # Load run_log (contains threshold and metrics)
     with open(artifacts_dir / "run_log.json", "r") as f:
         run_log = json.load(f)
         optimal_threshold = run_log.get("optimal_threshold", 0.5)
-    print(f"✅ Threshold loaded: {optimal_threshold}")
-    print(f"✅ Model metadata loaded: run_name={run_log.get('run_name', 'unknown')}")
+    print(f"Threshold loaded: {optimal_threshold}")
+    print(f"Model metadata loaded: run_name={run_log.get('run_name', 'unknown')}")
 
-    print("🎉 All artifacts loaded successfully!")
+    print("All artifacts loaded successfully!")
 
 @app.on_event("startup")
 async def startup_event():
@@ -125,8 +124,8 @@ async def startup_event():
     try:
         load_model_and_metadata()
     except Exception as e:
-        print(f"❌ Failed to load model: {e}")
-        print("⚠️  Server will start but prediction endpoints will fail")
+        print(f"Failed to load model: {e}")
+        print("Server will start but prediction endpoints will fail")
 
 @app.get("/")
 async def root():
@@ -207,12 +206,12 @@ def main():
         if port != args.port:
             print(f"⚠️  Port {args.port} is busy, using port {port}")
     except RuntimeError as e:
-        print(f"❌ {e}")
+        print(f"{e}")
         return 1
     
-    print(f"🚀 Starting server on {args.host}:{port}")
-    print(f"📖 API documentation: http://localhost:{port}/docs")
-    print(f"🌍 Access via: http://localhost:{port}")
+    print(f"Starting server on {args.host}:{port}")
+    print(f"API documentation: http://localhost:{port}/docs")
+    print(f"Access via: http://localhost:{port}")
     
     uvicorn.run(
         "run_serve:app",

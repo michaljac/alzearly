@@ -9,7 +9,7 @@ ART_DIR.mkdir(parents=True, exist_ok=True)
 
 
 @contextmanager
-def tracker_run(run_name: str, params: dict = None):
+def tracker_run(run_name, params=None):
     """Context manager for experiment tracking with pluggable backends.
     
     Args:
@@ -39,6 +39,8 @@ def tracker_run(run_name: str, params: dict = None):
             wandb.finish()
 
     elif tracker == "mlflow":
+        import warnings
+        warnings.filterwarnings("ignore", message="pkg_resources is deprecated", category=UserWarning)
         import mlflow
         mlflow.set_tracking_uri(os.getenv("MLFLOW_TRACKING_URI", "file:./mlruns"))
         mlflow.set_experiment(os.getenv("MLFLOW_EXPERIMENT", "alz_detect"))

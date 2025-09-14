@@ -93,17 +93,17 @@ class ConfigLoader:
         with open(filepath, "r") as f:
             return yaml.safe_load(f)
 
-    def load_data_gen_config(self, filename="data_gen.yaml") -> dict:
+    def load_data_gen_config(self, filename="data_gen.yaml"):
         return self.load_yaml(filename)
 
-    def load_preprocess_config(self, filename="preprocess.yaml") -> dict:
+    def load_preprocess_config(self, filename="preprocess.yaml"):
         return self.load_yaml(filename)
 
-    def load_model_config(self, filename="model.yaml") -> dict:
+    def load_model_config(self, filename="model.yaml"):
         return self.load_yaml(filename)
 
 
-def load_config(config_type: str, filename=None):
+def load_config(config_type, filename=None):
     loader = ConfigLoader()
     if config_type == "data_gen":
         return loader.load_data_gen_config(filename or "data_gen.yaml")

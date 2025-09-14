@@ -6,9 +6,8 @@ import os
 import subprocess
 import sys
 from pathlib import Path
-from typing import List, Optional, Tuple, Any
 
-def set_seed(seed: int) -> None:
+def set_seed(seed):
     """Set random seeds for deterministic runs across all libraries."""
     import random
     import numpy as np
@@ -44,7 +43,7 @@ def set_seed(seed: int) -> None:
     
     print(f"🌱 Random seed set to: {seed}")
 
-def setup_logging(level: str = "INFO") -> None:
+def setup_logging(level="INFO"):
     """Setup logging configuration."""
     import logging
     
@@ -56,7 +55,7 @@ def setup_logging(level: str = "INFO") -> None:
         ]
     )
 
-def get_input(prompt: str, input_type: str = "text", allow_quit: bool = False, valid_choices: Optional[List[str]] = None) -> str:
+def get_input(prompt, input_type="text", allow_quit=False, valid_choices=None):
     """Get user input with validation."""
     while True:
         try:
@@ -68,13 +67,13 @@ def get_input(prompt: str, input_type: str = "text", allow_quit: bool = False, v
             if input_type == "y/n":
                 if user_input.lower() in ['y', 'yes', 'n', 'no']:
                     return user_input.lower()
-                print("❌ Please enter 'y' or 'n'")
+                print("Please enter 'y' or 'n'")
                 continue
             
             if input_type == "choice" and valid_choices:
                 if user_input in valid_choices:
                     return user_input
-                print(f"❌ Invalid choice. Please enter one of: {', '.join(valid_choices)}")
+                print(f"Invalid choice. Please enter one of: {', '.join(valid_choices)}")
                 continue
             
             return user_input
@@ -86,7 +85,7 @@ def get_input(prompt: str, input_type: str = "text", allow_quit: bool = False, v
             print("\n👋 Goodbye!")
             sys.exit(0)
 
-def check_dependencies() -> bool:
+def check_dependencies():
     """Check if all required dependencies are available."""
     # Map package names to their import names
     package_imports = {
@@ -111,26 +110,26 @@ def check_dependencies() -> bool:
             missing_packages.append(package_name)
     
     if missing_packages:
-        print(f"❌ Missing required packages: {', '.join(missing_packages)}")
+        print(f"Missing required packages: {', '.join(missing_packages)}")
         print("Please install them with: pip install -r requirements.txt")
         return False
     
-    print("✅ All dependencies are available")
+    print("All dependencies are available")
     return True
 
-def create_directories(directories: List[str]) -> None:
+def create_directories(directories):
     """Create directories if they don't exist."""
     for directory in directories:
         Path(directory).mkdir(parents=True, exist_ok=True)
 
-def handle_critical_error(error: Exception, message: str = "Critical error occurred") -> None:
+def handle_critical_error(error, message="Critical error occurred"):
     """Handle critical errors."""
-    print(f"❌ {message}: {error}")
+    print(f"{message}: {error}")
     sys.exit(1)
 
-def handle_recoverable_error(error: Exception, message: str = "Error occurred") -> bool:
+def handle_recoverable_error(error, message="Error occurred"):
     """Handle recoverable errors."""
-    print(f"⚠️  {message}: {error}")
+    print(f"{message}: {error}")
     return False
 
 
@@ -149,11 +148,11 @@ def setup_experiment_tracker():
     warnings.filterwarnings("ignore", message="Field.*has conflict with protected namespace")
     warnings.filterwarnings("ignore", message="Valid config keys have changed in V2")
     
-    print("\n🔬 Experiment Tracking Setup")
+    print("\n Experiment Tracking Setup")
     print("=" * 50)
     
     # Automatically choose MLflow (no user input required)
-    print("✅ Automatically selecting MLflow for experiment tracking")
+    print("Automatically selecting MLflow for experiment tracking")
     return setup_mlflow()
 
 
@@ -170,24 +169,26 @@ def setup_mlflow():
     
     # Try to import mlflow
     try:
+        import warnings
+        warnings.filterwarnings("ignore", message="pkg_resources is deprecated", category=UserWarning)
         import mlflow
-        print("✅ mlflow available")
+        print("mlflow available")
     except ImportError:
-        print("❌ mlflow not available - please install it in the Dockerfile")
-        print("🔄 Falling back to no tracking")
+        print("mlflow not available - please install it in the Dockerfile")
+        print("Falling back to no tracking")
         return None, "none"
     
     # Set up MLflow tracking
     try:
         mlflow.set_tracking_uri("file:./mlruns")
         mlflow.set_experiment("alzheimers_prediction")
-        print("✅ MLflow tracking configured")
+        print("MLflow tracking configured")
         print("   - Tracking URI: file:./mlruns")
         print("   - Experiment: alzheimers_prediction")
         return mlflow, "mlflow"
     except Exception as e:
-        print(f"❌ MLflow setup failed: {e}")
-        print("🔄 Falling back to no tracking")
+        print(f"MLflow setup failed: {e}")
+        print("Falling back to no tracking")
         return None, "none"
 
 

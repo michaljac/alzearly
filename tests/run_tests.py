@@ -35,9 +35,9 @@ def get_container_type():
             elif choice == "3":
                 return "dev"
             else:
-                print("❌ Invalid choice. Please enter 1, 2, or 3.")
+                print("ERROR: Invalid choice. Please enter 1, 2, or 3.")
         except KeyboardInterrupt:
-            print("\n\n🛑 Test runner cancelled.")
+            print("\n\nTest runner cancelled.")
             sys.exit(1)
 
 def get_relevant_test_files(container_type):
@@ -79,7 +79,7 @@ def run_tests_by_container(container_type):
     test_files = get_relevant_test_files(container_type)
     
     if not test_files:
-        print(f"⚠️  No relevant test files found for {container_type} container")
+        print(f"WARNING: No relevant test files found for {container_type} container")
         return True
     
     print(f"🧪 Running {len(test_files)} test files for {container_type} container...")
@@ -92,15 +92,15 @@ def run_tests_by_container(container_type):
         print(f"\n📋 Running {test_file.name}...")
         if run_test_file(str(test_file)):
             success_count += 1
-            print(f"✅ {test_file.name} passed")
+            print(f"{test_file.name} passed")
         else:
-            print(f"❌ {test_file.name} failed")
+            print(f"ERROR: {test_file.name} failed")
     
     print("\n" + "=" * 60)
-    print(f"📊 Test Results: {success_count}/{total_count} test files passed")
+    print(f"Test Results: {success_count}/{total_count} test files passed")
     
     if success_count == total_count:
-        print("🎉 All tests passed!")
+        print("All tests passed!")
         return True
     else:
         print("💥 Some tests failed!")
@@ -121,15 +121,15 @@ def run_all_tests():
         print(f"\n📋 Running {test_file.name}...")
         if run_test_file(str(test_file)):
             success_count += 1
-            print(f"✅ {test_file.name} passed")
+            print(f"{test_file.name} passed")
         else:
-            print(f"❌ {test_file.name} failed")
+            print(f"ERROR: {test_file.name} failed")
     
     print("\n" + "=" * 60)
-    print(f"📊 Test Results: {success_count}/{total_count} test files passed")
+    print(f"Test Results: {success_count}/{total_count} test files passed")
     
     if success_count == total_count:
-        print("🎉 All tests passed!")
+        print("All tests passed!")
         return True
     else:
         print("💥 Some tests failed!")
@@ -148,7 +148,7 @@ def main():
     # If specific test file is provided, run it
     if args.test_file:
         if not os.path.exists(args.test_file):
-            print(f"❌ Test file {args.test_file} not found")
+            print(f"ERROR: Test file {args.test_file} not found")
             return 1
         
         success = run_test_file(args.test_file)
