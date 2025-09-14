@@ -1,0 +1,6 @@
+steps:
+- name: gcr.io/cloud-builders/docker
+  args: [build, -f, Dockerfile.cloudrun, -t, gcr.io/$PROJECT_ID/alzearly-api, .]
+- name: gcr.io/cloud-builders/docker  
+  args: [push, gcr.io/$PROJECT_ID/alzearly-api]
+images: [gcr.io/$PROJECT_ID/alzearly-api]

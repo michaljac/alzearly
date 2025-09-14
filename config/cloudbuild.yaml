@@ -1,0 +1,43 @@
+# Google Cloud Build configuration for Alzearly API
+steps:
+  # Build the container image
+  - name: 'gcr.io/cloud-builders/docker'
+    args: [
+      'build', 
+      '-f', 'Dockerfile.cloudrun',
+      '-t', 'gcr.io/$PROJECT_ID/alzearly-api:$BUILD_ID', 
+      '-t', 'gcr.io/$PROJECT_ID/alzearly-api:latest',
+      '.'
+    ]
+
+  # Push the container image to Container Registry
+  - name: 'gcr.io/cloud-builders/docker'
+    args: ['push', 'gcr.io/$PROJECT_ID/alzearly-api:$BUILD_ID']
+  
+  - name: 'gcr.io/cloud-builders/docker'
+    args: ['push', 'gcr.io/$PROJECT_ID/alzearly-api:latest']
+
+  # Deploy container image to Cloud Run
+  - name: 'gcr.io/cloud-builders/gcloud'
+    args: [
+      'run', 'deploy', 'alzearly-api',
+      '--image', 'gcr.io/$PROJECT_ID/alzearly-api:$BUILD_ID',
+      '--region', 'europe-west4',
+      '--platform', 'managed',
+      '--allow-unauthenticated',
+      '--port', '8000',
+      '--memory', '2Gi',
+      '--cpu', '1',
+      '--min-instances', '0',
+      '--max-instances', '10',
+      '--set-env-vars', 'GCS_BUCKET=$PROJECT_ID-alzearly-models',
+      '--set-env-vars', 'PROJECT_ID=$PROJECT_ID'
+    ]
+
+images:
+  - 'gcr.io/$PROJECT_ID/alzearly-api:$BUILD_ID'
+  - 'gcr.io/$PROJECT_ID/alzearly-api:latest'
+
+# options:
+#   machineType: 'E2_HIGHCPU_4'  # More cost-effective
+#   logging: CLOUD_LOGGING_ONLY
