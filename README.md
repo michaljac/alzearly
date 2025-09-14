@@ -45,50 +45,20 @@ The Alzearly system follows this intelligent pipeline with user control:
    - **Runs when**: Both data and model exist
    - **Cannot run** if data or model are missing
 
-### Pipeline Flow Examples
 
-#### Scenario 1: Fresh Start (No Data/Model)
-```
-1. User runs startup script
-2. System detects: No data, no model
-3. System: "No data found. Generating data..."
-4. System: "No model found. Training model..."
-5. System: "Starting server..."
-6. Result: ✅ Server running with fresh data and model
-```
+## <img src="readme_images/hippo.jpeg" width="20" height="20" style="vertical-align: middle; margin-right: 8px;"> Cloud Pipeline Setup (Google Cloud Platform)
 
-#### Scenario 2: Existing Data/Model
-```
-1. User runs startup script  
-2. System detects: Data exists, model exists
-3. System: "Data found. Regenerate? (y/n)"
-4. User: "n" (no)
-5. System: "Model found. Retrain? (y/n)" 
-6. User: "n" (no)
-7. System: "Starting server with existing data and model..."
-8. Result: ✅ Server running with existing data and model
-```
+For complete Google Cloud Platform setup instructions, including BigQuery data upload and querying, see: **[docs/google-cloud-setup.md](docs/google-cloud-setup.md)**
 
-#### Scenario 3: Partial Data (Data exists, no model)
-```
-1. User runs startup script
-2. System detects: Data exists, no model
-3. System: "Data found. Regenerate? (y/n)"
-4. User: "n" (no)
-5. System: "No model found. Training model..."
-6. System: "Starting server..."
-7. Result: ✅ Server running with existing data and new model
-```
+### Quick Summary:
+1. **Install Google Cloud CLI** and authenticate
+2. **Generate data** using `make gen-data-tiny`
+3. **Upload to BigQuery**: 
+   ```bash
+   python src/cli/upload_bigQuery.py --data-path /Data/featurized --project-id YOUR_PROJECT_ID
+   ```
+4. **View data** in [BigQuery Console](https://console.cloud.google.com/bigquery)
 
-#### Scenario 4: Cannot Serve (Missing requirements)
-```
-1. User runs startup script
-2. System detects: No data, no model
-3. System: "No data found. Generating data..."
-4. System: "No model found. Training model..."
-5. System: "Starting server..."
-6. Result: ✅ Server running (data and model created)
-```
 
 ## <img src="readme_images/hippo.jpeg" width="20" height="20" style="vertical-align: middle; margin-right: 8px;"> Quick Start Summary
 
@@ -115,7 +85,7 @@ md artifacts
 docker build -t alzearly:v1 -f Dockerfile .
 ```
 
-4. **Start the services (Cross-platform):**
+4. **Start the services:**
 
 **Option A: Use the Python launcher (Recommended):**
 ```bash

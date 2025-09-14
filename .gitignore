@@ -73,3 +73,5 @@ scripts/start_compose.sh
 # Temporary files
 *.tmp
 *.temp
+
+static-mile-470219-g4-ef8d0fdeafd7.json

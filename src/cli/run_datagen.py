@@ -1,7 +1,13 @@
 #!/usr/bin/env python3
+"""
+Data generation CLI for AlzEarly project.
+
+Generates synthetic patient data and preprocesses it for model training.
+"""
 
 import argparse
 import os
+import subprocess
 import sys
 from pathlib import Path
 
@@ -17,25 +23,22 @@ FEAT_DIR  = DATA_ROOT / "featurized"
 def set_permissive_umask():
     try:
         os.umask(0)
-    except Exception as e:
+    except OSError as e:
         print(f"WARNING: could not set umask(0): {e}")
-    return
 
 
 def ensure_dir(p):
     p.mkdir(parents=True, exist_ok=True)
     try:
         os.chmod(p, DIR_MODE)
-    except Exception as e:
+    except OSError as e:
         print(f"WARNING: chmod {p} -> {oct(DIR_MODE)} failed: {e}")
-    return
 
 
 def ensure_tree():
     ensure_dir(DATA_ROOT)
     ensure_dir(RAW_DIR)
     ensure_dir(FEAT_DIR)
-    return
 
 
 def chmod_recursive(root):
@@ -45,15 +48,14 @@ def chmod_recursive(root):
             for base, dirs, files in os.walk(root):
                 for d in dirs:
                     try: os.chmod(Path(base) / d, DIR_MODE)
-                    except Exception as e: print(f"WARNING: chmod dir {Path(base)/d}: {e}")
+                    except OSError as e: print(f"WARNING: chmod dir {Path(base)/d}: {e}")
                 for f in files:
                     try: os.chmod(Path(base) / f, FILE_MODE)
-                    except Exception as e: print(f"WARNING: chmod file {Path(base)/f}: {e}")
+                    except OSError as e: print(f"WARNING: chmod file {Path(base)/f}: {e}")
         elif root.exists():
             os.chmod(root, FILE_MODE)
-    except Exception as e:
+    except OSError as e:
         print(f"WARNING: recursive chmod at {root}: {e}")
-    return
 
 
 # ---- Setup / checks ----------------------------------------------------------
@@ -118,24 +120,20 @@ def run_pipeline(args):
     if not args.skip_data_gen:
         print("Step 1: Data Generation")
         try:
-            # Call generate function through subprocess as CLI command
-            import subprocess
-            cmd = [
-                sys.executable, "-m", "src.data_gen",
-                "--n-patients", str(args.num_patients or 3000),
-                "--years", "2021,2022,2023,2024",
-                "--positive-rate", "0.08",
-                "--out", str(raw_out),
-                "--seed", str(args.seed or 42)
-            ]
-            print(f"Running command: {' '.join(cmd)}")
-            result = subprocess.run(cmd, capture_output=True, text=True)
+            # Use direct import instead of subprocess
+            from src.data_gen import SyntheticDataGenerator
+            from src.config import load_config
             
-            if result.returncode != 0:
-                print(f"ERROR: Command failed with exit code {result.returncode}")
-                print(f"STDOUT: {result.stdout}")
-                print(f"STDERR: {result.stderr}")
-                return 1
+            # Load config and set parameters
+            config = load_config("data_gen")
+            config['dataset']['n_patients'] = args.num_patients or config['dataset']['n_patients']
+            config['processing']['seed'] = args.seed or config['processing']['seed']
+            config['output']['directory'] = str(raw_out)
+            config['output']['clean_existing'] = args.force_regen
+            
+            # Generate data
+            generator = SyntheticDataGenerator(config)
+            generator.generate()
                 
             print("Data generation: done.")
         except Exception as e:
@@ -167,7 +165,7 @@ def run_pipeline(args):
                 return 1
                 
             print("Preprocessing: done.")
-        except Exception as e:
+        except (subprocess.SubprocessError, OSError) as e:
             print(f"ERROR: preprocessing failed: {e}")
             return 1
     else:
