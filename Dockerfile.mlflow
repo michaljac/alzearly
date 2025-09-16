@@ -1,0 +1,25 @@
+# Dockerfile.mlflow
+FROM python:3.11-slim
+
+# Install MLflow and dependencies
+RUN pip install mlflow==2.8.1 \
+    google-cloud-storage==2.10.0 \
+    psycopg2-binary==2.9.7
+
+# Create MLflow directory
+WORKDIR /mlflow
+
+# Expose MLflow port
+EXPOSE 5000
+
+# Set environment variables
+ENV MLFLOW_BACKEND_STORE_URI=postgresql://username:password@host:5432/mlflow
+ENV MLFLOW_DEFAULT_ARTIFACT_ROOT=gs://your-bucket/mlflow-artifacts
+
+# Start MLflow server
+CMD ["mlflow", "server", \
+     "--host", "0.0.0.0", \
+     "--port", "5000", \
+     "--backend-store-uri", "${MLFLOW_BACKEND_STORE_URI}", \
+     "--default-artifact-root", "${MLFLOW_DEFAULT_ARTIFACT_ROOT}", \
+     "--serve-artifacts"]

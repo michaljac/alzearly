@@ -140,7 +140,6 @@ REM Simple status check
 timeout /t 5 /nobreak >nul
 docker compose ps serve | findstr "Up" >nul
 if errorlevel 1 (
-    echo Service failed
 ) else (
     echo Service running
 )

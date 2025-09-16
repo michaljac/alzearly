@@ -1,6 +1,7 @@
 """
 Cloud-optimized FastAPI application for Alzheimer's prediction.
 Loads model artifacts from Google Cloud Storage and serves predictions.
+Includes MLflow tracking for monitoring and metrics.
 """
 
 import os
@@ -10,12 +11,17 @@ import numpy as np
 from pathlib import Path
 from typing import Dict, Any, Optional
 import logging
+import time
+from datetime import datetime
 
 from fastapi import FastAPI, HTTPException, BackgroundTasks
 from pydantic import BaseModel
 import pandas as pd
 import joblib
 from google.cloud import storage
+import mlflow
+import mlflow.sklearn
+from mlflow.tracking import MlflowClient
 
 # Configure logging
 logging.basicConfig(level=logging.INFO)
@@ -24,50 +30,55 @@ logger = logging.getLogger(__name__)
 # Initialize FastAPI app
 app = FastAPI(
     title="Alzearly API - Cloud",
-    description="Alzheimer's disease risk prediction API running on Google Cloud Run",
-    version="2.0.0"
+    description="Alzheimer's disease risk prediction API running on Google Cloud Run with MLflow tracking",
+    version="2.1.0"
 )
 
 # Global variables for model and config
 model = None
 feature_names = None
 model_info = None
+mlflow_client = None
+
+# MLflow configuration
+MLFLOW_TRACKING_URI = os.getenv("MLFLOW_TRACKING_URI", "https://dagshub.com/yourusername/alzearly.mlflow")
+MLFLOW_EXPERIMENT_NAME = os.getenv("MLFLOW_EXPERIMENT_NAME", "alzearly-production")
 
 
 class PredictionRequest(BaseModel):
     """Request model for predictions."""
     # Demographics
-    age: float
-    sex: str  # "M" or "F"
-    region: str
-    insurance_tier: str
-    education_level: str
-    marital_status: str
-    occupation: str
+    age: float = 65.0
+    sex: str = "F"  # "M" or "F"
+    region: str = "California"
+    insurance_tier: str = "Premium"
+    education_level: str = "Bachelor's"
+    marital_status: str = "Married"
+    occupation: str = "Professional"
     
     # Healthcare utilization  
-    visits_count: int
-    meds_count: int
-    labs_count: int
+    visits_count: int = 5
+    meds_count: int = 3
+    labs_count: int = 8
     
     # Clinical vitals
-    bmi: float
-    bp_sys: float
-    bp_dia: float
-    heart_rate: float
-    temperature: float
+    bmi: float = 26.5
+    bp_sys: float = 135.0
+    bp_dia: float = 82.0
+    heart_rate: float = 72.0
+    temperature: float = 98.6
     
     # Laboratory values
-    hba1c: float
-    ldl: float
-    hdl: float
-    glucose: float
-    creatinine: float
-    hemoglobin: float
+    hba1c: float = 5.8
+    ldl: float = 125.0
+    hdl: float = 48.0
+    glucose: float = 95.0
+    creatinine: float = 1.0
+    hemoglobin: float = 13.5
     
     # Financial
-    costs_total: float
-    costs_outpatient: float
+    costs_total: float = 8500.0
+    costs_outpatient: float = 2200.0
 
 
 class PredictionResponse(BaseModel):
@@ -77,6 +88,83 @@ class PredictionResponse(BaseModel):
     prediction: str
     model_version: str
     confidence: str
+    prediction_id: str
+
+
+def setup_mlflow():
+    """Initialize MLflow tracking."""
+    global mlflow_client
+    
+    try:
+        # Set tracking URI
+        mlflow.set_tracking_uri(MLFLOW_TRACKING_URI)
+        
+        # Create MLflow client
+        mlflow_client = MlflowClient()
+        
+        # Create experiment if it doesn't exist
+        try:
+            experiment = mlflow.get_experiment_by_name(MLFLOW_EXPERIMENT_NAME)
+            if experiment is None:
+                experiment_id = mlflow.create_experiment(MLFLOW_EXPERIMENT_NAME)
+                logger.info(f"Created MLflow experiment: {MLFLOW_EXPERIMENT_NAME} (ID: {experiment_id})")
+            else:
+                logger.info(f"Using existing MLflow experiment: {MLFLOW_EXPERIMENT_NAME}")
+        except Exception as e:
+            logger.warning(f"Could not create/access MLflow experiment: {e}")
+        
+        # Set experiment
+        mlflow.set_experiment(MLFLOW_EXPERIMENT_NAME)
+        
+        logger.info("MLflow tracking initialized successfully")
+        
+    except Exception as e:
+        logger.warning(f"MLflow setup failed: {e}. Continuing without tracking.")
+        mlflow_client = None
+
+
+def log_prediction_to_mlflow(request_data: dict, prediction_result: dict, processing_time: float):
+    """Log prediction to MLflow."""
+    if mlflow_client is None:
+        return
+    
+    try:
+        with mlflow.start_run():
+            # Log input parameters
+            mlflow.log_params({
+                "age": request_data["age"],
+                "sex": request_data["sex"],
+                "bmi": request_data["bmi"],
+                "bp_sys": request_data["bp_sys"],
+                "bp_dia": request_data["bp_dia"],
+                "region": request_data["region"],
+                "insurance_tier": request_data["insurance_tier"]
+            })
+            
+            # Log prediction metrics
+            mlflow.log_metrics({
+                "alzheimers_risk_probability": prediction_result["alzheimers_risk_probability"],
+                "processing_time_ms": processing_time * 1000,
+                "prediction_timestamp": time.time()
+            })
+            
+            # Log prediction metadata
+            mlflow.log_params({
+                "model_version": prediction_result["model_version"],
+                "risk_level": prediction_result["risk_level"],
+                "confidence": prediction_result["confidence"],
+                "prediction_id": prediction_result["prediction_id"]
+            })
+            
+            # Log tags
+            mlflow.set_tags({
+                "environment": "production",
+                "service": "cloud_run",
+                "api_version": "2.1.0"
+            })
+            
+    except Exception as e:
+        logger.warning(f"Failed to log to MLflow: {e}")
 
 
 def preprocess_patient_data(request: PredictionRequest, target_features: list) -> pd.DataFrame:
@@ -304,6 +392,9 @@ async def initialize_model():
     """Initialize model on startup."""
     global model, feature_names, model_info
     
+    # Setup MLflow
+    setup_mlflow()
+    
     # Get configuration from environment
     bucket_name = os.getenv("GCS_BUCKET")
     if not bucket_name:
@@ -343,11 +434,13 @@ async def startup_event():
 async def health_check():
     """Health check endpoint."""
     model_status = "loaded" if model is not None else "not_loaded"
+    mlflow_status = "connected" if mlflow_client is not None else "disconnected"
     
     return {
         "status": "healthy",
         "model_status": model_status,
-        "version": "2.0.0",
+        "mlflow_status": mlflow_status,
+        "version": "2.1.0",
         "environment": "cloud_run"
     }
 
@@ -361,8 +454,50 @@ async def get_model_info():
     return {
         "model_info": model_info,
         "feature_count": len(feature_names) if feature_names else 0,
-        "model_type": type(model).__name__ if model else None
+        "model_type": type(model).__name__ if model else None,
+        "mlflow_tracking": MLFLOW_TRACKING_URI,
+        "mlflow_experiment": MLFLOW_EXPERIMENT_NAME
     }
+
+
+@app.get("/metrics")
+async def get_metrics():
+    """Get prediction metrics from MLflow."""
+    if mlflow_client is None:
+        raise HTTPException(status_code=503, detail="MLflow not available")
+    
+    try:
+        experiment = mlflow.get_experiment_by_name(MLFLOW_EXPERIMENT_NAME)
+        if experiment is None:
+            return {"error": "Experiment not found"}
+        
+        # Get recent runs
+        runs = mlflow_client.search_runs(
+            experiment_ids=[experiment.experiment_id],
+            max_results=100,
+            order_by=["start_time DESC"]
+        )
+        
+        # Calculate metrics
+        total_predictions = len(runs)
+        high_risk_count = sum(1 for run in runs if run.data.params.get("risk_level") in ["High", "Very High"])
+        avg_processing_time = np.mean([
+            float(run.data.metrics.get("processing_time_ms", 0)) 
+            for run in runs if run.data.metrics.get("processing_time_ms")
+        ]) if runs else 0
+        
+        return {
+            "total_predictions": total_predictions,
+            "high_risk_predictions": high_risk_count,
+            "high_risk_percentage": (high_risk_count / total_predictions * 100) if total_predictions > 0 else 0,
+            "average_processing_time_ms": round(avg_processing_time, 2),
+            "experiment_id": experiment.experiment_id,
+            "mlflow_ui": f"{MLFLOW_TRACKING_URI}/#/experiments/{experiment.experiment_id}"
+        }
+        
+    except Exception as e:
+        logger.error(f"Failed to get metrics: {e}")
+        raise HTTPException(status_code=500, detail="Failed to retrieve metrics")
 
 
 @app.post("/predict", response_model=PredictionResponse)
@@ -371,8 +506,11 @@ async def predict(request: PredictionRequest):
     if model is None or feature_names is None:
         raise HTTPException(status_code=503, detail="Model not loaded")
     
+    start_time = time.time()
+    prediction_id = f"pred_{int(time.time() * 1000)}"
+    
     try:
-        logger.info(f"Processing prediction request for patient age {request.age}")
+        logger.info(f"Processing prediction request {prediction_id} for patient age {request.age}")
         
         # Preprocess the patient data to create the 150 features
         processed_df = preprocess_patient_data(request, feature_names)
@@ -408,18 +546,34 @@ async def predict(request: PredictionRequest):
         
         model_version = model_info.get("model_version", "unknown") if model_info else "unknown"
         
-        logger.info(f"Prediction completed: risk={risk_level}, probability={probability:.4f}")
+        processing_time = time.time() - start_time
         
-        return PredictionResponse(
+        logger.info(f"Prediction {prediction_id} completed: risk={risk_level}, probability={probability:.4f}, time={processing_time:.3f}s")
+        
+        # Create response
+        response = PredictionResponse(
             alzheimers_risk_probability=round(probability, 4),
             risk_level=risk_level,
             prediction=prediction,
             model_version=model_version,
-            confidence=confidence
+            confidence=confidence,
+            prediction_id=prediction_id
         )
         
+        # Log to MLflow asynchronously
+        try:
+            log_prediction_to_mlflow(
+                request.dict(), 
+                response.dict(), 
+                processing_time
+            )
+        except Exception as e:
+            logger.warning(f"Failed to log to MLflow: {e}")
+        
+        return response
+        
     except Exception as e:
-        logger.error(f"Prediction failed: {e}")
+        logger.error(f"Prediction {prediction_id} failed: {e}")
         raise HTTPException(status_code=500, detail="Prediction failed")
 
 
